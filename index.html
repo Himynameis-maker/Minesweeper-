@@ -52,6 +52,7 @@ textarea{width:100%;height:150px;font:11px monospace;box-sizing:border-box;margi
 .mini{--s:30px;display:grid;grid-template-columns:repeat(7,var(--s));gap:2px;justify-content:center;margin:6px 0 10px}
 .mini .c{cursor:default}.mini .ctr{background:#3b82f6;color:#fff}.mini .cnt{background:#bfdbfe;color:#1d4ed8}
 .bad{outline:3px solid #ef4b5f;outline-offset:-1px}
+.hon{outline:2px solid #3b82f6;outline-offset:-2px}
 </style></head>
 <body><div id="app">
 <section id="setup">
@@ -101,8 +102,8 @@ textarea{width:100%;height:150px;font:11px monospace;box-sizing:border-box;margi
 /* ===== [CORE] 触らない。ルール追加は末尾の <script id="rules"> だけ ===== */
 const $=s=>document.querySelector(s),rnd=Math.random;
 const RULES={},RULE_ERR=[],TEST={},PAIR_NG=[];
-const conflict=(a,b)=>a.id!=b.id&&((a.excl&&a.excl===b.excl)||(a.grp&&b.grp)||(a.conflicts||[]).includes(b.id)||(b.conflicts||[]).includes(a.id));
-const CHANGELOG=['v0.1 基盤: コア(ソルバ/ノーゲス生成/ヒント/自己検査/context生成) + ルール4種','v0.2 UI刷新: 2画面化, 縛り検索モーダル, 旗切替, ヒントは根拠のみ強調','v0.3 gen を非同期化(長時間探索OK/キャンセル可), ノーゲス未達の盤面を出さない','v0.4 併用不可(conflicts/excl)で選択を無効化, 長押しで例盤面(自動生成), context.md を自己完結化, 併用検査','v0.5 CORE拡張: grp(爆弾の連結成分サイズ固定)フック, mstep/why(爆弾数の条件), フリープレイは不適合なら開始を止める/チャレンジは爆弾数を自動調整, 入力欄タップ時のズーム禁止, ルール groupBomb'];
+const conflict=(a,b)=>a.id!=b.id&&((a.excl&&a.excl===b.excl)||(a.grp&&b.grp)||(a.liar&&b.liar)||(a.conflicts||[]).includes(b.id)||(b.conflicts||[]).includes(a.id));
+const CHANGELOG=['v0.1 基盤: コア(ソルバ/ノーゲス生成/ヒント/自己検査/context生成) + ルール4種','v0.2 UI刷新: 2画面化, 縛り検索モーダル, 旗切替, ヒントは根拠のみ強調','v0.3 gen を非同期化(長時間探索OK/キャンセル可), ノーゲス未達の盤面を出さない','v0.4 併用不可(conflicts/excl)で選択を無効化, 長押しで例盤面(自動生成), context.md を自己完結化, 併用検査','v0.5 CORE拡張: grp(爆弾の連結成分サイズ固定)フック, mstep/why(爆弾数の条件), フリープレイは不適合なら開始を止める/チャレンジは爆弾数を自動調整, 入力欄タップ時のズーム禁止, ルール groupBomb','v0.6 CORE拡張: liar(数字が実際と1ズレる。各行・各列に正直な数字がちょうど1つ)フック, ルール liar'];
 const D8=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],D4=[[-1,0],[0,-1],[0,1],[1,0]],KN=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
 const offs=(R,C,i,L)=>{const r=i/C|0,c=i%C,o=[];for(const[a,b]of L){const y=r+a,x=c+b;if(y>=0&&y<R&&x>=0&&x<C)o.push(y*C+x)}return o};
 /* 爆弾数の条件: 必要な倍数(mstep か grp) / 倍数に丸める */
@@ -123,8 +124,8 @@ function reg(d){try{
 function prep(cfg){const{R,C,ids}=cfg,rs=ids.map(id=>RULES[id]),nr=rs.find(r=>r.nb),nb=[];
  for(let i=0;i<R*C;i++)nb.push(nr?nr.nb(R,C,i):offs(R,C,i,D8));
  const cons=[];for(const r of rs)if(r.cons)for(const k of r.cons(R,C))cons.push({cells:k.cells,lo:k.lo,hi:k.hi,src:{t:'r',id:r.id}});
- const gr=rs.find(r=>r.grp),adj=gr?[...Array(R*C)].map((_,i)=>offs(R,C,i,D4)):null;
- return{nb,cons,grp:gr?gr.grp:0,gid:gr?gr.id:'',adj}}
+ const gr=rs.find(r=>r.grp),lr=rs.find(r=>r.liar),adj=gr?[...Array(R*C)].map((_,i)=>offs(R,C,i,D4)):null;
+ return{nb,cons,grp:gr?gr.grp:0,gid:gr?gr.id:'',adj,R,C,lie:lr?1:0,lid:lr?lr.id:''}}
 /* 爆弾の縦横連結成分(配列の配列) */
 function gcomps(P,m){const N=m.length,seen=new Uint8Array(N),o=[];
  for(let i=0;i<N;i++)if(m[i]&&!seen[i]){const q=[i];seen[i]=1;for(let h=0;h<q.length;h++)for(const y of P.adj[q[h]])if(m[y]&&!seen[y]){seen[y]=1;q.push(y)}o.push(q)}
@@ -135,9 +136,11 @@ function gcomps(P,m){const N=m.length,seen=new Uint8Array(N),o=[];
 function deduce(P,st,num,M,skip){
  const N=P.nb.length,out=[],K=[],unk=[];let km=0;
  for(let i=0;i<N;i++){if(st[i]==2)km++;if(st[i]==0)unk.push(i)}
- const add=(cells,lo,hi,src)=>{const u=[];let m=0;for(const c of cells){if(st[c]==0)u.push(c);else if(st[c]==2)m++}
-  if(u.length)K.push({cells:u,lo:Math.max(0,lo-m),hi:Math.min(u.length,hi-m),src})};
- for(let i=0;i<N;i++)if(st[i]==1)add(P.nb[i],num[i],num[i],{t:'n',i});
+ const add=(cells,lo,hi,src,d)=>{const u=[];let m=0;for(const c of cells){if(st[c]==0)u.push(c);else if(st[c]==2)m++}
+  if(u.length)K.push({cells:u,lo:Math.max(0,lo-m),hi:Math.min(u.length,hi-m),src,hv:(d||0)-m})};
+ for(let i=0;i<N;i++)if(st[i]==1){
+  if(P.lie){const L=P.nb[i].length,d=num[i],un=P.nb[i].some(c=>st[c]!=1);add(P.nb[i],Math.max(d-1,un?1:0),Math.min(L,d+1),{t:'n',i},d)}
+  else add(P.nb[i],num[i],num[i],{t:'n',i})}
  for(const k of P.cons)if(k.src.id!==skip)add(k.cells,k.lo,k.hi,k.src);
  const T=M-km,seen=new Set(),push=(i,mine,tier,src)=>{if(!seen.has(i)){seen.add(i);out.push({i,mine,tier,src})}};
  const GN=(P.grp&&P.gid!==skip)?P.grp:0;let S=null,vis=null,sp=0,hb=0;
@@ -149,6 +152,10 @@ function deduce(P,st,num,M,skip){
   for(const y of P.adj[x])if(S[y]!=0&&reach(y,0,GN)<GN&&hb)return false;
   return true};
  if(GN){S=new Uint8Array(N);vis=new Int32Array(N);for(let i=0;i<N;i++)S[i]=st[i]==1?0:st[i]==2?1:2}
+ const HM=P.lie&&P.lid!==skip;let rH,cH,rU,cU,rX,cX;
+ if(HM){const R0=P.R,C0=P.C;rH=new Int8Array(R0);cH=new Int8Array(C0);rU=new Int8Array(R0);cU=new Int8Array(C0);rX=new Int8Array(R0);cX=new Int8Array(C0);
+  for(let i=0;i<N;i++){const r=i/C0|0,c=i%C0;if(st[i]==0){rX[r]=1;cX[c]=1}
+   else if(st[i]==1){if(P.nb[i].some(j=>st[j]==0)){rU[r]++;cU[c]++}else{let m=0;for(const j of P.nb[i])if(st[j]==2)m++;if(m==num[i]){rH[r]++;cH[c]++}}}}}
  for(const k of K){if(k.hi<=0)k.cells.forEach(c=>push(c,0,1,k.src));else if(k.lo>=k.cells.length)k.cells.forEach(c=>push(c,1,1,k.src))}
  if(T<=0)unk.forEach(c=>push(c,0,1,{t:'c'}));else if(T>=unk.length)unk.forEach(c=>push(c,1,1,{t:'c'}));
  if(GN){const gs={t:'r',id:P.gid};
@@ -158,11 +165,12 @@ function deduce(P,st,num,M,skip){
  const par={},f=x=>par[x]===x?x:(par[x]=f(par[x]));
  for(const k of K)for(const c of k.cells)if(par[c]===undefined)par[c]=c;
  for(const k of K){const a=f(k.cells[0]);for(const c of k.cells)par[f(c)]=a}
+ if(HM){const all=Object.keys(par);if(all.length){const r0=f(+all[0]);for(const c of all)par[f(+c)]=r0}}
  const groups={};for(const c in par)(groups[f(+c)]=groups[f(+c)]||[]).push(+c);
  const comps=[];
  for(const g of Object.values(groups)){
   const gs=new Set(g),n=g.length,pos={};g.forEach((c,j)=>pos[c]=j);
-  const cc=K.filter(k=>gs.has(k.cells[0])).map(k=>({cells:k.cells.map(c=>pos[c]),lo:k.lo,hi:k.hi,a:0,u:k.cells.length}));
+  const cc=K.filter(k=>gs.has(k.cells[0])).map(k=>({cells:k.cells.map(c=>pos[c]),lo:k.lo,hi:k.hi,a:0,u:k.cells.length,y:k.src.t=='n'?k.src.i:-1,hv:k.hv}));
   const byCell=g.map(()=>[]);cc.forEach(k=>k.cells.forEach(j=>byCell[j].push(k)));
   const ks=new Uint8Array(n+1),mk=g.map(()=>new Uint8Array(n+1)),sk=g.map(()=>new Uint8Array(n+1)),a=new Array(n);
   let nodes=0,over=false,cnt=0;
@@ -171,7 +179,11 @@ function deduce(P,st,num,M,skip){
    for(const v of[0,1]){for(const k of byCell[j]){k.u--;k.a+=v}
     let bad=false;for(const k of byCell[j])if(k.a>k.hi||k.a+k.u<k.lo)bad=true;
     if(!bad&&GN){S[g[j]]=v;if(!gchk(g[j],v))bad=true}
+    const dec=[];
+    if(!bad&&HM){const C0=P.C;for(const k of byCell[j])if(k.y>=0&&k.u==0){const r=k.y/C0|0,c=k.y%C0,h=k.a==k.hv;rU[r]--;cU[c]--;if(h){rH[r]++;cH[c]++}dec.push([r,c,h])}
+     for(const[r,c]of dec)if(rH[r]>1||cH[c]>1||rH[r]+rU[r]+rX[r]<1||cH[c]+cU[c]+cX[c]<1)bad=true}
     if(!bad){a[j]=v;cnt+=v;rec(j+1);cnt-=v}
+    for(const[r,c,h]of dec){rU[r]++;cU[c]++;if(h){rH[r]--;cH[c]--}}
     if(GN)S[g[j]]=2;
     for(const k of byCell[j]){k.u++;k.a-=v}}};
   rec(0);
@@ -182,16 +194,16 @@ function deduce(P,st,num,M,skip){
   for(let k=0;k<=fn;k++){mk[k]=k>=1?1:0;sk[k]=k<=fn-1?1:0}
   comps.push({cells:fr,ks,mk:fr.map(()=>mk),sk:fr.map(()=>sk),n:fn,free:1})}
  const conv=(A,B)=>{const r=new Uint8Array(A.length+B.length-1);for(let i=0;i<A.length;i++)if(A[i])for(let j=0;j<B.length;j++)if(B[j])r[i+j]=1;return r};
- const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[])])]}};
+ const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[]),...(HM?[P.lid]:[])])]}};
  comps.forEach((cj,j)=>{let O=Uint8Array.of(1);comps.forEach((c,q)=>{if(q!=j)O=conv(O,c.ks)});
   cj.cells.forEach((x,p)=>{let m=0,s=0;
    for(let k=0;k<=cj.n;k++)if(T-k>=0&&T-k<O.length&&O[T-k]){if(cj.mk[p][k])m=1;if(cj.sk[p][k])s=1}
    if(m&&!s)push(x,1,3,cj.free?{t:'c'}:why(x));else if(s&&!m)push(x,0,3,cj.free?{t:'c'}:why(x))})});
  return out}
 /* 開始マスから推論のみで解き進めるシミュレーション。真の配置と食い違えばbug */
-function sim(P,M,mines,start,skip){
- const N=P.nb.length,st=new Uint8Array(N),num=P.nb.map(l=>l.reduce((s,j)=>s+mines[j],0));
- const rev=i=>{const q=[i];while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;if(!num[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}};
+function sim(P,M,mines,start,skip,L){
+ const N=P.nb.length,st=new Uint8Array(N),act=P.nb.map(l=>l.reduce((s,j)=>s+mines[j],0)),num=L?L.sh:act;
+ const rev=i=>{const q=[i];while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;if(!act[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}};
  rev(start);let open0=0;for(let i=0;i<N;i++)if(st[i]==1)open0++;
  const kinds=new Set(),safe=N-M;let rounds=0,bug=0;
  for(;;){const d=deduce(P,st,num,M,skip);if(!d.length)break;rounds++;
@@ -210,6 +222,22 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
  const byC=[...Array(N)].map(()=>[]);kc.forEach((k,q)=>k.cells.forEach(c=>byC[c].push(q)));
  const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp));
  const nec=ids.filter(id=>RULES[id].grp||(RULES[id].cons&&RULES[id].cons(R,C).length));
+ const LM=!!P.lie;if(LM&&R!=C)throw Error('縦と横が同じ盤面のみ');
+ const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+ /* 正直な数字: 各行・各列に1つ(安全マスのみ)。ほかの安全マスは±1ズレる(範囲外なら逆向き) */
+ const pickHon=m=>{const hon=new Uint8Array(N),used=new Uint8Array(C);let nodes=0;
+  const rec=r=>{if(r==R)return true;if(++nodes>3000)return false;const cs=shuf([...Array(C).keys()].filter(c=>!used[c]&&!m[r*C+c]));
+   for(const c of cs){used[c]=1;hon[r*C+c]=1;if(rec(r+1))return true;used[c]=0;hon[r*C+c]=0}return false};
+  return rec(0)?hon:null};
+ const mkShown=(m,hon,sg)=>{const sh=new Int8Array(N);for(let i=0;i<N;i++)if(!m[i]){let a=0;for(const j of P.nb[i])a+=m[j];const ln=P.nb[i].length;
+  if(hon[i])sh[i]=a;else{let s=sg[i]?1:-1;if(a+s<0||a+s>ln)s=-s;sh[i]=a+s}}return sh};
+ const lstate=(m,hon0,sg0)=>{const hon=hon0||pickHon(m);if(!hon)return null;const sg=sg0||Uint8Array.from({length:N},()=>rnd()<.5?1:0);return{hon,sg,sh:mkShown(m,hon,sg)}};
+ const lmove=(cur,cl,U)=>{const mv=rnd();
+  if(mv<.5){const r1=rnd()*R|0,r2=rnd()*R|0;if(r1==r2)return null;let c1=-1,c2=-1;for(let c=0;c<C;c++){if(cl.hon[r1*C+c])c1=c;if(cl.hon[r2*C+c])c2=c}
+   if(cur[r1*C+c2]||cur[r2*C+c1])return null;const hon=cl.hon.slice();hon[r1*C+c1]=hon[r2*C+c2]=0;hon[r1*C+c2]=hon[r2*C+c1]=1;
+   return{m:cur,L:{hon,sg:cl.sg,sh:mkShown(cur,hon,cl.sg)}}}
+  const cs2=U.filter(i=>!cur[i]&&!cl.hon[i]);if(!cs2.length)return null;const sg=cl.sg.slice(),i=cs2[rnd()*cs2.length|0];sg[i]^=1;
+  return{m:cur,L:{hon:cl.hon,sg,sh:mkShown(cur,cl.hon,sg)}}};
  const wpick=(a,w)=>{let t=rnd()*a.reduce((s,c)=>s+w[c],0),p=a[a.length-1];for(const c of a){t-=w[c];if(t<=0){p=c;break}}return p};
  const gsample=(sz,w)=>{const n=P.grp,m=new Uint8Array(N),cnt=kc.map(()=>0),blk=new Uint8Array(N);
   const can=c=>!sz.has(c)&&!m[c]&&!blk[c]&&byC[c].every(q=>cnt[q]<kc[q].hi);
@@ -241,24 +269,27 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
    const vi=kc.filter(q=>{let s=0;for(const c of q.cells)s+=m[c];return s<q.lo||s>q.hi});
    const gb=P.grp?gcomps(P,m).filter(q=>q.length!=P.grp).flat():[];
    if(vi.length||gb.length){bad=m;bc=[...new Set([...vi.flatMap(q=>q.cells),...gb])]}}
-  return{P,mines:ex,bad,bc}}
- const qual=(m,s,r)=>r.kinds.size>=2&&r.rounds>=3&&r.open0<=.5*r.safe&&nec.every(id=>!sim(P,M,m,s,id).ok);
- let cur=null,cs=0,cr=null,soft=null,inv=0,it=0,tries=0,last=t0;
+  let L=null;if(LM&&ex)for(let k=0;k<50&&!L;k++)L=lstate(ex);
+  return{P,mines:ex,bad,bc,L}}
+ const qual=(m,s,r,L)=>r.kinds.size>=2&&r.rounds>=3&&r.open0<=.5*r.safe&&nec.every(id=>!sim(P,M,m,s,id,L).ok);
+ let cur=null,cl=null,cs=0,cr=null,soft=null,inv=0,it=0,tries=0,last=t0;
  for(;;){const now=performance.now(),el=now-t0;
   if(el>hard||cancel())break;
   if(soft&&el>qms)break;
   if(now-last>40){last=now;tick(el,tries);await new Promise(r=>setTimeout(r,0))}
-  if(!cur){cs=rnd()*N|0;cur=sample(cs);inv=it=0;if(!cur)continue;tries++;cr=sim(P,M,cur,cs);if(cr.bug)throw Error('solver unsound')}
-  if(cr.ok){if(qual(cur,cs,cr))return{mines:cur,start:cs,gf:1,q:1};soft={mines:cur,start:cs,gf:1,q:0};cur=null;continue}
+  if(!cur){cs=rnd()*N|0;cur=sample(cs);inv=it=0;if(!cur)continue;cl=null;if(LM){cl=lstate(cur);if(!cl){cur=null;continue}}tries++;cr=sim(P,M,cur,cs,undefined,cl);if(cr.bug)throw Error('solver unsound')}
+  if(cr.ok){if(qual(cur,cs,cr,cl))return{mines:cur,start:cs,gf:1,q:1,L:cl};soft={mines:cur,start:cs,gf:1,q:0,L:cl};cur=null;continue}
   if(++it>400){cur=null;continue}
   const U=[];for(let i=0;i<N;i++)if(!cr.st[i])U.push(i);
   const a=U.filter(i=>cur[i]),b=U.filter(i=>!cur[i]);
   if(!a.length||!b.length){cur=null;continue}
-  let m2;
-  if(P.grp)m2=gmove(cur,a,new Set(U),cs);else{m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1}
+  let m2=null,l2=cl;const lm=LM&&rnd()<.6?lmove(cur,cl,U):null;
+  if(lm){m2=lm.m;l2=lm.L}
+  else{if(P.grp)m2=gmove(cur,a,new Set(U),cs);else{m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1}
+   if(m2&&LM){if(m2.some((x,i)=>x&&cl.hon[i]))m2=null;else l2=lstate(m2,cl.hon,cl.sg)}}
   if(!m2||!valid(m2)){if(++inv>40)cur=null;continue}
-  const r2=sim(P,M,m2,cs);if(r2.bug)throw Error('solver unsound');
-  if(r2.rv>=cr.rv){cur=m2;cr=r2}}
+  const r2=sim(P,M,m2,cs,undefined,l2);if(r2.bug)throw Error('solver unsound');
+  if(r2.rv>=cr.rv){cur=m2;cl=l2;cr=r2}}
  return cancel()?null:soft}
 async function selfTest(){PAIR_NG.length=0;const ids=Object.keys(RULES);
  for(const id of ids){const r=RULES[id];let ok=0,fail=0,why='';
@@ -271,7 +302,7 @@ async function selfTest(){PAIR_NG.length=0;const ids=Object.keys(RULES);
  
 /* ===== [CONTEXT] 自己記述: 現在のレジストリから常に最新を生成 ===== */
 function buildContext(){const F='`'.repeat(3),src=(n,f)=>f?'  '+n+': '+String(f):'';
- const rl=Object.values(RULES).map(r=>'### '+r.id+' 「'+r.name+'」\n- 説明: '+r.desc+'\n- 使用フック: '+[r.nb?'nb':'',r.cons?'cons':'',r.ok?'ok':'',r.grp?'grp='+r.grp:'',r.mstep?'mstep='+r.mstep:'',r.why?'why':'',r.excl?'excl='+r.excl:'',r.conflicts?'conflicts='+r.conflicts.join(','):''].filter(Boolean).join(', ')+'\n- 自己検査: '+(TEST[r.id]||'未実施')+'\n'+F+'js\n'+[src('nb',r.nb),src('cons',r.cons),src('ok',r.ok),r.grp?'  grp: '+r.grp:'',r.mstep?'  mstep: '+r.mstep:'',r.why?'  why: '+JSON.stringify(r.why):''].filter(Boolean).join('\n')+'\n'+F).join('\n\n');
+ const rl=Object.values(RULES).map(r=>'### '+r.id+' 「'+r.name+'」\n- 説明: '+r.desc+'\n- 使用フック: '+[r.nb?'nb':'',r.cons?'cons':'',r.ok?'ok':'',r.grp?'grp='+r.grp:'',r.liar?'liar':'',r.mstep?'mstep='+r.mstep:'',r.why?'why':'',r.excl?'excl='+r.excl:'',r.conflicts?'conflicts='+r.conflicts.join(','):''].filter(Boolean).join(', ')+'\n- 自己検査: '+(TEST[r.id]||'未実施')+'\n'+F+'js\n'+[src('nb',r.nb),src('cons',r.cons),src('ok',r.ok),r.grp?'  grp: '+r.grp:'',r.liar?'  liar: true':'',r.mstep?'  mstep: '+r.mstep:'',r.why?'  why: '+JSON.stringify(r.why):''].filter(Boolean).join('\n')+'\n'+F).join('\n\n');
  return['# Minesweeper Variants context.md (自動生成 '+new Date().toISOString().slice(0,10)+')','',
  '> この md だけで作業できます。HTML全体は不要です。新しいチャットのAIは、まず全体を読んでください。','',
  '## 0. あなた(AI)の役割と出力形式',
@@ -299,10 +330,12 @@ function buildContext(){const F='`'.repeat(3),src=(n,f)=>f?'  '+n+': '+String(f)
  ' mstep:2,                           // 任意: 爆弾数がこの倍数でなければならない(2以上の整数。grpがあれば自動で grp の倍数)',
  ' nb:(R,C,i)=>offs(R,C,i,D8),        // 任意: マスiの数字が数えるマス(省略=D8)',
  ' cons:(R,C)=>[{cells:[0,1],lo:0,hi:1}], // 任意: 常に成り立つ制約。cells内の爆弾数は lo 以上 hi 以下',
+ ' liar:true,                        // 任意: 表示される数字が実際と±1ズレる(各行・各列に正直な数字がちょうど1つ。縦横同じ盤面のみ)。liar持ちは同時に1つだけ',
  ' grp:4                              // 任意: 爆弾の縦横連結成分が全てちょうどこの個数(2以上の整数)。grp持ちは同時に1つだけ選べる',
  '});',F,
  '- cons は盤面サイズ(R,C)だけから決まる静的な制約。配置は必ず全 cons を満たす。ソルバも同じ制約で推論する。',
- '- nb を持つルールが複数同時に選ばれることはない(excl で防ぐ)。grp も同様に1つだけ。',
+ '- nb を持つルールが複数同時に選ばれることはない(excl で防ぐ)。grp / liar も同様に1つだけ。',
+ '- liar: 安全マスのうち各行・各列に1つ(計R個)が正直(数字=実際の値)、それ以外は±1ズレる(範囲外になる向きは逆)。開いたマスの実際の値が0なら周囲は自動で開く(=周囲に未開のマスがある開示済みマスは実際の値>=1と分かる)。ソルバは数字を範囲[d-1,d+1]として扱い、正直=「実際の値がdと等しい」を行・列で数える。nb(十字/ナイト)や cons 系とは併用できる。',
  '- grp は「爆弾を縦横につながった grp 個ずつのグループにし、グループ同士は縦横で触れない」と同じ意味(斜めの接触は可)。grp を使うなら、縦横に爆弾が隣り合うのを禁じる縛りとは conflicts にする。','',
  '## 4. 良いルールの条件',
  '- cons / grp を持つルールは、外すと解けなくなる盤面だけが採用される(縛りが飾りにならない)。外しても解けるのが普通になる弱すぎる制約(例: hi が大きすぎる)は生成が難航する。',
@@ -314,6 +347,7 @@ function buildContext(){const F='`'.repeat(3),src=(n,f)=>f?'  '+n+': '+String(f)
  '- できない(CORE拡張が先): 偶奇だけを表示する数字、数字が範囲で出る、数字が複数、配置に依存して変わる制約(連結成分サイズ固定以外)、プレイ中に状態が動くルール、lo/hi で書けない制約(集合 allowed)、成分サイズが2種類以上混ざる/範囲指定、形(テトロミノの種類)の指定。','',
  '## 6. 不変条件(壊さない)',
  '- ソルバは sound(確定は必ず真)。sim が真の配置と食い違えば bug として例外。',
+ '- liar の推論も必要条件のみ(行・列ごとに正直な数字は<=1、未開マスが残る行・列には正直な数字がまだ隠れうる、と楽観的に扱う)。全未開マスを1つの成分として列挙するため、盤面が大きいと推論が打ち切られ(安全側)生成が難航する。',
  '- grp の推論は「必要条件のみ」(確定爆弾の連結成分<=grp、その成分が属する安全でないマスの連結領域>=grp)を楽観的に使う。十分条件を足して sound を壊さない。',
  '- ノーゲスでない盤面は絶対に出さない。gen は非同期・キャンセル可で、見つからなければ失敗として戻る(妥協盤面を出さない)。',
  '- 1ルール=1回の reg。他のルールや CORE に触らない。','',
@@ -361,10 +395,10 @@ async function start(nr){const ch=mode()=='c',tk=++TK;
  catch(e){if(tk==TK){$('#ld').hidden=true;msg('内部エラー: '+e.message)}return}
  if(tk!=TK)return;$('#ld').hidden=true;
  if(!res)return msg('ノーゲスの盤面が見つかりませんでした(条件が厳しすぎる可能性)。「設定に戻る」で条件を変えてください');
- const P=prep(cfg),N=cfg.R*cfg.C,num=P.nb.map(l=>l.reduce((s,j)=>s+res.mines[j],0));
- G={cfg,P,N,mines:res.mines,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,hint:null};
+ const P=prep(cfg),N=cfg.R*cfg.C,act=P.nb.map(l=>l.reduce((s,j)=>s+res.mines[j],0)),num=res.L?res.L.sh:act;
+ G={cfg,P,N,mines:res.mines,act,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,hint:null};
  flood(res.start);msg(cfg.dropped?cfg.dropped+'件の縛りは条件に合わないため外しました':'');draw()}
-function flood(i){const q=[i],{st,fl,num,mines,P}=G;while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;fl[x]=0;G.rev++;if(!num[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}}
+function flood(i){const q=[i],{st,fl,act:ac,mines,P}=G;while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;fl[x]=0;G.rev++;if(!ac[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}}
 function act(i,f){if(!G||G.over||G.done||G.st[i])return;G.hint=null;
  if(f){G.fl[i]^=1;return draw()}if(G.fl[i])return;
  if(G.mines[i]){G.st[i]=2;if(run){run.lives--;if(run.lives<=0){G.over=1;msg('ゲームオーバー… 連続クリア '+run.streak+'回')}else msg('ミス! 残りライフ '+run.lives)}else{G.over=1;msg('爆発…')}}
@@ -398,7 +432,7 @@ function draw(){if(!G)return;const{cfg,st,fl,num,mines,over,hint:h}=G,{R,C}=cfg,
  let lab=null,nr=0;if(!run)lab='新しい盤面';else if(G.over||(G.done&&run.streak>=run.X)){lab='もう一度挑戦';nr=1}else if(G.done)lab='次の盤面';
  const nx=$('#nx');nx.hidden=!lab;nx.textContent=lab||'';nx.dataset.nr=nr}
 /* ---- 縛りモーダル(pick=検索つき選択 / view=今の盤面の縛り) ---- */
-const tags=r=>(r.nb?'<span class="tag">数字変更</span>':'')+(r.cons?'<span class="tag">制約</span>':'')+(r.grp?'<span class="tag">グループ</span>':'')+(r.ok?'<span class="tag">条件付き</span>':'')+(stepOf(r)>1?'<span class="tag">爆弾数は'+stepOf(r)+'の倍数</span>':'');
+const tags=r=>(r.nb?'<span class="tag">数字変更</span>':'')+(r.cons?'<span class="tag">制約</span>':'')+(r.grp?'<span class="tag">グループ</span>':'')+(r.liar?'<span class="tag">数字が嘘</span>':'')+(r.ok?'<span class="tag">条件付き</span>':'')+(stepOf(r)>1?'<span class="tag">爆弾数は'+stepOf(r)+'の倍数</span>':'');
 const vis=()=>{const q=$('#mq').value.trim().toLowerCase();return Object.values(RULES).filter(r=>!q||(r.id+r.name+r.desc).toLowerCase().includes(q))};
 function renderList(){const L=$('#ml');
  if(MODE=='pick'){$('#mt').textContent='縛りを選ぶ ('+SEL.size+'/'+Object.keys(RULES).length+')';
@@ -414,7 +448,7 @@ const exCache={};
 function mini(P,m,o){o=o||{};let h='<div class="mini">';
  for(let i=0;i<49;i++){let cl='c o',t='';
   if(o.pat){if(i==24){cl+=' ctr';t='?'}else if(P.nb[24].includes(i)){cl+=' cnt';t='●'}}
-  else if(m[i])t='💣';else{const n=P.nb[i].reduce((s,j)=>s+m[j],0);t=n||'';if(n)cl+=' n'+Math.min(n,8)}
+  else if(m[i])t='💣';else{const n=o.sh?o.sh[i]:P.nb[i].reduce((s,j)=>s+m[j],0);t=n||'';if(n)cl+=' n'+Math.min(n,8);if(o.hon&&o.hon[i])cl+=' hon'}
   if(o.bc&&o.bc.includes(i))cl+=' bad';
   h+='<div class="'+cl+'">'+t+'</div>'}
  return h+'</div>'}
@@ -423,7 +457,8 @@ async function exHtml(id){if(exCache[id])return exCache[id];const r=RULES[id];
  for(const M of[8,12,16]){const c={R:7,C:7,M,ids:[id]};if(M%stepOf(r)==0&&(!r.ok||r.ok(c))){cfg=c;break}}
  const e=cfg&&await gen(cfg,{sampleOnly:1});
  if(!e||!e.mines)return h+'<p class="mut">例の盤面を作れませんでした</p>';
- h+='<div class="mut">OK例'+(r.nb?'(数字はこのルールで数えた値)':'')+'</div>'+mini(e.P,e.mines);
+ h+='<div class="mut">OK例'+(r.nb?'(数字はこのルールで数えた値)':'')+'</div>'+mini(e.P,e.mines,{sh:e.L&&e.L.sh,hon:e.L&&e.L.hon});
+ if(r.liar)h+='<div class="mut">青枠が正直な数字(各行・各列に1つ)。ほかの数字は実際の爆弾数と1ズレている</div>';
  if(r.nb)h+='<div class="mut">数字が数えるマス: 中央「?」の数字は ● のマスの爆弾数</div>'+mini(e.P,null,{pat:1});
  else if(e.bad)h+='<div class="mut">NG例(赤枠がルール違反)</div>'+mini(e.P,e.bad,{bc:e.bc});
  return exCache[id]=h}
@@ -470,6 +505,7 @@ reg({id:'knight',name:'ナイト数字',desc:'数字は桂馬位置(最大8マ�
 reg({id:'lines',name:'全行全列に爆弾',desc:'どの行にも列にも爆弾が1個以上ある',ok:c=>c.M>=Math.max(c.R,c.C),why:'爆弾数が縦・横の大きい方以上必要です',
  cons:(R,C)=>{const o=[];for(let r=0;r<R;r++)o.push({cells:[...Array(C)].map((_,c)=>r*C+c),lo:1,hi:C});
   for(let c=0;c<C;c++)o.push({cells:[...Array(R)].map((_,r)=>r*C+c),lo:1,hi:R});return o}});
+reg({id:'liar',name:'嘘つき数字',desc:'数字は実際の爆弾数と1ズレている。ただし各行・各列にちょうど1つだけ正直な数字がある',liar:true,ok:c=>c.R===c.C,why:'縦と横が同じ盤面でだけ使えます'});
 reg({id:'groupBomb',name:'グループ爆弾',desc:'爆弾は縦横につながった4個1組(斜めは不可)で、組同士は縦横で隣り合わない',grp:4,conflicts:['noTouch']});
 </script>
 </body></html>
