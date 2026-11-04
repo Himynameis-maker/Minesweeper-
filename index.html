@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Minesweeper Variants</title>
 <style>
 :root{--bg:#eef0f6;--card:#fff;--fg:#1d2030;--mut:#6b7185;--l:#dfe2ec;--ac:#5b6cff;--ac2:#8a5cff;--c1:#cdd2e4;--c2:#b6bcd2;--o:#f3f4fa;--bad:#ef4b5f}
@@ -11,6 +11,7 @@ h1{margin:4px 0 0;font-size:28px;letter-spacing:-.5px}
 h1 span{background:linear-gradient(90deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
 .sub{margin:0 0 16px;color:var(--mut);font-size:13px}
 .mut{color:var(--mut);font-size:13px;margin:6px 0 0}
+.warn{color:var(--bad);font-size:13px;font-weight:600;margin:6px 0 10px}
 .card{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(20,24,50,.08)}
 .card h3{margin:0 0 10px;font-size:12px;letter-spacing:.06em;color:var(--mut);font-weight:700}
 summary{cursor:pointer;font-weight:600}
@@ -18,7 +19,7 @@ summary{cursor:pointer;font-weight:600}
 .col{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 .fld{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)}
 .tg{display:flex;gap:8px;align-items:center}
-input[type=number],input[type=search]{font:inherit;color:var(--fg);background:var(--o);border:1px solid var(--l);border-radius:10px;padding:8px 10px;width:84px}
+input[type=number],input[type=search]{font:inherit;font-size:16px;color:var(--fg);background:var(--o);border:1px solid var(--l);border-radius:10px;padding:8px 10px;width:84px}
 input[type=search]{width:100%;margin-top:8px}
 button{font:inherit;color:var(--fg);background:var(--o);border:1px solid var(--l);border-radius:12px;padding:10px 14px;cursor:pointer;transition:transform .08s}
 button:active{transform:scale(.97)}button:disabled{opacity:.4}
@@ -72,6 +73,7 @@ textarea{width:100%;height:150px;font:11px monospace;box-sizing:border-box;margi
    <label class="tg"><input type="checkbox" id="rs">盤面サイズをランダム</label>
    <label class="tg"><input type="checkbox" id="rm">爆弾率をランダム</label>
    <label class="tg"><input type="checkbox" id="rk">縛り数をランダム</label></div></div>
+ <p class="warn" id="mw"></p>
  <button class="pri big" id="go">スタート</button>
  <p class="mut" id="sm"></p>
  <details class="card" style="margin-top:14px"><summary>context.md(AIに渡す用・ロード時に自動生成済み)</summary>
@@ -99,23 +101,37 @@ textarea{width:100%;height:150px;font:11px monospace;box-sizing:border-box;margi
 /* ===== [CORE] 触らない。ルール追加は末尾の <script id="rules"> だけ ===== */
 const $=s=>document.querySelector(s),rnd=Math.random;
 const RULES={},RULE_ERR=[],TEST={},PAIR_NG=[];
-const conflict=(a,b)=>a.id!=b.id&&((a.excl&&a.excl===b.excl)||(a.conflicts||[]).includes(b.id)||(b.conflicts||[]).includes(a.id));
-const CHANGELOG=['v0.1 基盤: コア(ソルバ/ノーゲス生成/ヒント/自己検査/context生成) + ルール4種','v0.2 UI刷新: 2画面化, 縛り検索モーダル, 旗切替, ヒントは根拠のみ強調','v0.3 gen を非同期化(長時間探索OK/キャンセル可), ノーゲス未達の盤面を出さない','v0.4 併用不可(conflicts/excl)で選択を無効化, 長押しで例盤面(自動生成), context.md を自己完結化, 併用検査'];
+const conflict=(a,b)=>a.id!=b.id&&((a.excl&&a.excl===b.excl)||(a.grp&&b.grp)||(a.conflicts||[]).includes(b.id)||(b.conflicts||[]).includes(a.id));
+const CHANGELOG=['v0.1 基盤: コア(ソルバ/ノーゲス生成/ヒント/自己検査/context生成) + ルール4種','v0.2 UI刷新: 2画面化, 縛り検索モーダル, 旗切替, ヒントは根拠のみ強調','v0.3 gen を非同期化(長時間探索OK/キャンセル可), ノーゲス未達の盤面を出さない','v0.4 併用不可(conflicts/excl)で選択を無効化, 長押しで例盤面(自動生成), context.md を自己完結化, 併用検査','v0.5 CORE拡張: grp(爆弾の連結成分サイズ固定)フック, mstep/why(爆弾数の条件), フリープレイは不適合なら開始を止める/チャレンジは爆弾数を自動調整, 入力欄タップ時のズーム禁止, ルール groupBomb'];
 const D8=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],D4=[[-1,0],[0,-1],[0,1],[1,0]],KN=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
 const offs=(R,C,i,L)=>{const r=i/C|0,c=i%C,o=[];for(const[a,b]of L){const y=r+a,x=c+b;if(y>=0&&y<R&&x>=0&&x<C)o.push(y*C+x)}return o};
+/* 爆弾数の条件: 必要な倍数(mstep か grp) / 倍数に丸める */
+const gcd=(a,b)=>b?gcd(b,a%b):a;
+const stepOf=r=>r.mstep||r.grp||1;
+const lcmStep=ids=>ids.reduce((s,id)=>{const t=stepOf(RULES[id]);return s/gcd(s,t)*t},1);
+function mfit(M,ids,N){const s=lcmStep(ids);if(s<2)return M;let m=Math.max(s,Math.round(M/s)*s);while(m>N-12&&m>s)m-=s;return m}
 function reg(d){try{
  if(!d||!/^[a-z][a-zA-Z0-9]*$/.test(d.id||''))throw'id不正';
  if(RULES[d.id])throw'id重複';
  if(!d.name||!d.desc)throw'name/desc必須';
  for(const k of['nb','cons','ok'])if(d[k]&&typeof d[k]!='function')throw k+'は関数';
  if(d.conflicts&&!Array.isArray(d.conflicts))throw'conflictsは配列';
+ for(const k of['grp','mstep'])if(d[k]!==undefined&&!(Number.isInteger(d[k])&&d[k]>=2))throw k+'は2以上の整数';
+ if(d.why!==undefined&&typeof d.why!='string')throw'whyは文字列';
  RULES[d.id]=d}catch(e){RULE_ERR.push((d&&d.id)+': '+e)}}
-/* cfg={R,C,M,ids} -> P={nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}]} */
+/* cfg={R,C,M,ids} -> P={nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp=連結成分サイズ(0=なし), gid=grpルールid, adj=上下左右} */
 function prep(cfg){const{R,C,ids}=cfg,rs=ids.map(id=>RULES[id]),nr=rs.find(r=>r.nb),nb=[];
  for(let i=0;i<R*C;i++)nb.push(nr?nr.nb(R,C,i):offs(R,C,i,D8));
  const cons=[];for(const r of rs)if(r.cons)for(const k of r.cons(R,C))cons.push({cells:k.cells,lo:k.lo,hi:k.hi,src:{t:'r',id:r.id}});
- return{nb,cons}}
-/* 確定推論。st:0未知/1開示/2既知爆弾, num:開示マスの数字。返り値[{i,mine,tier,src}] tier1=単一制約, tier3=組合せ(CSP全列挙+残り爆弾数)。常にsound */
+ const gr=rs.find(r=>r.grp),adj=gr?[...Array(R*C)].map((_,i)=>offs(R,C,i,D4)):null;
+ return{nb,cons,grp:gr?gr.grp:0,gid:gr?gr.id:'',adj}}
+/* 爆弾の縦横連結成分(配列の配列) */
+function gcomps(P,m){const N=m.length,seen=new Uint8Array(N),o=[];
+ for(let i=0;i<N;i++)if(m[i]&&!seen[i]){const q=[i];seen[i]=1;for(let h=0;h<q.length;h++)for(const y of P.adj[q[h]])if(m[y]&&!seen[y]){seen[y]=1;q.push(y)}o.push(q)}
+ return o}
+/* 確定推論。st:0未知/1開示/2既知爆弾, num:開示マスの数字。返り値[{i,mine,tier,src}] tier1=単一制約, tier3=組合せ(CSP全列挙+残り爆弾数)。常にsound
+   grp(連結成分サイズ固定)は「必要条件のみ」(楽観側)で使う: S[i]=0安全/1爆弾確定/2未確定。
+   必要条件1: 確定爆弾の連結成分は grp 以下 / 必要条件2: その成分を含む「安全でないマス」の連結領域は grp 以上 */
 function deduce(P,st,num,M,skip){
  const N=P.nb.length,out=[],K=[],unk=[];let km=0;
  for(let i=0;i<N;i++){if(st[i]==2)km++;if(st[i]==0)unk.push(i)}
@@ -124,8 +140,20 @@ function deduce(P,st,num,M,skip){
  for(let i=0;i<N;i++)if(st[i]==1)add(P.nb[i],num[i],num[i],{t:'n',i});
  for(const k of P.cons)if(k.src.id!==skip)add(k.cells,k.lo,k.hi,k.src);
  const T=M-km,seen=new Set(),push=(i,mine,tier,src)=>{if(!seen.has(i)){seen.add(i);out.push({i,mine,tier,src})}};
+ const GN=(P.grp&&P.gid!==skip)?P.grp:0;let S=null,vis=null,sp=0,hb=0;
+ const reach=(x,onlyB,cap)=>{const q=[x];vis[x]=++sp;hb=S[x]==1?1:0;
+  for(let h=0;h<q.length&&q.length<cap;h++)for(const y of P.adj[q[h]])if(vis[y]!=sp&&(onlyB?S[y]==1:S[y]!=0)){vis[y]=sp;q.push(y);if(S[y]==1)hb=1}
+  return q.length};
+ const gchk=(x,v)=>{
+  if(v){if(reach(x,1,GN+1)>GN)return false;return reach(x,0,GN)>=GN}
+  for(const y of P.adj[x])if(S[y]!=0&&reach(y,0,GN)<GN&&hb)return false;
+  return true};
+ if(GN){S=new Uint8Array(N);vis=new Int32Array(N);for(let i=0;i<N;i++)S[i]=st[i]==1?0:st[i]==2?1:2}
  for(const k of K){if(k.hi<=0)k.cells.forEach(c=>push(c,0,1,k.src));else if(k.lo>=k.cells.length)k.cells.forEach(c=>push(c,1,1,k.src))}
  if(T<=0)unk.forEach(c=>push(c,0,1,{t:'c'}));else if(T>=unk.length)unk.forEach(c=>push(c,1,1,{t:'c'}));
+ if(GN){const gs={t:'r',id:P.gid};
+  for(const x of unk){S[x]=1;if(!gchk(x,1)){S[x]=2;push(x,0,1,gs);continue}
+   S[x]=0;const ok0=gchk(x,0);S[x]=2;if(!ok0)push(x,1,1,gs)}}
  if(out.length)return out;
  const par={},f=x=>par[x]===x?x:(par[x]=f(par[x]));
  for(const k of K)for(const c of k.cells)if(par[c]===undefined)par[c]=c;
@@ -142,7 +170,9 @@ function deduce(P,st,num,M,skip){
    if(j==n){ks[cnt]=1;for(let x=0;x<n;x++)(a[x]?mk:sk)[x][cnt]=1;return}
    for(const v of[0,1]){for(const k of byCell[j]){k.u--;k.a+=v}
     let bad=false;for(const k of byCell[j])if(k.a>k.hi||k.a+k.u<k.lo)bad=true;
+    if(!bad&&GN){S[g[j]]=v;if(!gchk(g[j],v))bad=true}
     if(!bad){a[j]=v;cnt+=v;rec(j+1);cnt-=v}
+    if(GN)S[g[j]]=2;
     for(const k of byCell[j]){k.u++;k.a-=v}}};
   rec(0);
   if(over||!ks.some(x=>x)){ks.fill(1);comps.push({cells:g,ks,mk:g.map(()=>ks),sk:g.map(()=>ks),n})}
@@ -152,7 +182,7 @@ function deduce(P,st,num,M,skip){
   for(let k=0;k<=fn;k++){mk[k]=k>=1?1:0;sk[k]=k<=fn-1?1:0}
   comps.push({cells:fr,ks,mk:fr.map(()=>mk),sk:fr.map(()=>sk),n:fn,free:1})}
  const conv=(A,B)=>{const r=new Uint8Array(A.length+B.length-1);for(let i=0;i<A.length;i++)if(A[i])for(let j=0;j<B.length;j++)if(B[j])r[i+j]=1;return r};
- const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set(L.filter(k=>k.src.t=='r').map(k=>k.src.id))]}};
+ const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[])])]}};
  comps.forEach((cj,j)=>{let O=Uint8Array.of(1);comps.forEach((c,q)=>{if(q!=j)O=conv(O,c.ks)});
   cj.cells.forEach((x,p)=>{let m=0,s=0;
    for(let k=0;k<=cj.n;k++)if(T-k>=0&&T-k<O.length&&O[T-k]){if(cj.mk[p][k])m=1;if(cj.sk[p][k])s=1}
@@ -170,16 +200,36 @@ function sim(P,M,mines,start,skip){
  let rv=0;for(let i=0;i<N;i++)if(st[i]==1)rv++;
  return{ok:rv==safe&&!bug,bug,rv,open0,rounds,kinds,safe,st}}
 /* ノーゲス+非単調な盤面生成(非同期・キャンセル可)。密度ムラ配置→推論で詰まった未確定領域だけ山登りで修正。
+   grp持ちは「連結成分サイズgrpのグループを、縦横で触れないように置く」配置と「グループごと動かす」山登り。
    ノーゲスでない盤面は絶対に返さない(見つからなければ null)。
-   品質条件: 推論の種類>=2, 手順3段以上, 開始開放<=50%, cons持ちルールは外すと詰む(=縛りが飾りでない)。
+   品質条件: 推論の種類>=2, 手順3段以上, 開始開放<=50%, cons/grp持ちルールは外すと詰む(=縛りが飾りでない)。
    qms秒探索して品質条件を満たさなければ「ノーゲスだが品質未達」を許容、hard秒で打ち切り */
 async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
  const{R,C,M,ids}=cfg,N=R*C,P=prep(cfg),t0=performance.now(),kc=P.cons;
+ if(P.grp&&M%P.grp)throw Error('爆弾数が'+P.grp+'の倍数ではありません');
  const byC=[...Array(N)].map(()=>[]);kc.forEach((k,q)=>k.cells.forEach(c=>byC[c].push(q)));
- const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi});
- const nec=ids.filter(id=>RULES[id].cons&&RULES[id].cons(R,C).length);
+ const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp));
+ const nec=ids.filter(id=>RULES[id].grp||(RULES[id].cons&&RULES[id].cons(R,C).length));
+ const wpick=(a,w)=>{let t=rnd()*a.reduce((s,c)=>s+w[c],0),p=a[a.length-1];for(const c of a){t-=w[c];if(t<=0){p=c;break}}return p};
+ const gsample=(sz,w)=>{const n=P.grp,m=new Uint8Array(N),cnt=kc.map(()=>0),blk=new Uint8Array(N);
+  const can=c=>!sz.has(c)&&!m[c]&&!blk[c]&&byC[c].every(q=>cnt[q]<kc[q].hi);
+  const put=c=>{m[c]=1;byC[c].forEach(q=>cnt[q]++)};
+  for(let g=0;g<M/n;g++){const a=[];for(let c=0;c<N;c++)if(can(c))a.push(c);if(!a.length)return null;
+   const gr=[wpick(a,w)];put(gr[0]);
+   while(gr.length<n){const f=[];for(const c of gr)for(const y of P.adj[c])if(can(y)&&!f.includes(y))f.push(y);if(!f.length)return null;const y=wpick(f,w);gr.push(y);put(y)}
+   for(const c of gr){blk[c]=1;for(const y of P.adj[c])blk[y]=1}}
+  return valid(m)?m:null};
+ const gmove=(cur,a,Us,cs)=>{const n=P.grp,sz=new Set([cs,...P.nb[cs]]),m=cur.slice(),x=a[rnd()*a.length|0],cm=gcomps(P,cur).find(q=>q.includes(x));
+  if(!cm)return null;for(const c of cm)m[c]=0;
+  const cand=[];for(let c=0;c<N;c++)if(!m[c]&&Us.has(c)&&!sz.has(c)&&!P.adj[c].some(y=>m[y]))cand.push(c);
+  if(!cand.length)return null;
+  const g=[cand[rnd()*cand.length|0]];m[g[0]]=1;
+  while(g.length<n){const f=[];for(const c of g)for(const y of P.adj[c])if(!m[y]&&!sz.has(y)&&!f.includes(y)&&!P.adj[y].some(z=>m[z]&&!g.includes(z)))f.push(y);
+   if(!f.length)return null;const y=f[rnd()*f.length|0];g.push(y);m[y]=1}
+  return m};
  const sample=s=>{const sz=new Set([s,...P.nb[s]]),cx=[0,1,2].map(()=>[rnd()*R,rnd()*C,rnd()]),sg=Math.max(R,C)/3,w=[];
   for(let i=0;i<N;i++){let v=.25;for(const[y,x,a]of cx)v+=a*2*Math.exp(-(((i/C|0)-y)**2+(i%C-x)**2)/(2*sg*sg));w.push(v)}
+  if(P.grp)return gsample(sz,w);
   const m=new Uint8Array(N),cnt=kc.map(()=>0),cand=[];for(let i=0;i<N;i++)if(!sz.has(i))cand.push(i);
   for(let n=0;n<M;n++){const ok=cand.filter(c=>!m[c]&&byC[c].every(q=>cnt[q]<kc[q].hi));if(!ok.length)return null;
    let t=rnd()*ok.reduce((a,c)=>a+w[c],0),pick=ok[ok.length-1];for(const c of ok){t-=w[c];if(t<=0){pick=c;break}}
@@ -187,8 +237,10 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   return valid(m)?m:null};
  if(o.sampleOnly){let ex=null,bad=null,bc=[];
   for(let k=0;k<500&&!ex;k++)ex=sample(rnd()*N|0);
-  for(let k=0;k<3000&&!bad&&kc.length;k++){const m=new Uint8Array(N);for(let n=0;n<M;){const c=rnd()*N|0;if(!m[c]){m[c]=1;n++}}
-   const vi=kc.filter(q=>{let s=0;for(const c of q.cells)s+=m[c];return s<q.lo||s>q.hi});if(vi.length){bad=m;bc=[...new Set(vi.flatMap(q=>q.cells))]}}
+  for(let k=0;k<3000&&!bad&&(kc.length||P.grp);k++){const m=new Uint8Array(N);for(let n=0;n<M;){const c=rnd()*N|0;if(!m[c]){m[c]=1;n++}}
+   const vi=kc.filter(q=>{let s=0;for(const c of q.cells)s+=m[c];return s<q.lo||s>q.hi});
+   const gb=P.grp?gcomps(P,m).filter(q=>q.length!=P.grp).flat():[];
+   if(vi.length||gb.length){bad=m;bc=[...new Set([...vi.flatMap(q=>q.cells),...gb])]}}
   return{P,mines:ex,bad,bc}}
  const qual=(m,s,r)=>r.kinds.size>=2&&r.rounds>=3&&r.open0<=.5*r.safe&&nec.every(id=>!sim(P,M,m,s,id).ok);
  let cur=null,cs=0,cr=null,soft=null,inv=0,it=0,tries=0,last=t0;
@@ -202,68 +254,75 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   const U=[];for(let i=0;i<N;i++)if(!cr.st[i])U.push(i);
   const a=U.filter(i=>cur[i]),b=U.filter(i=>!cur[i]);
   if(!a.length||!b.length){cur=null;continue}
-  const m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1;
-  if(!valid(m2)){if(++inv>40)cur=null;continue}
+  let m2;
+  if(P.grp)m2=gmove(cur,a,new Set(U),cs);else{m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1}
+  if(!m2||!valid(m2)){if(++inv>40)cur=null;continue}
   const r2=sim(P,M,m2,cs);if(r2.bug)throw Error('solver unsound');
   if(r2.rv>=cr.rv){cur=m2;cr=r2}}
  return cancel()?null:soft}
 async function selfTest(){PAIR_NG.length=0;const ids=Object.keys(RULES);
  for(const id of ids){const r=RULES[id];let ok=0,fail=0,why='';
-  for(const[R,C,M]of[[7,7,8],[9,9,14]]){const cfg={R,C,M,ids:[id]};if(r.ok&&!r.ok(cfg))continue;
+  for(const[R,C,M0]of[[7,7,8],[9,9,14]]){const cfg={R,C,M:mfit(M0,[id],R*C),ids:[id]};if(r.ok&&!r.ok(cfg))continue;
    for(let t=0;t<2;t++){try{(await gen(cfg,{qms:1500,hard:8000}))?ok++:fail++}catch(e){fail++;why=e.message}}}
   TEST[id]=fail?'NG('+ok+'/'+(ok+fail)+(why?' '+why:'')+')':ok?'OK('+ok+')':'未検査(適用外)'}
  for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const a=RULES[ids[i]],b=RULES[ids[j]];if(conflict(a,b))continue;
-  const cfg={R:7,C:7,M:10,ids:[a.id,b.id]};if((a.ok&&!a.ok(cfg))||(b.ok&&!b.ok(cfg)))continue;
+  const cfg={R:7,C:7,M:mfit(10,[a.id,b.id],49),ids:[a.id,b.id]};if((a.ok&&!a.ok(cfg))||(b.ok&&!b.ok(cfg)))continue;
   try{if(!await gen(cfg,{qms:800,hard:4000}))PAIR_NG.push(a.id+'+'+b.id)}catch(e){PAIR_NG.push(a.id+'+'+b.id+'('+e.message+')')}}}
-
+ 
 /* ===== [CONTEXT] 自己記述: 現在のレジストリから常に最新を生成 ===== */
 function buildContext(){const F='`'.repeat(3),src=(n,f)=>f?'  '+n+': '+String(f):'';
- const rl=Object.values(RULES).map(r=>'### '+r.id+' 「'+r.name+'」\n- 説明: '+r.desc+'\n- 使用フック: '+[r.nb?'nb':'',r.cons?'cons':'',r.ok?'ok':'',r.excl?'excl='+r.excl:'',r.conflicts?'conflicts='+r.conflicts.join(','):''].filter(Boolean).join(', ')+'\n- 自己検査: '+(TEST[r.id]||'未実施')+'\n'+F+'js\n'+[src('nb',r.nb),src('cons',r.cons),src('ok',r.ok)].filter(Boolean).join('\n')+'\n'+F).join('\n\n');
+ const rl=Object.values(RULES).map(r=>'### '+r.id+' 「'+r.name+'」\n- 説明: '+r.desc+'\n- 使用フック: '+[r.nb?'nb':'',r.cons?'cons':'',r.ok?'ok':'',r.grp?'grp='+r.grp:'',r.mstep?'mstep='+r.mstep:'',r.why?'why':'',r.excl?'excl='+r.excl:'',r.conflicts?'conflicts='+r.conflicts.join(','):''].filter(Boolean).join(', ')+'\n- 自己検査: '+(TEST[r.id]||'未実施')+'\n'+F+'js\n'+[src('nb',r.nb),src('cons',r.cons),src('ok',r.ok),r.grp?'  grp: '+r.grp:'',r.mstep?'  mstep: '+r.mstep:'',r.why?'  why: '+JSON.stringify(r.why):''].filter(Boolean).join('\n')+'\n'+F).join('\n\n');
  return['# Minesweeper Variants context.md (自動生成 '+new Date().toISOString().slice(0,10)+')','',
  '> この md だけで作業できます。HTML全体は不要です。新しいチャットのAIは、まず全体を読んでください。','',
  '## 0. あなた(AI)の役割と出力形式',
  '- あなたは「縛り(ルール)追加担当」です。ユーザーの新しい縛りのアイデアを、第3節の定義に従い reg({...}) 1個として書きます。',
  '- 出力は次の3点だけ: (1) コピペ用の reg ブロック(コードブロック1つ) (2) CHANGELOG 用の1行 (3) 併用すると壊れる既存ルールがあれば conflicts に入れた旨。',
  '- CORE / UI / ゲーム本体のコードは出力しない・書き換えない。ユーザーは reg ブロックを HTML 末尾の <script id="rules"> 内に追記する。',
- '- ユーザーは日本語話者。簡潔に。案が複数あるなら短く列挙して選んでもらう。第5節の「表現できない」案は、先に理由とCORE拡張の必要性を伝える。','',
+ '- ユーザーは日本語話者。簡潔に。案が複数あるなら短く列挙して選んでもらう。第5節の「表現できない」案は、先に理由とCORE拡張の必要性を伝える(CORE拡張が要るときは、作る前にユーザーに確認する)。','',
  '## 1. ゲーム概要',
  '- 単一HTML(minesweeper-variants.html)のマインスイーパー・バリアント。縛り(ルール)をランダムに選び、それを攻略する。ルールはAIで少しずつ増やす。',
- '- 既定7x7。フリープレイ: 盤面/爆弾数/縛りを自由指定、ミス=即終了、ヒント無制限。',
- '- チャレンジ: X連続クリアが目標。縛りはプレイヤーが選んだプールからランダム。爆弾率・盤面・縛り数は固定/ランダム/少しずつ増加を選べる。ミス許容(ライフ)が尽きたらゲームオーバー。ヒントはX回まで。',
+ '- 既定7x7。フリープレイ: 盤面/爆弾数/縛りを自由指定、ミス=即終了、ヒント無制限。選んだ縛りが今の盤面・爆弾数に合わない(okが偽、または爆弾数が必要な倍数でない)ときは、理由を表示してスタートを止める。',
+ '- チャレンジ: X連続クリアが目標。縛りはプレイヤーが選んだプールからランダム。爆弾率・盤面・縛り数は固定/ランダム/少しずつ増加を選べる。ミス許容(ライフ)が尽きたらゲームオーバー。ヒントはX回まで。爆弾数は縛りの条件(倍数)に合うよう自動で丸める。',
  '- 最重要: 1/2(運ゲー)が発生しない盤面だけを出す(開始マスは自動オープン、そこから推論のみで完走できる配置のみ採用)。かつ単調でない(推論の種類>=2、手順3段以上、各縛りは外すと解けなくなる=飾りでない、爆弾配置に密度ムラ、縛りは最近使っていないものを優先)。',
  '- ヒント: 確定マス自体は強調しない。根拠だけ示す(数字=青枠 / 縛り=縛りボタンと一覧内を強調 / 残り爆弾数=チップを強調)+「爆弾/安全と言い切れるマスがある」と文で伝える。旗は無視。',
- '- UI: 設定画面と盤面画面の2画面。縛りは検索つきモーダルで選択。併用不可の縛りは、片方を選ぶともう片方が選べなくなる。縛りを長押しすると、7x7の例盤面(最大2枚)がスクロール可能なポップアップで出る(自動生成なので、ルール側で例を書く必要はない)。','',
+ '- UI: 設定画面と盤面画面の2画面。縛りは検索つきモーダルで選択。併用不可の縛りは、片方を選ぶともう片方が選べなくなる。縛りを長押しすると、7x7の例盤面(最大2枚)がスクロール可能なポップアップで出る(自動生成なので、ルール側で例を書く必要はない)。入力欄はタップしてもズームしない。','',
  '## 2. 座標とヘルパー',
  '- 盤面は R行 x C列。マス番号 i = r*C + c (0始まり)。行 r = floor(i/C)、列 c = i%C。',
  '- offs(R,C,i,オフセット配列): i から [dr,dc] だけずらしたマスのうち盤内のものを番号配列で返す。定数: D8(8近傍) D4(上下左右) KN(桂馬8方向)。',
  '- 数字は「そのマスの nb が指すマスの爆弾数」。数字0のマスは周囲(nb)を自動で開く。','',
- '## 3. ルール定義(全ルールは nb と cons の2フックだけで表現する)',F+'js',
+ '## 3. ルール定義(nb / cons / grp の3フックで表現する)',F+'js',
  'reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",',
  ' excl:"num",                        // 任意: 数字の定義を変えるルールは "num"(同じexclは併用不可)',
  ' conflicts:["otherId"],             // 任意: 併用不可の相手(片側だけの宣言で双方向に効く)',
- ' ok:c=>c.M>=c.R,                    // 任意: 適用条件 c={R,C,M}。偽なら選ばれない/外される',
+ ' ok:c=>c.M>=c.R,                    // 任意: 適用条件 c={R,C,M}。偽なら選ばれない/外される(フリープレイでは開始を止める)',
+ ' why:"爆弾数は盤面の縦以上",         // 任意: okが偽のとき画面に出す理由(省略時は汎用文)',
+ ' mstep:2,                           // 任意: 爆弾数がこの倍数でなければならない(2以上の整数。grpがあれば自動で grp の倍数)',
  ' nb:(R,C,i)=>offs(R,C,i,D8),        // 任意: マスiの数字が数えるマス(省略=D8)',
- ' cons:(R,C)=>[{cells:[0,1],lo:0,hi:1}] // 任意: 常に成り立つ制約。cells内の爆弾数は lo 以上 hi 以下',
+ ' cons:(R,C)=>[{cells:[0,1],lo:0,hi:1}], // 任意: 常に成り立つ制約。cells内の爆弾数は lo 以上 hi 以下',
+ ' grp:4                              // 任意: 爆弾の縦横連結成分が全てちょうどこの個数(2以上の整数)。grp持ちは同時に1つだけ選べる',
  '});',F,
  '- cons は盤面サイズ(R,C)だけから決まる静的な制約。配置は必ず全 cons を満たす。ソルバも同じ制約で推論する。',
- '- nb を持つルールが複数同時に選ばれることはない(excl で防ぐ)。','',
+ '- nb を持つルールが複数同時に選ばれることはない(excl で防ぐ)。grp も同様に1つだけ。',
+ '- grp は「爆弾を縦横につながった grp 個ずつのグループにし、グループ同士は縦横で触れない」と同じ意味(斜めの接触は可)。grp を使うなら、縦横に爆弾が隣り合うのを禁じる縛りとは conflicts にする。','',
  '## 4. 良いルールの条件',
- '- cons を持つルールは、外すと解けなくなる盤面だけが採用される(縛りが飾りにならない)。外しても解けるのが普通になる弱すぎる制約(例: hi が大きすぎる)は生成が難航する。',
+ '- cons / grp を持つルールは、外すと解けなくなる盤面だけが採用される(縛りが飾りにならない)。外しても解けるのが普通になる弱すぎる制約(例: hi が大きすぎる)は生成が難航する。',
  '- 他の縛りと併用するとノーゲス盤面が作れない組み合わせは conflicts に入れる。「ルール検査」の結果(下の検査状況)を参考にする。',
+ '- 爆弾数に条件があるルールは ok / mstep / why を書く(プレイヤーに理由が出る)。',
  '- 説明は1行で、プレイヤーが読んで理解できること。','',
  '## 5. 表現できる/できない',
- '- できる: マス集合の爆弾数の範囲(隣接禁止、行・列・ブロックの個数、領域の個数範囲、特定マスの扱い)、数字が数えるマスの変更(十字、桂馬、距離2のリングなど)。',
- '- できない(CORE拡張が先): 偶奇だけを表示する数字、数字が範囲で出る、数字が複数、配置に依存して変わる制約、プレイ中に状態が動くルール、lo/hi で書けない制約(集合 allowed)。','',
+ '- できる: マス集合の爆弾数の範囲(隣接禁止、行・列・ブロックの個数、領域の個数範囲、特定マスの扱い)、数字が数えるマスの変更(十字、桂馬、距離2のリングなど)、爆弾の連結成分サイズの固定(grp)、爆弾数の倍数条件(mstep)。',
+ '- できない(CORE拡張が先): 偶奇だけを表示する数字、数字が範囲で出る、数字が複数、配置に依存して変わる制約(連結成分サイズ固定以外)、プレイ中に状態が動くルール、lo/hi で書けない制約(集合 allowed)、成分サイズが2種類以上混ざる/範囲指定、形(テトロミノの種類)の指定。','',
  '## 6. 不変条件(壊さない)',
  '- ソルバは sound(確定は必ず真)。sim が真の配置と食い違えば bug として例外。',
+ '- grp の推論は「必要条件のみ」(確定爆弾の連結成分<=grp、その成分が属する安全でないマスの連結領域>=grp)を楽観的に使う。十分条件を足して sound を壊さない。',
  '- ノーゲスでない盤面は絶対に出さない。gen は非同期・キャンセル可で、見つからなければ失敗として戻る(妥協盤面を出さない)。',
  '- 1ルール=1回の reg。他のルールや CORE に触らない。','',
  '## 7. 現在のルール一覧(ソース付き・自動生成)',rl||'(なし)',RULE_ERR.length?'\n登録エラー: '+RULE_ERR.join(' / '):'','',
  '## 8. 検査状況','- 併用で生成に失敗した組(conflicts の検討対象): '+(PAIR_NG.length?PAIR_NG.join(', '):'なし(または未検査)'),'',
  '## 9. 追加手順チェックリスト','1. reg を1つ書く(第3節)。id一意、name/descあり。','2. ユーザーが末尾 <script id="rules"> に追記し、「ルール検査してから生成」を押して新ルールが OK か、併用NGが出ないか確認。','3. CHANGELOG に1行追記し、context.md を再生成してAIに渡す。','',
- '## 10. 既知の制限','- 推論は単一制約+組合せ(各成分3万ノード上限、超過時は推論せず=安全側)。','- 大盤面+高密度では探索に時間がかかり、上限(約2分)で失敗することがある。生成中は経過表示とキャンセルボタンがある。','',
+ '## 10. 既知の制限','- 推論は単一制約+組合せ(各成分3万ノード上限、超過時は推論せず=安全側)。','- grp の推論は局所的(grp マス以内)な必要条件のみ。大きな盤面+高密度+grp では生成に時間がかかり、上限(約2分)で失敗することがある。','- 大盤面+高密度では探索に時間がかかり、上限(約2分)で失敗することがある。生成中は経過表示とキャンセルボタンがある。','',
  '## 11. CHANGELOG',...CHANGELOG.map(x=>'- '+x)].join('\n')}
-
+ 
 /* ===== [GAME/UI] 画面は #setup(設定) と #game(盤面) の2つ。hidden切替なので設定は保持される ===== */
 let G=null,run=null,fm=0,LAST='',MODE='',TK=0;const AGE={},SEL=new Set();
 const v=id=>+$('#'+id).value,chk=id=>$('#'+id).checked,mode=()=>$('#mc').classList.contains('on')?'c':'f';
@@ -280,7 +339,18 @@ function plan(ch){let R=Math.max(3,Math.min(24,v('R'))),C=Math.max(3,Math.min(24
   if(chk('rs')){R=5+(rnd()*8|0);C=5+(rnd()*8|0)}if(chk('rm'))ratio=.12+rnd()*.1;if(chk('rk'))k=1+(rnd()*3|0)}
  const N=R*C,M=ch?Math.max(1,Math.min(N-12,Math.round(N*ratio))):Math.max(1,Math.min(N-10,v('M')));
  const pool=Object.keys(RULES).filter(id=>SEL.has(id)),cfg={R,C,M,ids:[]};
- cfg.ids=ch?pick(pool,k,cfg):norm(pool,cfg);cfg.dropped=ch?0:pool.length-cfg.ids.length;return cfg}
+ cfg.ids=ch?pick(pool,k,cfg):norm(pool,cfg);cfg.dropped=ch?0:pool.length-cfg.ids.length;
+ /* チャレンジ: 選ばれた縛りが要求する倍数に爆弾数を合わせ、合わなくなった縛りは外す */
+ if(ch){cfg.M=mfit(cfg.M,cfg.ids,N);cfg.ids=cfg.ids.filter(id=>!RULES[id].ok||RULES[id].ok(cfg))}
+ return cfg}
+/* フリープレイ: 選んだ縛りが今の盤面・爆弾数に合わないとき、理由を返す(スタートを止める) */
+function freeCfg(){const R=Math.max(3,Math.min(24,v('R')||3)),C=Math.max(3,Math.min(24,v('C')||3)),N=R*C;return{R,C,M:Math.max(1,Math.min(N-10,v('M')||1)),ids:[...SEL]}}
+function problems(){if(mode()!='f')return[];const cfg=freeCfg(),o=[];
+ for(const id of SEL){const r=RULES[id],s=stepOf(r);
+  if(s>1&&cfg.M%s){const lo=Math.max(s,Math.floor(cfg.M/s)*s);o.push('「'+r.name+'」は爆弾数が'+s+'の倍数のときだけ使えます(いま'+cfg.M+'個 → '+lo+'個か'+(lo+s)+'個など)')}
+  else if(r.ok&&!r.ok(cfg))o.push('「'+r.name+'」: '+(r.why||'今の盤面・爆弾数では使えません'))}
+ return o}
+function upd(){const p=problems();$('#mw').innerHTML=p.map(x=>'⚠ '+x).join('<br>');$('#go').disabled=p.length>0}
 function cancelGen(){TK++;$('#ld').hidden=true;show('setup')}
 async function start(nr){const ch=mode()=='c',tk=++TK;
  if(ch&&(nr||!run))run={streak:0,lives:v('L'),hints:v('H'),X:v('X')};if(!ch)run=null;
@@ -328,7 +398,7 @@ function draw(){if(!G)return;const{cfg,st,fl,num,mines,over,hint:h}=G,{R,C}=cfg,
  let lab=null,nr=0;if(!run)lab='新しい盤面';else if(G.over||(G.done&&run.streak>=run.X)){lab='もう一度挑戦';nr=1}else if(G.done)lab='次の盤面';
  const nx=$('#nx');nx.hidden=!lab;nx.textContent=lab||'';nx.dataset.nr=nr}
 /* ---- 縛りモーダル(pick=検索つき選択 / view=今の盤面の縛り) ---- */
-const tags=r=>(r.nb?'<span class="tag">数字変更</span>':'')+(r.cons?'<span class="tag">制約</span>':'')+(r.ok?'<span class="tag">条件付き</span>':'');
+const tags=r=>(r.nb?'<span class="tag">数字変更</span>':'')+(r.cons?'<span class="tag">制約</span>':'')+(r.grp?'<span class="tag">グループ</span>':'')+(r.ok?'<span class="tag">条件付き</span>':'')+(stepOf(r)>1?'<span class="tag">爆弾数は'+stepOf(r)+'の倍数</span>':'');
 const vis=()=>{const q=$('#mq').value.trim().toLowerCase();return Object.values(RULES).filter(r=>!q||(r.id+r.name+r.desc).toLowerCase().includes(q))};
 function renderList(){const L=$('#ml');
  if(MODE=='pick'){$('#mt').textContent='縛りを選ぶ ('+SEL.size+'/'+Object.keys(RULES).length+')';
@@ -336,7 +406,7 @@ function renderList(){const L=$('#ml');
  else{const h=G&&G.hint,hr=h?(h.src.t=='r'?[h.src.id]:h.src.rs||[]):[];
   L.innerHTML=G.cfg.ids.map(id=>'<div class="ri '+(hr.includes(id)?'hl':'')+'" data-rid="'+id+'"><div><b>'+RULES[id].name+'</b>'+tags(RULES[id])+'<div class="mut" style="margin:0">'+RULES[id].desc+'</div></div></div>').join('')||'<p class="mut">この盤面に縛りはありません</p>'}}
 function openM(m){MODE=m;const p=m=='pick';if(!p)$('#mt').textContent='この盤面の縛り';$('#mq').hidden=$('#mfoot').hidden=!p;$('#mq').value='';$('#md').hidden=false;renderList()}
-function closeM(){$('#md').hidden=true;updSel()}
+function closeM(){$('#md').hidden=true;updSel();upd()}
 function updSel(){const n=[...SEL].map(id=>RULES[id].name);$('#sel').textContent=n.length?n.length+'件: '+n.join(' / '):'未選択(縛りなし)'}
 /* ---- 競合(併用不可)と例盤面 ---- */
 const blockers=id=>[...SEL].filter(s=>s!=id&&conflict(RULES[s],RULES[id]));
@@ -350,7 +420,7 @@ function mini(P,m,o){o=o||{};let h='<div class="mini">';
  return h+'</div>'}
 async function exHtml(id){if(exCache[id])return exCache[id];const r=RULES[id];
  let h='<h4 style="margin:14px 0 2px">'+r.name+'</h4><p class="mut" style="margin:0 0 6px">'+r.desc+'</p>',cfg=null;
- for(const M of[8,12,16]){const c={R:7,C:7,M,ids:[id]};if(!r.ok||r.ok(c)){cfg=c;break}}
+ for(const M of[8,12,16]){const c={R:7,C:7,M,ids:[id]};if(M%stepOf(r)==0&&(!r.ok||r.ok(c))){cfg=c;break}}
  const e=cfg&&await gen(cfg,{sampleOnly:1});
  if(!e||!e.mines)return h+'<p class="mut">例の盤面を作れませんでした</p>';
  h+='<div class="mut">OK例'+(r.nb?'(数字はこのルールで数えた値)':'')+'</div>'+mini(e.P,e.mines);
@@ -366,10 +436,11 @@ function longpress(el,sel,fn){let tm=0,fired=0;
  el.addEventListener('contextmenu',e=>{if(e.target.closest(sel))e.preventDefault()})}
 const ctx=()=>{const t=buildContext();$('#ctx').value=t;return t};
 function setMode(c){$('#mc').classList.toggle('on',c);$('#mf').classList.toggle('on',!c);$('#chs').hidden=!c;
- $('#rcap').textContent=c?'チャレンジ: 選んだ縛りの中から、盤面ごとにランダムで決まります':'フリープレイ: 選んだ縛りを全部適用します'}
+ $('#rcap').textContent=c?'チャレンジ: 選んだ縛りの中から、盤面ごとにランダムで決まります(爆弾数は縛りに合わせて自動で調整)':'フリープレイ: 選んだ縛りを全部適用します(爆弾数などが縛りに合わないときはスタートできません)';upd()}
 window.addEventListener('load',()=>{
  if(RULE_ERR.length)$('#sm').textContent='ルール登録エラー: '+RULE_ERR.join(' / ');
  setMode(false);updSel();
+ for(const id of['R','C','M'])$('#'+id).addEventListener('input',upd);
  $('#mf').onclick=()=>setMode(false);$('#mc').onclick=()=>setMode(true);
  $('#pk').onclick=()=>openM('pick');$('#rv').onclick=()=>G&&openM('view');
  $('#mx').onclick=$('#mok').onclick=closeM;$('#md').onclick=e=>{if(e.target.id=='md')closeM()};
@@ -378,7 +449,7 @@ window.addEventListener('load',()=>{
  $('#ex2').onclick=()=>$('#ex').hidden=true;$('#ex').onclick=e=>{if(e.target.id=='ex')$('#ex').hidden=true};
  $('#ml').onchange=e=>{const id=e.target.dataset.id;if(id){e.target.checked?SEL.add(id):SEL.delete(id);renderList()}};
  $('#ma').onclick=()=>{vis().forEach(r=>{if(!blockers(r.id).length)SEL.add(r.id)});renderList()};$('#mn').onclick=()=>{vis().forEach(r=>SEL.delete(r.id));renderList()};
- $('#go').onclick=()=>{show('game');start(1)};$('#bk').onclick=cancelGen;$('#lc').onclick=cancelGen;
+ $('#go').onclick=()=>{if(problems().length)return upd();show('game');start(1)};$('#bk').onclick=cancelGen;$('#lc').onclick=cancelGen;
  $('#nx').onclick=()=>start(+$('#nx').dataset.nr);$('#hb').onclick=hint;
  $('#fo').onclick=()=>{fm=0;$('#fo').classList.add('on');$('#ff').classList.remove('on')};
  $('#ff').onclick=()=>{fm=1;$('#ff').classList.add('on');$('#fo').classList.remove('on')};
@@ -389,15 +460,16 @@ window.addEventListener('load',()=>{
  $('#cd').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([ctx()],{type:'text/markdown'}));a.download='context.md';a.click()};
  ctx()});
 </script>
-
+ 
 <script id="rules">
 /* ===== [RULES] ルール追加はここへ reg({...}) を追記するだけ。context.md参照 ===== */
 reg({id:'noTouch',name:'縦横非隣接',desc:'爆弾同士は上下左右に隣り合わない',
  cons:(R,C)=>{const o=[];for(let i=0;i<R*C;i++){if(i%C<C-1)o.push({cells:[i,i+1],lo:0,hi:1});if(i<(R-1)*C)o.push({cells:[i,i+C],lo:0,hi:1})}return o}});
 reg({id:'cross',name:'十字数字',desc:'数字は上下左右4マスの爆弾数',excl:'num',nb:(R,C,i)=>offs(R,C,i,D4)});
 reg({id:'knight',name:'ナイト数字',desc:'数字は桂馬位置(最大8マス)の爆弾数',excl:'num',nb:(R,C,i)=>offs(R,C,i,KN)});
-reg({id:'lines',name:'全行全列に爆弾',desc:'どの行にも列にも爆弾が1個以上ある',ok:c=>c.M>=Math.max(c.R,c.C),
+reg({id:'lines',name:'全行全列に爆弾',desc:'どの行にも列にも爆弾が1個以上ある',ok:c=>c.M>=Math.max(c.R,c.C),why:'爆弾数が縦・横の大きい方以上必要です',
  cons:(R,C)=>{const o=[];for(let r=0;r<R;r++)o.push({cells:[...Array(C)].map((_,c)=>r*C+c),lo:1,hi:C});
   for(let c=0;c<C;c++)o.push({cells:[...Array(R)].map((_,r)=>r*C+c),lo:1,hi:R});return o}});
+reg({id:'groupBomb',name:'グループ爆弾',desc:'爆弾は縦横につながった4個1組(斜めは不可)で、組同士は縦横で隣り合わない',grp:4,conflicts:['noTouch']});
 </script>
 </body></html>
