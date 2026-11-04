@@ -1,6 +1,6 @@
 /* [ui/modal] 縛りモーダル(pick=検索つき選択 / view=今の盤面の縛り)、併用不可の無効化、長押しで出る7x7の例盤面。
    縛りに付くタグ(tags)は、新しいフックを足したらここに1行足す。例盤面(mini/exHtml)の見せ方もここ。 */
-const tags=r=>(r.nb?'<span class="tag">数字変更</span>':'')+(r.cons?'<span class="tag">制約</span>':'')+(r.grp?'<span class="tag">グループ</span>':'')+(r.liar?'<span class="tag">数字が嘘</span>':'')+(r.ok?'<span class="tag">条件付き</span>':'')+(stepOf(r)>1?'<span class="tag">爆弾数は'+stepOf(r)+'の倍数</span>':'');
+const tags=r=>(r.nb?'<span class="tag">数字変更</span>':'')+(r.cons?'<span class="tag">制約</span>':'')+(r.grp?'<span class="tag">グループ</span>':'')+(r.liar?'<span class="tag">数字が嘘</span>':'')+(r.wt?'<span class="tag">数え方変更</span>':'')+(r.ok?'<span class="tag">条件付き</span>':'')+(stepOf(r)>1?'<span class="tag">爆弾数は'+stepOf(r)+'の倍数</span>':'');
 const vis=()=>{const q=$('#mq').value.trim().toLowerCase();return Object.values(RULES).filter(r=>!q||(r.id+r.name+r.desc).toLowerCase().includes(q))};
 function renderList(){const L=$('#ml');
  if(MODE=='pick'){$('#mt').textContent='縛りを選ぶ ('+SEL.size+'/'+Object.keys(RULES).length+')';
@@ -16,9 +16,9 @@ const exCache={};
 function mini(P,m,o){o=o||{};let h='<div class="mini">';
  for(let i=0;i<49;i++){let cl='c o',t='';
   if(o.pat){if(i==24){cl+=' ctr';t='?'}else if(P.nb[24].includes(i)){cl+=' cnt';t='●'}}
-  else if(m[i])t='💣';else{const n=o.sh?o.sh[i]:P.nb[i].reduce((s,j)=>s+m[j],0);t=n||'';if(n)cl+=' n'+Math.min(n,8);if(o.hon&&o.hon[i])cl+=' hon'}
+  else if(m[i])t='💣';else{const n=o.sh?o.sh[i]:ncount(P,m,i);t=n||'';if(n)cl+=' n'+Math.min(n,8);if(o.hon&&o.hon[i])cl+=' hon'}
   if(o.bc&&o.bc.includes(i))cl+=' bad';
-  h+='<div class="'+cl+'">'+t+'</div>'}
+  h+='<div class="'+cl+'"'+(P.w&&P.w[i]>1?WTST:'')+'>'+t+'</div>'}
  return h+'</div>'}
 async function exHtml(id){if(exCache[id])return exCache[id];const r=RULES[id];
  let h='<h4 style="margin:14px 0 2px">'+r.name+'</h4><p class="mut" style="margin:0 0 6px">'+r.desc+'</p>',cfg=null;
@@ -26,6 +26,7 @@ async function exHtml(id){if(exCache[id])return exCache[id];const r=RULES[id];
  const e=cfg&&await gen(cfg,{sampleOnly:1});
  if(!e||!e.mines)return h+'<p class="mut">例の盤面を作れませんでした</p>';
  h+='<div class="mut">OK例'+(r.nb?'(数字はこのルールで数えた値)':'')+'</div>'+mini(e.P,e.mines,{sh:e.L&&e.L.sh,hon:e.L&&e.L.hon});
+ if(r.wt)h+='<div class="mut">橙に塗ったマスが色つき。色つきマスの爆弾は数字に2個ぶんとして数える(爆弾の総数は変わらない)</div>';
  if(r.liar)h+='<div class="mut">青枠が正直な数字(各行・各列に1つ)。ほかの数字は実際の爆弾数と1ズレている</div>';
  if(r.nb)h+='<div class="mut">数字が数えるマス: 中央「?」の数字は ● のマスの爆弾数</div>'+mini(e.P,null,{pat:1});
  else if(e.bad)h+='<div class="mut">NG例(赤枠がルール違反)</div>'+mini(e.P,e.bad,{bc:e.bc});

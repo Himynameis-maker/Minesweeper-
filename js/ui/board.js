@@ -1,13 +1,15 @@
 /* [ui/board] 盤面画面の描画(draw)。G を読んで #g と #st(チップ)と各ボタンを更新する。 */
+/* [wt] 重みが2以上のマス(色つきマス)の薄い塗り。CSSを触らずに済むよう inline で背景画像として重ねる */
+const WTST=' style="background-image:linear-gradient(rgba(255,150,0,.28),rgba(255,150,0,.28))"';
 function draw(){if(!G)return;const{cfg,st,fl,num,mines,over,hint:h}=G,{R,C}=cfg,s=Math.min(40,Math.floor(Math.min(620,innerWidth-40)/C));
- const ns=h?h.ns:[],hr=h?h.rs:[];
+ const ns=h?h.ns:[],hr=h?h.rs:[],wt=G.P.w;
  let o='',expl=0,flg=0;
  for(let i=0;i<G.N;i++){let cl='c',t='';if(fl[i]&&!st[i])flg++;
   if(st[i]==1){cl+=' o';t=num[i]||'';if(t)cl+=' n'+Math.min(t,8)}
   else if(st[i]==2){cl+=' x';t='💥';expl++}
   else if(over&&mines[i]){cl+=' o';t='💣'}else if(fl[i])t='🚩';
   if(ns.includes(i))cl+=' hsrc';
-  o+='<div class="'+cl+'" data-i="'+i+'">'+t+'</div>'}
+  o+='<div class="'+cl+'" data-i="'+i+'"'+(wt&&wt[i]>1?WTST:'')+'>'+t+'</div>'}
  const g=$('#g');g.style.setProperty('--s',s+'px');g.style.gridTemplateColumns='repeat('+C+','+s+'px)';g.innerHTML=o;
  const ch=(t,c,k)=>'<span class="chip '+(c||'')+'"'+(k?' data-k="'+k+'"':'')+'>'+t+'</span>';
  $('#st').innerHTML=ch(R+'×'+C)+ch('💣 残り '+(cfg.M-expl-flg),h&&h.c?'hl':'','c')+(run?ch('連続 '+run.streak+'/'+run.X)+ch('❤ '+run.lives)+ch('💡 '+run.hints):'')+(G.gf?'':ch('⚠ ノーゲス未達'))+(G.gf&&!G.q?ch('品質条件未達'):'');
