@@ -9,11 +9,12 @@
 function deduce(P,st,num,M,skip,all){
  const N=P.nb.length,out=[],K=[],unk=[];let km=0;
  for(let i=0;i<N;i++){if(st[i]==2)km++;if(st[i]==0)unk.push(i)}
- const add=(cells,lo,hi,src,d)=>{const u=[];let m=0;for(const c of cells){if(st[c]==0)u.push(c);else if(st[c]==2)m++}
-  if(u.length)K.push({cells:u,lo:Math.max(0,lo-m),hi:Math.min(u.length,hi-m),src,hv:(d||0)-m})};
+ /*[wt]*/const add=(cells,lo,hi,src,d,w)=>{const u=[],uw=w?[]:null;let m=0,sw=0;
+  for(let q=0;q<cells.length;q++){const c=cells[q],x=w?w[q]:1;if(st[c]==0){u.push(c);if(w)uw.push(x);sw+=x}else if(st[c]==2)m+=x}
+  if(u.length)K.push({cells:u,w:uw,sw,lo:Math.max(0,lo-m),hi:Math.min(sw,hi-m),src,hv:(d||0)-m})};
  for(let i=0;i<N;i++)if(st[i]==1){
   /*[liar]*/if(P.lie){const L=P.nb[i].length,d=num[i],un=P.nb[i].some(c=>st[c]!=1);add(P.nb[i],Math.max(d-1,un?1:0),Math.min(L,d+1),{t:'n',i},d)}
-  else add(P.nb[i],num[i],num[i],{t:'n',i})}
+  else add(P.nb[i],num[i],num[i],{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
  for(const k of P.cons)if(k.src.id!==skip)add(k.cells,k.lo,k.hi,k.src);
  const T=M-km,seen=new Set(),push=(i,mine,tier,src)=>{const key=all?i+src.t+(src.id??src.i??''):i;if(!seen.has(key)){seen.add(key);out.push({i,mine,tier,src})}};
  /*[grp]*/const GN=(P.grp&&P.gid!==skip)?P.grp:0;let S=null,vis=null,sp=0,hb=0;
@@ -29,7 +30,7 @@ function deduce(P,st,num,M,skip,all){
  /*[liar]*/if(HM){const R0=P.R,C0=P.C;rH=new Int8Array(R0);cH=new Int8Array(C0);rU=new Int8Array(R0);cU=new Int8Array(C0);rX=new Int8Array(R0);cX=new Int8Array(C0);
   for(let i=0;i<N;i++){const r=i/C0|0,c=i%C0;if(st[i]==0){rX[r]=1;cX[c]=1}
    else if(st[i]==1){if(P.nb[i].some(j=>st[j]==0)){rU[r]++;cU[c]++}else{let m=0;for(const j of P.nb[i])if(st[j]==2)m++;if(m==num[i]){rH[r]++;cH[c]++}}}}}
- for(const k of K){if(k.hi<=0)k.cells.forEach(c=>push(c,0,1,k.src));else if(k.lo>=k.cells.length)k.cells.forEach(c=>push(c,1,1,k.src))}
+ /*[wt]*/for(const k of K)for(let q=0;q<k.cells.length;q++){const x=k.w?k.w[q]:1;if(x>k.hi)push(k.cells[q],0,1,k.src);else if(k.sw-x<k.lo)push(k.cells[q],1,1,k.src)}
  if(T<=0)unk.forEach(c=>push(c,0,1,{t:'c'}));else if(T>=unk.length)unk.forEach(c=>push(c,1,1,{t:'c'}));
  /*[grp]*/if(GN){const gs={t:'r',id:P.gid};
   for(const x of unk){S[x]=1;if(!gchk(x,1)){S[x]=2;push(x,0,1,gs);continue}
@@ -43,14 +44,14 @@ function deduce(P,st,num,M,skip,all){
  const comps=[];
  for(const g of Object.values(groups)){
   const gs=new Set(g),n=g.length,pos={};g.forEach((c,j)=>pos[c]=j);
-  const cc=K.filter(k=>gs.has(k.cells[0])).map(k=>({cells:k.cells.map(c=>pos[c]),lo:k.lo,hi:k.hi,a:0,u:k.cells.length,y:k.src.t=='n'?k.src.i:-1,hv:k.hv}));
-  const byCell=g.map(()=>[]);cc.forEach(k=>k.cells.forEach(j=>byCell[j].push(k)));
+  const cc=K.filter(k=>gs.has(k.cells[0])).map(k=>({cells:k.cells.map(c=>pos[c]),w:k.w,lo:k.lo,hi:k.hi,a:0,u:k.sw,y:k.src.t=='n'?k.src.i:-1,hv:k.hv}));
+  /*[wt]*/const byCell=g.map(()=>[]),byW=g.map(()=>[]);cc.forEach(k=>k.cells.forEach((j,q)=>{byCell[j].push(k);byW[j].push(k.w?k.w[q]:1)}));
   const ks=new Uint8Array(n+1),mk=g.map(()=>new Uint8Array(n+1)),sk=g.map(()=>new Uint8Array(n+1)),a=new Array(n);
   let nodes=0,over=false,cnt=0;
   const rec=j=>{if(over)return;if(++nodes>30000){over=true;return}
    if(j==n){ks[cnt]=1;for(let x=0;x<n;x++)(a[x]?mk:sk)[x][cnt]=1;return}
-   for(const v of[0,1]){for(const k of byCell[j]){k.u--;k.a+=v}
-    let bad=false;for(const k of byCell[j])if(k.a>k.hi||k.a+k.u<k.lo)bad=true;
+   for(const v of[0,1]){const bj=byCell[j],wj=byW[j];for(let q=0;q<bj.length;q++){bj[q].u-=wj[q];bj[q].a+=v*wj[q]}
+    let bad=false;for(const k of bj)if(k.a>k.hi||k.a+k.u<k.lo)bad=true;
     /*[grp]*/if(!bad&&GN){S[g[j]]=v;if(!gchk(g[j],v))bad=true}
     const dec=[];
     /*[liar]*/if(!bad&&HM){const C0=P.C;for(const k of byCell[j])if(k.y>=0&&k.u==0){const r=k.y/C0|0,c=k.y%C0,h=k.a==k.hv;rU[r]--;cU[c]--;if(h){rH[r]++;cH[c]++}dec.push([r,c,h])}
@@ -58,7 +59,7 @@ function deduce(P,st,num,M,skip,all){
     if(!bad){a[j]=v;cnt+=v;rec(j+1);cnt-=v}
     for(const[r,c,h]of dec){rU[r]++;cU[c]++;if(h){rH[r]--;cH[c]--}}
     /*[grp]*/if(GN)S[g[j]]=2;
-    for(const k of byCell[j]){k.u++;k.a-=v}}};
+    for(let q=0;q<bj.length;q++){bj[q].u+=wj[q];bj[q].a-=v*wj[q]}}};
   rec(0);
   if(over||!ks.some(x=>x)){ks.fill(1);comps.push({cells:g,ks,mk:g.map(()=>ks),sk:g.map(()=>ks),n})}
   else comps.push({cells:g,ks,mk,sk,n})}
@@ -76,7 +77,7 @@ function deduce(P,st,num,M,skip,all){
 
 /* 開始マスから推論のみで解き進めるシミュレーション。真の配置と食い違えばbug。L=liarの表示状態({sh:表示数字}) */
 function sim(P,M,mines,start,skip,L){
- const N=P.nb.length,st=new Uint8Array(N),act=P.nb.map(l=>l.reduce((s,j)=>s+mines[j],0)),num=L?L.sh:act;
+ const N=P.nb.length,st=new Uint8Array(N),act=P.nb.map((_,i)=>ncount(P,mines,i)),num=L?L.sh:act;
  const rev=i=>{const q=[i];while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;if(!act[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}};
  rev(start);let open0=0;for(let i=0;i<N;i++)if(st[i]==1)open0++;
  const kinds=new Set(),safe=N-M;let rounds=0,bug=0;
