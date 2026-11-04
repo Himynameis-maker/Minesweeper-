@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Minesweeper Variants</title>
+<style>
+:root{--bg:#eef0f6;--card:#fff;--fg:#1d2030;--mut:#6b7185;--l:#dfe2ec;--ac:#5b6cff;--ac2:#8a5cff;--c1:#cdd2e4;--c2:#b6bcd2;--o:#f3f4fa;--bad:#ef4b5f}
+@media(prefers-color-scheme:dark){:root{--bg:#12131a;--card:#1c1e29;--fg:#eceef7;--mut:#9aa0b8;--l:#2c2f3e;--c1:#4d526c;--c2:#3b4056;--o:#171923}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--fg)}
+#app{max-width:640px;margin:auto;padding:18px 14px 48px}
+h1{margin:4px 0 0;font-size:28px;letter-spacing:-.5px}
+h1 span{background:linear-gradient(90deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{margin:0 0 16px;color:var(--mut);font-size:13px}
+.mut{color:var(--mut);font-size:13px;margin:6px 0 0}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(20,24,50,.08)}
+.card h3{margin:0 0 10px;font-size:12px;letter-spacing:.06em;color:var(--mut);font-weight:700}
+summary{cursor:pointer;font-weight:600}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.col{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.fld{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)}
+.tg{display:flex;gap:8px;align-items:center}
+input[type=number],input[type=search]{font:inherit;color:var(--fg);background:var(--o);border:1px solid var(--l);border-radius:10px;padding:8px 10px;width:84px}
+input[type=search]{width:100%;margin-top:8px}
+button{font:inherit;color:var(--fg);background:var(--o);border:1px solid var(--l);border-radius:12px;padding:10px 14px;cursor:pointer;transition:transform .08s}
+button:active{transform:scale(.97)}button:disabled{opacity:.4}
+.pri{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border:0;font-weight:700}
+.big{width:100%;padding:15px;font-size:17px;border-radius:14px}.grow{flex:1}
+.seg{display:flex;background:var(--o);border:1px solid var(--l);border-radius:14px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;border-radius:11px}
+.seg button.on{background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.18);font-weight:700}
+.top{justify-content:space-between;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+.chip{background:var(--card);border-radius:999px;padding:3px 12px;font-size:13px;box-shadow:0 1px 2px rgba(20,24,50,.1)}
+#msg{min-height:26px;font-weight:600;text-align:center;margin:6px 0}
+#g{display:grid;gap:3px;justify-content:center;margin:8px 0 14px;user-select:none;touch-action:manipulation}
+.c{width:var(--s);height:var(--s);display:flex;align-items:center;justify-content:center;border-radius:6px;font-weight:800;font-size:calc(var(--s)*.52);cursor:pointer;background:linear-gradient(145deg,var(--c1),var(--c2));box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 1px 2px rgba(0,0,0,.2)}
+.o{background:var(--o);box-shadow:inset 0 0 0 1px var(--l);cursor:default}
+.x{background:var(--bad);box-shadow:none}
+.n1{color:#2563eb}.n2{color:#16a34a}.n3{color:#dc2626}.n4{color:#7c3aed}.n5{color:#b45309}.n6{color:#0891b2}.n7{color:#777}.n8{color:#999}
+.hsrc,.hl{outline:3px solid #3b82f6;outline-offset:-1px;animation:pl 1.1s infinite}
+@keyframes pl{50%{box-shadow:0 0 0 5px rgba(59,130,246,.3)}}
+#md,#ex{position:fixed;inset:0;background:rgba(10,12,25,.55);display:flex;align-items:flex-end;justify-content:center;z-index:9}
+#mb,#eb{background:var(--card);width:100%;max-width:640px;max-height:86vh;border-radius:22px 22px 0 0;display:flex;flex-direction:column;padding:16px}
+#mb .row,#eb .row{align-items:center;justify-content:space-between}
+#ml,#el{overflow:auto;flex:1;margin:10px 0}
+.ri{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:12px;cursor:pointer}
+.ri:hover{background:var(--o)}.ri input{margin-top:5px;width:18px;height:18px}
+.tag{font-size:11px;background:var(--o);border:1px solid var(--l);border-radius:6px;padding:0 6px;color:var(--mut);margin-left:6px}
+textarea{width:100%;height:150px;font:11px monospace;box-sizing:border-box;margin-top:8px;background:var(--o);color:var(--fg);border:1px solid var(--l);border-radius:10px}
+#ex{z-index:10}.ri,#rv{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.ri.dis{opacity:.45;cursor:not-allowed}
+.mini{--s:30px;display:grid;grid-template-columns:repeat(7,var(--s));gap:2px;justify-content:center;margin:6px 0 10px}
+.mini .c{cursor:default}.mini .ctr{background:#3b82f6;color:#fff}.mini .cnt{background:#bfdbfe;color:#1d4ed8}
+.bad{outline:3px solid #ef4b5f;outline-offset:-1px}
+</style></head>
+<body><div id="app">
+<section id="setup">
+ <h1>Minesweeper <span>Variants</span></h1>
+ <p class="sub">ノーゲス盤面 × ランダム縛り</p>
+ <div class="card"><h3>モード</h3><div class="seg"><button id="mf" class="on">フリープレイ</button><button id="mc">チャレンジ</button></div></div>
+ <div class="card"><h3>盤面</h3><div class="row">
+  <label class="fld">縦<input id="R" type="number" value="7" min="3" max="24"></label>
+  <label class="fld">横<input id="C" type="number" value="7" min="3" max="24"></label>
+  <label class="fld">爆弾数<input id="M" type="number" value="8" min="1"></label></div></div>
+ <div class="card"><h3>縛り</h3><button id="pk" style="width:100%">🧩 縛りを選ぶ</button><p class="mut" id="sel"></p><p class="mut" id="rcap"></p></div>
+ <div class="card" id="chs" hidden><h3>チャレンジ設定</h3><div class="row">
+  <label class="fld">目標連続クリア<input id="X" type="number" value="3" min="1"></label>
+  <label class="fld">ミス許容<input id="L" type="number" value="1" min="1"></label>
+  <label class="fld">ヒント回数<input id="H" type="number" value="3" min="0"></label>
+  <label class="fld">縛り数<input id="K" type="number" value="1" min="0" max="6"></label></div>
+  <div class="col">
+   <label class="tg"><input type="checkbox" id="prog">少しずつ難化(盤面・爆弾率・縛り数)</label>
+   <label class="tg"><input type="checkbox" id="rs">盤面サイズをランダム</label>
+   <label class="tg"><input type="checkbox" id="rm">爆弾率をランダム</label>
+   <label class="tg"><input type="checkbox" id="rk">縛り数をランダム</label></div></div>
+ <button class="pri big" id="go">スタート</button>
+ <p class="mut" id="sm"></p>
+ <details class="card" style="margin-top:14px"><summary>context.md(AIに渡す用・ロード時に自動生成済み)</summary>
+  <div class="row" style="margin-top:8px"><button id="cg">生成+コピー</button><button id="ct">ルール検査してから生成</button><button id="cd">DL</button></div>
+  <textarea id="ctx" readonly></textarea></details>
+</section>
+<section id="game" hidden>
+ <div class="row top"><button id="bk">← 設定に戻る</button><button id="rv">🧩 縛り</button></div>
+ <div class="chips" id="st"></div>
+ <div id="ld" class="card" hidden style="text-align:center"><div id="ldt"></div><button id="lc" style="margin-top:8px">キャンセルして設定に戻る</button></div>
+ <div id="msg"></div>
+ <div id="g"></div>
+ <div class="seg" style="margin-bottom:10px"><button id="fo" class="on">⛏ 開ける</button><button id="ff">🚩 旗を立てる</button></div>
+ <div class="row"><button id="hb" class="grow">💡 ヒント</button><button id="nx" class="pri grow" hidden>次の盤面</button></div>
+</section></div>
+<div id="md" hidden><div id="mb">
+ <div class="row"><b id="mt"></b><button id="mx">閉じる</button></div>
+ <div class="mut" id="mh">縛りを長押しすると、例の盤面が表示されます</div>
+ <input type="search" id="mq" placeholder="縛りを検索(名前・説明)">
+ <div id="ml"></div>
+ <div class="row" id="mfoot"><button id="ma">表示中を全選択</button><button id="mn">表示中を解除</button><button class="pri" id="mok">決定</button></div>
+</div></div>
+<div id="ex" hidden><div id="eb"><div class="row"><b id="et"></b><button id="ex2">閉じる</button></div><div id="el"></div></div></div>
+<script>
+/* ===== [CORE] 触らない。ルール追加は末尾の <script id="rules"> だけ ===== */
+const $=s=>document.querySelector(s),rnd=Math.random;
+const RULES={},RULE_ERR=[],TEST={},PAIR_NG=[];
+const conflict=(a,b)=>a.id!=b.id&&((a.excl&&a.excl===b.excl)||(a.conflicts||[]).includes(b.id)||(b.conflicts||[]).includes(a.id));
+const CHANGELOG=['v0.1 基盤: コア(ソルバ/ノーゲス生成/ヒント/自己検査/context生成) + ルール4種','v0.2 UI刷新: 2画面化, 縛り検索モーダル, 旗切替, ヒントは根拠のみ強調','v0.3 gen を非同期化(長時間探索OK/キャンセル可), ノーゲス未達の盤面を出さない','v0.4 併用不可(conflicts/excl)で選択を無効化, 長押しで例盤面(自動生成), context.md を自己完結化, 併用検査'];
+const D8=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],D4=[[-1,0],[0,-1],[0,1],[1,0]],KN=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+const offs=(R,C,i,L)=>{const r=i/C|0,c=i%C,o=[];for(const[a,b]of L){const y=r+a,x=c+b;if(y>=0&&y<R&&x>=0&&x<C)o.push(y*C+x)}return o};
+function reg(d){try{
+ if(!d||!/^[a-z][a-zA-Z0-9]*$/.test(d.id||''))throw'id不正';
+ if(RULES[d.id])throw'id重複';
+ if(!d.name||!d.desc)throw'name/desc必須';
+ for(const k of['nb','cons','ok'])if(d[k]&&typeof d[k]!='function')throw k+'は関数';
+ if(d.conflicts&&!Array.isArray(d.conflicts))throw'conflictsは配列';
+ RULES[d.id]=d}catch(e){RULE_ERR.push((d&&d.id)+': '+e)}}
+/* cfg={R,C,M,ids} -> P={nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}]} */
+function prep(cfg){const{R,C,ids}=cfg,rs=ids.map(id=>RULES[id]),nr=rs.find(r=>r.nb),nb=[];
+ for(let i=0;i<R*C;i++)nb.push(nr?nr.nb(R,C,i):offs(R,C,i,D8));
+ const cons=[];for(const r of rs)if(r.cons)for(const k of r.cons(R,C))cons.push({cells:k.cells,lo:k.lo,hi:k.hi,src:{t:'r',id:r.id}});
+ return{nb,cons}}
+/* 確定推論。st:0未知/1開示/2既知爆弾, num:開示マスの数字。返り値[{i,mine,tier,src}] tier1=単一制約, tier3=組合せ(CSP全列挙+残り爆弾数)。常にsound */
+function deduce(P,st,num,M,skip){
+ const N=P.nb.length,out=[],K=[],unk=[];let km=0;
+ for(let i=0;i<N;i++){if(st[i]==2)km++;if(st[i]==0)unk.push(i)}
+ const add=(cells,lo,hi,src)=>{const u=[];let m=0;for(const c of cells){if(st[c]==0)u.push(c);else if(st[c]==2)m++}
+  if(u.length)K.push({cells:u,lo:Math.max(0,lo-m),hi:Math.min(u.length,hi-m),src})};
+ for(let i=0;i<N;i++)if(st[i]==1)add(P.nb[i],num[i],num[i],{t:'n',i});
+ for(const k of P.cons)if(k.src.id!==skip)add(k.cells,k.lo,k.hi,k.src);
+ const T=M-km,seen=new Set(),push=(i,mine,tier,src)=>{if(!seen.has(i)){seen.add(i);out.push({i,mine,tier,src})}};
+ for(const k of K){if(k.hi<=0)k.cells.forEach(c=>push(c,0,1,k.src));else if(k.lo>=k.cells.length)k.cells.forEach(c=>push(c,1,1,k.src))}
+ if(T<=0)unk.forEach(c=>push(c,0,1,{t:'c'}));else if(T>=unk.length)unk.forEach(c=>push(c,1,1,{t:'c'}));
+ if(out.length)return out;
+ const par={},f=x=>par[x]===x?x:(par[x]=f(par[x]));
+ for(const k of K)for(const c of k.cells)if(par[c]===undefined)par[c]=c;
+ for(const k of K){const a=f(k.cells[0]);for(const c of k.cells)par[f(c)]=a}
+ const groups={};for(const c in par)(groups[f(+c)]=groups[f(+c)]||[]).push(+c);
+ const comps=[];
+ for(const g of Object.values(groups)){
+  const gs=new Set(g),n=g.length,pos={};g.forEach((c,j)=>pos[c]=j);
+  const cc=K.filter(k=>gs.has(k.cells[0])).map(k=>({cells:k.cells.map(c=>pos[c]),lo:k.lo,hi:k.hi,a:0,u:k.cells.length}));
+  const byCell=g.map(()=>[]);cc.forEach(k=>k.cells.forEach(j=>byCell[j].push(k)));
+  const ks=new Uint8Array(n+1),mk=g.map(()=>new Uint8Array(n+1)),sk=g.map(()=>new Uint8Array(n+1)),a=new Array(n);
+  let nodes=0,over=false,cnt=0;
+  const rec=j=>{if(over)return;if(++nodes>30000){over=true;return}
+   if(j==n){ks[cnt]=1;for(let x=0;x<n;x++)(a[x]?mk:sk)[x][cnt]=1;return}
+   for(const v of[0,1]){for(const k of byCell[j]){k.u--;k.a+=v}
+    let bad=false;for(const k of byCell[j])if(k.a>k.hi||k.a+k.u<k.lo)bad=true;
+    if(!bad){a[j]=v;cnt+=v;rec(j+1);cnt-=v}
+    for(const k of byCell[j]){k.u++;k.a-=v}}};
+  rec(0);
+  if(over||!ks.some(x=>x)){ks.fill(1);comps.push({cells:g,ks,mk:g.map(()=>ks),sk:g.map(()=>ks),n})}
+  else comps.push({cells:g,ks,mk,sk,n})}
+ const fr=unk.filter(c=>par[c]===undefined),fn=fr.length;
+ if(fn){const ks=new Uint8Array(fn+1).fill(1),mk=new Uint8Array(fn+1),sk=new Uint8Array(fn+1);
+  for(let k=0;k<=fn;k++){mk[k]=k>=1?1:0;sk[k]=k<=fn-1?1:0}
+  comps.push({cells:fr,ks,mk:fr.map(()=>mk),sk:fr.map(()=>sk),n:fn,free:1})}
+ const conv=(A,B)=>{const r=new Uint8Array(A.length+B.length-1);for(let i=0;i<A.length;i++)if(A[i])for(let j=0;j<B.length;j++)if(B[j])r[i+j]=1;return r};
+ const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set(L.filter(k=>k.src.t=='r').map(k=>k.src.id))]}};
+ comps.forEach((cj,j)=>{let O=Uint8Array.of(1);comps.forEach((c,q)=>{if(q!=j)O=conv(O,c.ks)});
+  cj.cells.forEach((x,p)=>{let m=0,s=0;
+   for(let k=0;k<=cj.n;k++)if(T-k>=0&&T-k<O.length&&O[T-k]){if(cj.mk[p][k])m=1;if(cj.sk[p][k])s=1}
+   if(m&&!s)push(x,1,3,cj.free?{t:'c'}:why(x));else if(s&&!m)push(x,0,3,cj.free?{t:'c'}:why(x))})});
+ return out}
+/* 開始マスから推論のみで解き進めるシミュレーション。真の配置と食い違えばbug */
+function sim(P,M,mines,start,skip){
+ const N=P.nb.length,st=new Uint8Array(N),num=P.nb.map(l=>l.reduce((s,j)=>s+mines[j],0));
+ const rev=i=>{const q=[i];while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;if(!num[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}};
+ rev(start);let open0=0;for(let i=0;i<N;i++)if(st[i]==1)open0++;
+ const kinds=new Set(),safe=N-M;let rounds=0,bug=0;
+ for(;;){const d=deduce(P,st,num,M,skip);if(!d.length)break;rounds++;
+  for(const e of d){if(!!mines[e.i]!=!!e.mine)bug=1;if(st[e.i])continue;kinds.add(e.tier+e.src.t);if(e.mine)st[e.i]=2;else rev(e.i)}
+  if(bug)break}
+ let rv=0;for(let i=0;i<N;i++)if(st[i]==1)rv++;
+ return{ok:rv==safe&&!bug,bug,rv,open0,rounds,kinds,safe,st}}
+/* ノーゲス+非単調な盤面生成(非同期・キャンセル可)。密度ムラ配置→推論で詰まった未確定領域だけ山登りで修正。
+   ノーゲスでない盤面は絶対に返さない(見つからなければ null)。
+   品質条件: 推論の種類>=2, 手順3段以上, 開始開放<=50%, cons持ちルールは外すと詰む(=縛りが飾りでない)。
+   qms秒探索して品質条件を満たさなければ「ノーゲスだが品質未達」を許容、hard秒で打ち切り */
+async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
+ const{R,C,M,ids}=cfg,N=R*C,P=prep(cfg),t0=performance.now(),kc=P.cons;
+ const byC=[...Array(N)].map(()=>[]);kc.forEach((k,q)=>k.cells.forEach(c=>byC[c].push(q)));
+ const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi});
+ const nec=ids.filter(id=>RULES[id].cons&&RULES[id].cons(R,C).length);
+ const sample=s=>{const sz=new Set([s,...P.nb[s]]),cx=[0,1,2].map(()=>[rnd()*R,rnd()*C,rnd()]),sg=Math.max(R,C)/3,w=[];
+  for(let i=0;i<N;i++){let v=.25;for(const[y,x,a]of cx)v+=a*2*Math.exp(-(((i/C|0)-y)**2+(i%C-x)**2)/(2*sg*sg));w.push(v)}
+  const m=new Uint8Array(N),cnt=kc.map(()=>0),cand=[];for(let i=0;i<N;i++)if(!sz.has(i))cand.push(i);
+  for(let n=0;n<M;n++){const ok=cand.filter(c=>!m[c]&&byC[c].every(q=>cnt[q]<kc[q].hi));if(!ok.length)return null;
+   let t=rnd()*ok.reduce((a,c)=>a+w[c],0),pick=ok[ok.length-1];for(const c of ok){t-=w[c];if(t<=0){pick=c;break}}
+   m[pick]=1;byC[pick].forEach(q=>cnt[q]++)}
+  return valid(m)?m:null};
+ if(o.sampleOnly){let ex=null,bad=null,bc=[];
+  for(let k=0;k<500&&!ex;k++)ex=sample(rnd()*N|0);
+  for(let k=0;k<3000&&!bad&&kc.length;k++){const m=new Uint8Array(N);for(let n=0;n<M;){const c=rnd()*N|0;if(!m[c]){m[c]=1;n++}}
+   const vi=kc.filter(q=>{let s=0;for(const c of q.cells)s+=m[c];return s<q.lo||s>q.hi});if(vi.length){bad=m;bc=[...new Set(vi.flatMap(q=>q.cells))]}}
+  return{P,mines:ex,bad,bc}}
+ const qual=(m,s,r)=>r.kinds.size>=2&&r.rounds>=3&&r.open0<=.5*r.safe&&nec.every(id=>!sim(P,M,m,s,id).ok);
+ let cur=null,cs=0,cr=null,soft=null,inv=0,it=0,tries=0,last=t0;
+ for(;;){const now=performance.now(),el=now-t0;
+  if(el>hard||cancel())break;
+  if(soft&&el>qms)break;
+  if(now-last>40){last=now;tick(el,tries);await new Promise(r=>setTimeout(r,0))}
+  if(!cur){cs=rnd()*N|0;cur=sample(cs);inv=it=0;if(!cur)continue;tries++;cr=sim(P,M,cur,cs);if(cr.bug)throw Error('solver unsound')}
+  if(cr.ok){if(qual(cur,cs,cr))return{mines:cur,start:cs,gf:1,q:1};soft={mines:cur,start:cs,gf:1,q:0};cur=null;continue}
+  if(++it>400){cur=null;continue}
+  const U=[];for(let i=0;i<N;i++)if(!cr.st[i])U.push(i);
+  const a=U.filter(i=>cur[i]),b=U.filter(i=>!cur[i]);
+  if(!a.length||!b.length){cur=null;continue}
+  const m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1;
+  if(!valid(m2)){if(++inv>40)cur=null;continue}
+  const r2=sim(P,M,m2,cs);if(r2.bug)throw Error('solver unsound');
+  if(r2.rv>=cr.rv){cur=m2;cr=r2}}
+ return cancel()?null:soft}
+async function selfTest(){PAIR_NG.length=0;const ids=Object.keys(RULES);
+ for(const id of ids){const r=RULES[id];let ok=0,fail=0,why='';
+  for(const[R,C,M]of[[7,7,8],[9,9,14]]){const cfg={R,C,M,ids:[id]};if(r.ok&&!r.ok(cfg))continue;
+   for(let t=0;t<2;t++){try{(await gen(cfg,{qms:1500,hard:8000}))?ok++:fail++}catch(e){fail++;why=e.message}}}
+  TEST[id]=fail?'NG('+ok+'/'+(ok+fail)+(why?' '+why:'')+')':ok?'OK('+ok+')':'未検査(適用外)'}
+ for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const a=RULES[ids[i]],b=RULES[ids[j]];if(conflict(a,b))continue;
+  const cfg={R:7,C:7,M:10,ids:[a.id,b.id]};if((a.ok&&!a.ok(cfg))||(b.ok&&!b.ok(cfg)))continue;
+  try{if(!await gen(cfg,{qms:800,hard:4000}))PAIR_NG.push(a.id+'+'+b.id)}catch(e){PAIR_NG.push(a.id+'+'+b.id+'('+e.message+')')}}}
+
+/* ===== [CONTEXT] 自己記述: 現在のレジストリから常に最新を生成 ===== */
+function buildContext(){const F='`'.repeat(3),src=(n,f)=>f?'  '+n+': '+String(f):'';
+ const rl=Object.values(RULES).map(r=>'### '+r.id+' 「'+r.name+'」\n- 説明: '+r.desc+'\n- 使用フック: '+[r.nb?'nb':'',r.cons?'cons':'',r.ok?'ok':'',r.excl?'excl='+r.excl:'',r.conflicts?'conflicts='+r.conflicts.join(','):''].filter(Boolean).join(', ')+'\n- 自己検査: '+(TEST[r.id]||'未実施')+'\n'+F+'js\n'+[src('nb',r.nb),src('cons',r.cons),src('ok',r.ok)].filter(Boolean).join('\n')+'\n'+F).join('\n\n');
+ return['# Minesweeper Variants context.md (自動生成 '+new Date().toISOString().slice(0,10)+')','',
+ '> この md だけで作業できます。HTML全体は不要です。新しいチャットのAIは、まず全体を読んでください。','',
+ '## 0. あなた(AI)の役割と出力形式',
+ '- あなたは「縛り(ルール)追加担当」です。ユーザーの新しい縛りのアイデアを、第3節の定義に従い reg({...}) 1個として書きます。',
+ '- 出力は次の3点だけ: (1) コピペ用の reg ブロック(コードブロック1つ) (2) CHANGELOG 用の1行 (3) 併用すると壊れる既存ルールがあれば conflicts に入れた旨。',
+ '- CORE / UI / ゲーム本体のコードは出力しない・書き換えない。ユーザーは reg ブロックを HTML 末尾の <script id="rules"> 内に追記する。',
+ '- ユーザーは日本語話者。簡潔に。案が複数あるなら短く列挙して選んでもらう。第5節の「表現できない」案は、先に理由とCORE拡張の必要性を伝える。','',
+ '## 1. ゲーム概要',
+ '- 単一HTML(minesweeper-variants.html)のマインスイーパー・バリアント。縛り(ルール)をランダムに選び、それを攻略する。ルールはAIで少しずつ増やす。',
+ '- 既定7x7。フリープレイ: 盤面/爆弾数/縛りを自由指定、ミス=即終了、ヒント無制限。',
+ '- チャレンジ: X連続クリアが目標。縛りはプレイヤーが選んだプールからランダム。爆弾率・盤面・縛り数は固定/ランダム/少しずつ増加を選べる。ミス許容(ライフ)が尽きたらゲームオーバー。ヒントはX回まで。',
+ '- 最重要: 1/2(運ゲー)が発生しない盤面だけを出す(開始マスは自動オープン、そこから推論のみで完走できる配置のみ採用)。かつ単調でない(推論の種類>=2、手順3段以上、各縛りは外すと解けなくなる=飾りでない、爆弾配置に密度ムラ、縛りは最近使っていないものを優先)。',
+ '- ヒント: 確定マス自体は強調しない。根拠だけ示す(数字=青枠 / 縛り=縛りボタンと一覧内を強調 / 残り爆弾数=チップを強調)+「爆弾/安全と言い切れるマスがある」と文で伝える。旗は無視。',
+ '- UI: 設定画面と盤面画面の2画面。縛りは検索つきモーダルで選択。併用不可の縛りは、片方を選ぶともう片方が選べなくなる。縛りを長押しすると、7x7の例盤面(最大2枚)がスクロール可能なポップアップで出る(自動生成なので、ルール側で例を書く必要はない)。','',
+ '## 2. 座標とヘルパー',
+ '- 盤面は R行 x C列。マス番号 i = r*C + c (0始まり)。行 r = floor(i/C)、列 c = i%C。',
+ '- offs(R,C,i,オフセット配列): i から [dr,dc] だけずらしたマスのうち盤内のものを番号配列で返す。定数: D8(8近傍) D4(上下左右) KN(桂馬8方向)。',
+ '- 数字は「そのマスの nb が指すマスの爆弾数」。数字0のマスは周囲(nb)を自動で開く。','',
+ '## 3. ルール定義(全ルールは nb と cons の2フックだけで表現する)',F+'js',
+ 'reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",',
+ ' excl:"num",                        // 任意: 数字の定義を変えるルールは "num"(同じexclは併用不可)',
+ ' conflicts:["otherId"],             // 任意: 併用不可の相手(片側だけの宣言で双方向に効く)',
+ ' ok:c=>c.M>=c.R,                    // 任意: 適用条件 c={R,C,M}。偽なら選ばれない/外される',
+ ' nb:(R,C,i)=>offs(R,C,i,D8),        // 任意: マスiの数字が数えるマス(省略=D8)',
+ ' cons:(R,C)=>[{cells:[0,1],lo:0,hi:1}] // 任意: 常に成り立つ制約。cells内の爆弾数は lo 以上 hi 以下',
+ '});',F,
+ '- cons は盤面サイズ(R,C)だけから決まる静的な制約。配置は必ず全 cons を満たす。ソルバも同じ制約で推論する。',
+ '- nb を持つルールが複数同時に選ばれることはない(excl で防ぐ)。','',
+ '## 4. 良いルールの条件',
+ '- cons を持つルールは、外すと解けなくなる盤面だけが採用される(縛りが飾りにならない)。外しても解けるのが普通になる弱すぎる制約(例: hi が大きすぎる)は生成が難航する。',
+ '- 他の縛りと併用するとノーゲス盤面が作れない組み合わせは conflicts に入れる。「ルール検査」の結果(下の検査状況)を参考にする。',
+ '- 説明は1行で、プレイヤーが読んで理解できること。','',
+ '## 5. 表現できる/できない',
+ '- できる: マス集合の爆弾数の範囲(隣接禁止、行・列・ブロックの個数、領域の個数範囲、特定マスの扱い)、数字が数えるマスの変更(十字、桂馬、距離2のリングなど)。',
+ '- できない(CORE拡張が先): 偶奇だけを表示する数字、数字が範囲で出る、数字が複数、配置に依存して変わる制約、プレイ中に状態が動くルール、lo/hi で書けない制約(集合 allowed)。','',
+ '## 6. 不変条件(壊さない)',
+ '- ソルバは sound(確定は必ず真)。sim が真の配置と食い違えば bug として例外。',
+ '- ノーゲスでない盤面は絶対に出さない。gen は非同期・キャンセル可で、見つからなければ失敗として戻る(妥協盤面を出さない)。',
+ '- 1ルール=1回の reg。他のルールや CORE に触らない。','',
+ '## 7. 現在のルール一覧(ソース付き・自動生成)',rl||'(なし)',RULE_ERR.length?'\n登録エラー: '+RULE_ERR.join(' / '):'','',
+ '## 8. 検査状況','- 併用で生成に失敗した組(conflicts の検討対象): '+(PAIR_NG.length?PAIR_NG.join(', '):'なし(または未検査)'),'',
+ '## 9. 追加手順チェックリスト','1. reg を1つ書く(第3節)。id一意、name/descあり。','2. ユーザーが末尾 <script id="rules"> に追記し、「ルール検査してから生成」を押して新ルールが OK か、併用NGが出ないか確認。','3. CHANGELOG に1行追記し、context.md を再生成してAIに渡す。','',
+ '## 10. 既知の制限','- 推論は単一制約+組合せ(各成分3万ノード上限、超過時は推論せず=安全側)。','- 大盤面+高密度では探索に時間がかかり、上限(約2分)で失敗することがある。生成中は経過表示とキャンセルボタンがある。','',
+ '## 11. CHANGELOG',...CHANGELOG.map(x=>'- '+x)].join('\n')}
+
+/* ===== [GAME/UI] 画面は #setup(設定) と #game(盤面) の2つ。hidden切替なので設定は保持される ===== */
+let G=null,run=null,fm=0,LAST='',MODE='',TK=0;const AGE={},SEL=new Set();
+const v=id=>+$('#'+id).value,chk=id=>$('#'+id).checked,mode=()=>$('#mc').classList.contains('on')?'c':'f';
+const msg=t=>$('#msg').textContent=t;
+const show=id=>{$('#setup').hidden=id!='setup';$('#game').hidden=id!='game';scrollTo(0,0)};
+function norm(ids,cfg){const o=[];for(const id of ids){const r=RULES[id];if(r.ok&&!r.ok(cfg))continue;if(o.some(x=>conflict(RULES[x],r)))continue;o.push(id)}return o}
+function pick(pool,k,cfg){let o;for(let t=0;t<3;t++){let c=pool.filter(id=>!RULES[id].ok||RULES[id].ok(cfg));o=[];
+ while(o.length<k&&c.length){const w=c.map(id=>1+(AGE[id]??3));let t2=rnd()*w.reduce((a,b)=>a+b),j=0;while((t2-=w[j])>0&&j<c.length-1)j++;
+  const id=c[j];o.push(id);c=c.filter(x=>x!=id&&!conflict(RULES[id],RULES[x]))}
+ if(o.slice().sort()+''!=LAST)break}
+ LAST=o.slice().sort()+'';for(const id in RULES)AGE[id]=o.includes(id)?0:(AGE[id]??3)+1;return o}
+function plan(ch){let R=Math.max(3,Math.min(24,v('R'))),C=Math.max(3,Math.min(24,v('C'))),k=v('K'),ratio=v('M')/(R*C),n=ch?run.streak:0;
+ if(ch){if(chk('prog')){R=Math.min(20,R+(n/2|0));C=Math.min(20,C+(n/2|0));ratio=Math.min(.28,ratio+.01*n);k+=n/3|0}
+  if(chk('rs')){R=5+(rnd()*8|0);C=5+(rnd()*8|0)}if(chk('rm'))ratio=.12+rnd()*.1;if(chk('rk'))k=1+(rnd()*3|0)}
+ const N=R*C,M=ch?Math.max(1,Math.min(N-12,Math.round(N*ratio))):Math.max(1,Math.min(N-10,v('M')));
+ const pool=Object.keys(RULES).filter(id=>SEL.has(id)),cfg={R,C,M,ids:[]};
+ cfg.ids=ch?pick(pool,k,cfg):norm(pool,cfg);cfg.dropped=ch?0:pool.length-cfg.ids.length;return cfg}
+function cancelGen(){TK++;$('#ld').hidden=true;show('setup')}
+async function start(nr){const ch=mode()=='c',tk=++TK;
+ if(ch&&(nr||!run))run={streak:0,lives:v('L'),hints:v('H'),X:v('X')};if(!ch)run=null;
+ const cfg=plan(ch);G=null;$('#g').innerHTML='';$('#st').innerHTML='';$('#nx').hidden=true;$('#hb').disabled=true;
+ $('#rv').textContent='🧩 縛り ('+cfg.ids.length+')';msg('');$('#ld').hidden=false;$('#ldt').textContent='ノーゲス盤面を探索中…';
+ let res=null;
+ try{res=await gen(cfg,{cancel:()=>tk!=TK,tick:(el,n)=>{$('#ldt').textContent='ノーゲス盤面を探索中… '+(el/1000|0)+'秒 / 候補 '+n+'件'}})}
+ catch(e){if(tk==TK){$('#ld').hidden=true;msg('内部エラー: '+e.message)}return}
+ if(tk!=TK)return;$('#ld').hidden=true;
+ if(!res)return msg('ノーゲスの盤面が見つかりませんでした(条件が厳しすぎる可能性)。「設定に戻る」で条件を変えてください');
+ const P=prep(cfg),N=cfg.R*cfg.C,num=P.nb.map(l=>l.reduce((s,j)=>s+res.mines[j],0));
+ G={cfg,P,N,mines:res.mines,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,hint:null};
+ flood(res.start);msg(cfg.dropped?cfg.dropped+'件の縛りは条件に合わないため外しました':'');draw()}
+function flood(i){const q=[i],{st,fl,num,mines,P}=G;while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;fl[x]=0;G.rev++;if(!num[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}}
+function act(i,f){if(!G||G.over||G.done||G.st[i])return;G.hint=null;
+ if(f){G.fl[i]^=1;return draw()}if(G.fl[i])return;
+ if(G.mines[i]){G.st[i]=2;if(run){run.lives--;if(run.lives<=0){G.over=1;msg('ゲームオーバー… 連続クリア '+run.streak+'回')}else msg('ミス! 残りライフ '+run.lives)}else{G.over=1;msg('爆発…')}}
+ else flood(i);
+ if(!G.over&&G.rev==G.N-G.cfg.M){G.done=1;if(run){run.streak++;msg(run.streak>=run.X?'🎉 目標達成! '+run.X+'連続クリア':'クリア! ('+run.streak+'/'+run.X+')')}else msg('🎉 クリア!')}
+ draw()}
+function hintText(e){const s=e.src,w=e.mine?'爆弾':'安全',nm=id=>'縛り「'+RULES[id].name+'」';
+ if(s.t=='n')return '青枠の数字の周りに、'+w+'と言い切れるマスがあります。';
+ if(s.t=='r')return nm(s.id)+'から、'+w+'と言い切れるマスがあります。';
+ if(s.t=='c')return '残り爆弾数から、'+w+'と言い切れるマスがあります。';
+ const p=[];if(s.ns&&s.ns.length)p.push('青枠の数字');if(s.rs&&s.rs.length)p.push(s.rs.map(nm).join('と'));
+ return (p.join('と')||'周りの状況')+'を組み合わせると、'+w+'と言い切れるマスが見つかります。'}
+function hint(){if(!G||G.over||G.done)return;if(run&&run.hints<=0)return msg('ヒントはもう使えません');
+ const d=deduce(G.P,G.st,G.num,G.cfg.M);if(!d.length)return msg('いま確定できるマスはありません');
+ const t=Math.min(...d.map(e=>e.tier)),c=d.filter(e=>e.tier==t),e=c[rnd()*c.length|0];
+ if(run)run.hints--;G.hint=e;msg(hintText(e));draw()}
+function draw(){if(!G)return;const{cfg,st,fl,num,mines,over,hint:h}=G,{R,C}=cfg,s=Math.min(40,Math.floor(Math.min(620,innerWidth-40)/C));
+ const ns=h?(h.src.t=='n'?[h.src.i]:h.src.ns||[]):[],hr=h?(h.src.t=='r'?[h.src.id]:h.src.rs||[]):[];
+ let o='',expl=0,flg=0;
+ for(let i=0;i<G.N;i++){let cl='c',t='';if(fl[i]&&!st[i])flg++;
+  if(st[i]==1){cl+=' o';t=num[i]||'';if(t)cl+=' n'+Math.min(t,8)}
+  else if(st[i]==2){cl+=' x';t='💥';expl++}
+  else if(over&&mines[i]){cl+=' o';t='💣'}else if(fl[i])t='🚩';
+  if(ns.includes(i))cl+=' hsrc';
+  o+='<div class="'+cl+'" data-i="'+i+'">'+t+'</div>'}
+ const g=$('#g');g.style.setProperty('--s',s+'px');g.style.gridTemplateColumns='repeat('+C+','+s+'px)';g.innerHTML=o;
+ const ch=(t,c)=>'<span class="chip '+(c||'')+'">'+t+'</span>';
+ $('#st').innerHTML=ch(R+'×'+C)+ch('💣 残り '+(cfg.M-expl-flg),h&&h.src.t=='c'?'hl':'')+(run?ch('連続 '+run.streak+'/'+run.X)+ch('❤ '+run.lives)+ch('💡 '+run.hints):'')+(G.gf?'':ch('⚠ ノーゲス未達'))+(G.gf&&!G.q?ch('品質条件未達'):'');
+ $('#rv').textContent='🧩 縛り ('+cfg.ids.length+')';$('#rv').className=hr.length?'hl':'';
+ const fin=G.over||G.done;$('#hb').disabled=fin||(run&&run.hints<=0);$('#hb').textContent='💡 ヒント'+(run?' (残り'+run.hints+')':'');
+ let lab=null,nr=0;if(!run)lab='新しい盤面';else if(G.over||(G.done&&run.streak>=run.X)){lab='もう一度挑戦';nr=1}else if(G.done)lab='次の盤面';
+ const nx=$('#nx');nx.hidden=!lab;nx.textContent=lab||'';nx.dataset.nr=nr}
+/* ---- 縛りモーダル(pick=検索つき選択 / view=今の盤面の縛り) ---- */
+const tags=r=>(r.nb?'<span class="tag">数字変更</span>':'')+(r.cons?'<span class="tag">制約</span>':'')+(r.ok?'<span class="tag">条件付き</span>':'');
+const vis=()=>{const q=$('#mq').value.trim().toLowerCase();return Object.values(RULES).filter(r=>!q||(r.id+r.name+r.desc).toLowerCase().includes(q))};
+function renderList(){const L=$('#ml');
+ if(MODE=='pick'){$('#mt').textContent='縛りを選ぶ ('+SEL.size+'/'+Object.keys(RULES).length+')';
+  L.innerHTML=vis().map(r=>{const b=blockers(r.id),d=b.length;return '<label class="ri'+(d?' dis':'')+'" data-rid="'+r.id+'"><input type="checkbox" data-id="'+r.id+'"'+(SEL.has(r.id)?' checked':'')+(d?' disabled':'')+'><div><b>'+r.name+'</b>'+tags(r)+'<div class="mut" style="margin:0">'+r.desc+'</div>'+(d?'<div style="color:#ef4b5f;font-size:12px">「'+b.map(x=>RULES[x].name).join('」「')+'」と併用不可</div>':'')+'</div></label>'}).join('')||'<p class="mut">該当する縛りがありません</p>'}
+ else{const h=G&&G.hint,hr=h?(h.src.t=='r'?[h.src.id]:h.src.rs||[]):[];
+  L.innerHTML=G.cfg.ids.map(id=>'<div class="ri '+(hr.includes(id)?'hl':'')+'" data-rid="'+id+'"><div><b>'+RULES[id].name+'</b>'+tags(RULES[id])+'<div class="mut" style="margin:0">'+RULES[id].desc+'</div></div></div>').join('')||'<p class="mut">この盤面に縛りはありません</p>'}}
+function openM(m){MODE=m;const p=m=='pick';if(!p)$('#mt').textContent='この盤面の縛り';$('#mq').hidden=$('#mfoot').hidden=!p;$('#mq').value='';$('#md').hidden=false;renderList()}
+function closeM(){$('#md').hidden=true;updSel()}
+function updSel(){const n=[...SEL].map(id=>RULES[id].name);$('#sel').textContent=n.length?n.length+'件: '+n.join(' / '):'未選択(縛りなし)'}
+/* ---- 競合(併用不可)と例盤面 ---- */
+const blockers=id=>[...SEL].filter(s=>s!=id&&conflict(RULES[s],RULES[id]));
+const exCache={};
+function mini(P,m,o){o=o||{};let h='<div class="mini">';
+ for(let i=0;i<49;i++){let cl='c o',t='';
+  if(o.pat){if(i==24){cl+=' ctr';t='?'}else if(P.nb[24].includes(i)){cl+=' cnt';t='●'}}
+  else if(m[i])t='💣';else{const n=P.nb[i].reduce((s,j)=>s+m[j],0);t=n||'';if(n)cl+=' n'+Math.min(n,8)}
+  if(o.bc&&o.bc.includes(i))cl+=' bad';
+  h+='<div class="'+cl+'">'+t+'</div>'}
+ return h+'</div>'}
+async function exHtml(id){if(exCache[id])return exCache[id];const r=RULES[id];
+ let h='<h4 style="margin:14px 0 2px">'+r.name+'</h4><p class="mut" style="margin:0 0 6px">'+r.desc+'</p>',cfg=null;
+ for(const M of[8,12,16]){const c={R:7,C:7,M,ids:[id]};if(!r.ok||r.ok(c)){cfg=c;break}}
+ const e=cfg&&await gen(cfg,{sampleOnly:1});
+ if(!e||!e.mines)return h+'<p class="mut">例の盤面を作れませんでした</p>';
+ h+='<div class="mut">OK例'+(r.nb?'(数字はこのルールで数えた値)':'')+'</div>'+mini(e.P,e.mines);
+ if(r.nb)h+='<div class="mut">数字が数えるマス: 中央「?」の数字は ● のマスの爆弾数</div>'+mini(e.P,null,{pat:1});
+ else if(e.bad)h+='<div class="mut">NG例(赤枠がルール違反)</div>'+mini(e.P,e.bad,{bc:e.bc});
+ return exCache[id]=h}
+async function showEx(ids,title){$('#et').textContent=title;$('#el').innerHTML='<p class="mut">作成中…</p>';$('#ex').hidden=false;
+ let h='';for(const id of ids)h+=await exHtml(id);$('#el').innerHTML=h||'<p class="mut">縛りはありません</p>'}
+function longpress(el,sel,fn){let tm=0,fired=0;
+ el.addEventListener('pointerdown',e=>{const t=e.target.closest(sel);if(!t)return;fired=0;clearTimeout(tm);tm=setTimeout(()=>{fired=1;fn(t)},500)});
+ for(const n of['pointerup','pointerleave','pointercancel'])el.addEventListener(n,()=>clearTimeout(tm));
+ el.addEventListener('click',e=>{if(fired){fired=0;e.preventDefault();e.stopImmediatePropagation()}},true);
+ el.addEventListener('contextmenu',e=>{if(e.target.closest(sel))e.preventDefault()})}
+const ctx=()=>{const t=buildContext();$('#ctx').value=t;return t};
+function setMode(c){$('#mc').classList.toggle('on',c);$('#mf').classList.toggle('on',!c);$('#chs').hidden=!c;
+ $('#rcap').textContent=c?'チャレンジ: 選んだ縛りの中から、盤面ごとにランダムで決まります':'フリープレイ: 選んだ縛りを全部適用します'}
+window.addEventListener('load',()=>{
+ if(RULE_ERR.length)$('#sm').textContent='ルール登録エラー: '+RULE_ERR.join(' / ');
+ setMode(false);updSel();
+ $('#mf').onclick=()=>setMode(false);$('#mc').onclick=()=>setMode(true);
+ $('#pk').onclick=()=>openM('pick');$('#rv').onclick=()=>G&&openM('view');
+ $('#mx').onclick=$('#mok').onclick=closeM;$('#md').onclick=e=>{if(e.target.id=='md')closeM()};
+ $('#mq').oninput=renderList;
+ longpress($('#ml'),'.ri',e=>showEx([e.dataset.rid],'縛りの例'));longpress($('#rv'),'#rv',()=>G&&showEx(G.cfg.ids,'この盤面の縛りの例'));
+ $('#ex2').onclick=()=>$('#ex').hidden=true;$('#ex').onclick=e=>{if(e.target.id=='ex')$('#ex').hidden=true};
+ $('#ml').onchange=e=>{const id=e.target.dataset.id;if(id){e.target.checked?SEL.add(id):SEL.delete(id);renderList()}};
+ $('#ma').onclick=()=>{vis().forEach(r=>{if(!blockers(r.id).length)SEL.add(r.id)});renderList()};$('#mn').onclick=()=>{vis().forEach(r=>SEL.delete(r.id));renderList()};
+ $('#go').onclick=()=>{show('game');start(1)};$('#bk').onclick=cancelGen;$('#lc').onclick=cancelGen;
+ $('#nx').onclick=()=>start(+$('#nx').dataset.nr);$('#hb').onclick=hint;
+ $('#fo').onclick=()=>{fm=0;$('#fo').classList.add('on');$('#ff').classList.remove('on')};
+ $('#ff').onclick=()=>{fm=1;$('#ff').classList.add('on');$('#fo').classList.remove('on')};
+ $('#g').onclick=e=>{const i=e.target.dataset.i;if(i!==undefined)act(+i,fm)};
+ $('#g').oncontextmenu=e=>{e.preventDefault();const i=e.target.dataset.i;if(i!==undefined)act(+i,1)};
+ $('#cg').onclick=()=>{const t=ctx();$('#ctx').select();try{navigator.clipboard.writeText(t)}catch(e){}};
+ $('#ct').onclick=async()=>{$('#ctx').value='検査中…(数十秒〜数分かかります)';await selfTest();ctx()};
+ $('#cd').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([ctx()],{type:'text/markdown'}));a.download='context.md';a.click()};
+ ctx()});
+</script>
+
+<script id="rules">
+/* ===== [RULES] ルール追加はここへ reg({...}) を追記するだけ。context.md参照 ===== */
+reg({id:'noTouch',name:'縦横非隣接',desc:'爆弾同士は上下左右に隣り合わない',
+ cons:(R,C)=>{const o=[];for(let i=0;i<R*C;i++){if(i%C<C-1)o.push({cells:[i,i+1],lo:0,hi:1});if(i<(R-1)*C)o.push({cells:[i,i+C],lo:0,hi:1})}return o}});
+reg({id:'cross',name:'十字数字',desc:'数字は上下左右4マスの爆弾数',excl:'num',nb:(R,C,i)=>offs(R,C,i,D4)});
+reg({id:'knight',name:'ナイト数字',desc:'数字は桂馬位置(最大8マス)の爆弾数',excl:'num',nb:(R,C,i)=>offs(R,C,i,KN)});
+reg({id:'lines',name:'全行全列に爆弾',desc:'どの行にも列にも爆弾が1個以上ある',ok:c=>c.M>=Math.max(c.R,c.C),
+ cons:(R,C)=>{const o=[];for(let r=0;r<R;r++)o.push({cells:[...Array(C)].map((_,c)=>r*C+c),lo:1,hi:C});
+  for(let c=0;c<C;c++)o.push({cells:[...Array(R)].map((_,r)=>r*C+c),lo:1,hi:R});return o}});
+</script>
+</body></html>
