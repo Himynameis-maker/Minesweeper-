@@ -53,6 +53,7 @@ textarea{width:100%;height:150px;font:11px monospace;box-sizing:border-box;margi
 .mini .c{cursor:default}.mini .ctr{background:#3b82f6;color:#fff}.mini .cnt{background:#bfdbfe;color:#1d4ed8}
 .bad{outline:3px solid #ef4b5f;outline-offset:-1px}
 .hon{outline:2px solid #3b82f6;outline-offset:-2px}
+#hb.on{background:#3b82f6;color:#fff;border-color:#3b82f6}
 </style></head>
 <body><div id="app">
 <section id="setup">
@@ -103,7 +104,7 @@ textarea{width:100%;height:150px;font:11px monospace;box-sizing:border-box;margi
 const $=s=>document.querySelector(s),rnd=Math.random;
 const RULES={},RULE_ERR=[],TEST={},PAIR_NG=[];
 const conflict=(a,b)=>a.id!=b.id&&((a.excl&&a.excl===b.excl)||(a.grp&&b.grp)||(a.liar&&b.liar)||(a.conflicts||[]).includes(b.id)||(b.conflicts||[]).includes(a.id));
-const CHANGELOG=['v0.1 基盤: コア(ソルバ/ノーゲス生成/ヒント/自己検査/context生成) + ルール4種','v0.2 UI刷新: 2画面化, 縛り検索モーダル, 旗切替, ヒントは根拠のみ強調','v0.3 gen を非同期化(長時間探索OK/キャンセル可), ノーゲス未達の盤面を出さない','v0.4 併用不可(conflicts/excl)で選択を無効化, 長押しで例盤面(自動生成), context.md を自己完結化, 併用検査','v0.5 CORE拡張: grp(爆弾の連結成分サイズ固定)フック, mstep/why(爆弾数の条件), フリープレイは不適合なら開始を止める/チャレンジは爆弾数を自動調整, 入力欄タップ時のズーム禁止, ルール groupBomb','v0.6 CORE拡張: liar(数字が実際と1ズレる。各行・各列に正直な数字がちょうど1つ)フック, ルール liar'];
+const CHANGELOG=['v0.1 基盤: コア(ソルバ/ノーゲス生成/ヒント/自己検査/context生成) + ルール4種','v0.2 UI刷新: 2画面化, 縛り検索モーダル, 旗切替, ヒントは根拠のみ強調','v0.3 gen を非同期化(長時間探索OK/キャンセル可), ノーゲス未達の盤面を出さない','v0.4 併用不可(conflicts/excl)で選択を無効化, 長押しで例盤面(自動生成), context.md を自己完結化, 併用検査','v0.5 CORE拡張: grp(爆弾の連結成分サイズ固定)フック, mstep/why(爆弾数の条件), フリープレイは不適合なら開始を止める/チャレンジは爆弾数を自動調整, 入力欄タップ時のズーム禁止, ルール groupBomb','v0.6 CORE拡張: liar(数字が実際と1ズレる。各行・各列に正直な数字がちょうど1つ)フック, ルール liar','v0.7 ヒントをON/OFF式に(数字/縛り/残り爆弾数をタップ。正しい旗を既知爆弾として連鎖推論), 爆弾数の不一致は前後の近い値のみ表示(mok/mnear に統一), 選べない縛りの理由表示を廃止'];
 const D8=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],D4=[[-1,0],[0,-1],[0,1],[1,0]],KN=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
 const offs=(R,C,i,L)=>{const r=i/C|0,c=i%C,o=[];for(const[a,b]of L){const y=r+a,x=c+b;if(y>=0&&y<R&&x>=0&&x<C)o.push(y*C+x)}return o};
 /* 爆弾数の条件: 必要な倍数(mstep か grp) / 倍数に丸める */
@@ -131,9 +132,10 @@ function gcomps(P,m){const N=m.length,seen=new Uint8Array(N),o=[];
  for(let i=0;i<N;i++)if(m[i]&&!seen[i]){const q=[i];seen[i]=1;for(let h=0;h<q.length;h++)for(const y of P.adj[q[h]])if(m[y]&&!seen[y]){seen[y]=1;q.push(y)}o.push(q)}
  return o}
 /* 確定推論。st:0未知/1開示/2既知爆弾, num:開示マスの数字。返り値[{i,mine,tier,src}] tier1=単一制約, tier3=組合せ(CSP全列挙+残り爆弾数)。常にsound
+   all=1 のときは同じマスの全根拠を返し、tier1があってもtier3まで調べる(ヒント用)。
    grp(連結成分サイズ固定)は「必要条件のみ」(楽観側)で使う: S[i]=0安全/1爆弾確定/2未確定。
    必要条件1: 確定爆弾の連結成分は grp 以下 / 必要条件2: その成分を含む「安全でないマス」の連結領域は grp 以上 */
-function deduce(P,st,num,M,skip){
+function deduce(P,st,num,M,skip,all){
  const N=P.nb.length,out=[],K=[],unk=[];let km=0;
  for(let i=0;i<N;i++){if(st[i]==2)km++;if(st[i]==0)unk.push(i)}
  const add=(cells,lo,hi,src,d)=>{const u=[];let m=0;for(const c of cells){if(st[c]==0)u.push(c);else if(st[c]==2)m++}
@@ -142,7 +144,7 @@ function deduce(P,st,num,M,skip){
   if(P.lie){const L=P.nb[i].length,d=num[i],un=P.nb[i].some(c=>st[c]!=1);add(P.nb[i],Math.max(d-1,un?1:0),Math.min(L,d+1),{t:'n',i},d)}
   else add(P.nb[i],num[i],num[i],{t:'n',i})}
  for(const k of P.cons)if(k.src.id!==skip)add(k.cells,k.lo,k.hi,k.src);
- const T=M-km,seen=new Set(),push=(i,mine,tier,src)=>{if(!seen.has(i)){seen.add(i);out.push({i,mine,tier,src})}};
+ const T=M-km,seen=new Set(),push=(i,mine,tier,src)=>{const key=all?i+src.t+(src.id??src.i??''):i;if(!seen.has(key)){seen.add(key);out.push({i,mine,tier,src})}};
  const GN=(P.grp&&P.gid!==skip)?P.grp:0;let S=null,vis=null,sp=0,hb=0;
  const reach=(x,onlyB,cap)=>{const q=[x];vis[x]=++sp;hb=S[x]==1?1:0;
   for(let h=0;h<q.length&&q.length<cap;h++)for(const y of P.adj[q[h]])if(vis[y]!=sp&&(onlyB?S[y]==1:S[y]!=0)){vis[y]=sp;q.push(y);if(S[y]==1)hb=1}
@@ -161,7 +163,7 @@ function deduce(P,st,num,M,skip){
  if(GN){const gs={t:'r',id:P.gid};
   for(const x of unk){S[x]=1;if(!gchk(x,1)){S[x]=2;push(x,0,1,gs);continue}
    S[x]=0;const ok0=gchk(x,0);S[x]=2;if(!ok0)push(x,1,1,gs)}}
- if(out.length)return out;
+ if(out.length&&!all)return out;
  const par={},f=x=>par[x]===x?x:(par[x]=f(par[x]));
  for(const k of K)for(const c of k.cells)if(par[c]===undefined)par[c]=c;
  for(const k of K){const a=f(k.cells[0]);for(const c of k.cells)par[f(c)]=a}
@@ -312,11 +314,11 @@ function buildContext(){const F='`'.repeat(3),src=(n,f)=>f?'  '+n+': '+String(f)
  '- ユーザーは日本語話者。簡潔に。案が複数あるなら短く列挙して選んでもらう。第5節の「表現できない」案は、先に理由とCORE拡張の必要性を伝える(CORE拡張が要るときは、作る前にユーザーに確認する)。','',
  '## 1. ゲーム概要',
  '- 単一HTML(minesweeper-variants.html)のマインスイーパー・バリアント。縛り(ルール)をランダムに選び、それを攻略する。ルールはAIで少しずつ増やす。',
- '- 既定7x7。フリープレイ: 盤面/爆弾数/縛りを自由指定、ミス=即終了、ヒント無制限。選んだ縛りが今の盤面・爆弾数に合わない(okが偽、または爆弾数が必要な倍数でない)ときは、理由を表示してスタートを止める。',
- '- チャレンジ: X連続クリアが目標。縛りはプレイヤーが選んだプールからランダム。爆弾率・盤面・縛り数は固定/ランダム/少しずつ増加を選べる。ミス許容(ライフ)が尽きたらゲームオーバー。ヒントはX回まで。爆弾数は縛りの条件(倍数)に合うよう自動で丸める。',
+ '- 既定7x7。フリープレイ: 盤面/爆弾数/縛りを自由指定、ミス=即終了、ヒント無制限。選んだ縛りが今の盤面・爆弾数に合わない(okが偽、または爆弾数が必要な倍数でない)ときは、スタートを止める。爆弾数が原因なら、前後の近い爆弾数を1つずつだけ表示する(mok/mnear)。盤面の形など爆弾数では直らない場合だけ why を表示する。',
+ '- チャレンジ: X連続クリアが目標。縛りはプレイヤーが選んだプールからランダム。爆弾率・盤面・縛り数は固定/ランダム/少しずつ増加を選べる。ミス許容(ライフ)が尽きたらゲームオーバー。ヒントはX回まで。爆弾数は縛りの条件に合う最寄りの値(mok/mnear)に自動で調整する。',
  '- 最重要: 1/2(運ゲー)が発生しない盤面だけを出す(開始マスは自動オープン、そこから推論のみで完走できる配置のみ採用)。かつ単調でない(推論の種類>=2、手順3段以上、各縛りは外すと解けなくなる=飾りでない、爆弾配置に密度ムラ、縛りは最近使っていないものを優先)。',
- '- ヒント: 確定マス自体は強調しない。根拠だけ示す(数字=青枠 / 縛り=縛りボタンと一覧内を強調 / 残り爆弾数=チップを強調)+「爆弾/安全と言い切れるマスがある」と文で伝える。旗は無視。',
- '- UI: 設定画面と盤面画面の2画面。縛りは検索つきモーダルで選択。併用不可の縛りは、片方を選ぶともう片方が選べなくなる。縛りを長押しすると、7x7の例盤面(最大2枚)がスクロール可能なポップアップで出る(自動生成なので、ルール側で例を書く必要はない)。入力欄はタップしてもズームしない。','',
+ '- ヒント: ON/OFF式。ON中に数字マス・縛り(盤面画面の縛り一覧内)・残り爆弾数チップをタップすると、その手がかりから確定できるマスがあるかだけ答える(場所は教えない)。正しい旗は既知の爆弾として連鎖推論に使う。1タップ=チャレンジではヒント1回消費。',
+ '- UI: 設定画面と盤面画面の2画面。縛りは検索つきモーダルで選択。併用不可の縛りは、片方を選ぶともう片方が選べなくなる(理由の文は出さない)。縛りを長押しすると、7x7の例盤面(最大2枚)がスクロール可能なポップアップで出る(自動生成なので、ルール側で例を書く必要はない)。入力欄はタップしてもズームしない。','',
  '## 2. 座標とヘルパー',
  '- 盤面は R行 x C列。マス番号 i = r*C + c (0始まり)。行 r = floor(i/C)、列 c = i%C。',
  '- offs(R,C,i,オフセット配列): i から [dr,dc] だけずらしたマスのうち盤内のものを番号配列で返す。定数: D8(8近傍) D4(上下左右) KN(桂馬8方向)。',
@@ -326,7 +328,7 @@ function buildContext(){const F='`'.repeat(3),src=(n,f)=>f?'  '+n+': '+String(f)
  ' excl:"num",                        // 任意: 数字の定義を変えるルールは "num"(同じexclは併用不可)',
  ' conflicts:["otherId"],             // 任意: 併用不可の相手(片側だけの宣言で双方向に効く)',
  ' ok:c=>c.M>=c.R,                    // 任意: 適用条件 c={R,C,M}。偽なら選ばれない/外される(フリープレイでは開始を止める)',
- ' why:"爆弾数は盤面の縦以上",         // 任意: okが偽のとき画面に出す理由(省略時は汎用文)',
+ ' why:"縦と横が同じ盤面のみ",         // 任意: okが盤面の形など爆弾数では直らない理由のときに画面に出す文(省略時は汎用文)',
  ' mstep:2,                           // 任意: 爆弾数がこの倍数でなければならない(2以上の整数。grpがあれば自動で grp の倍数)',
  ' nb:(R,C,i)=>offs(R,C,i,D8),        // 任意: マスiの数字が数えるマス(省略=D8)',
  ' cons:(R,C)=>[{cells:[0,1],lo:0,hi:1}], // 任意: 常に成り立つ制約。cells内の爆弾数は lo 以上 hi 以下',
@@ -340,7 +342,7 @@ function buildContext(){const F='`'.repeat(3),src=(n,f)=>f?'  '+n+': '+String(f)
  '## 4. 良いルールの条件',
  '- cons / grp を持つルールは、外すと解けなくなる盤面だけが採用される(縛りが飾りにならない)。外しても解けるのが普通になる弱すぎる制約(例: hi が大きすぎる)は生成が難航する。',
  '- 他の縛りと併用するとノーゲス盤面が作れない組み合わせは conflicts に入れる。「ルール検査」の結果(下の検査状況)を参考にする。',
- '- 爆弾数に条件があるルールは ok / mstep / why を書く(プレイヤーに理由が出る)。',
+ '- 爆弾数に条件があるルールは ok / mstep を書く(合わないときは前後の近い爆弾数が1つずつ自動表示される。why は爆弾数では直らない理由のときだけ表示)。',
  '- 説明は1行で、プレイヤーが読んで理解できること。','',
  '## 5. 表現できる/できない',
  '- できる: マス集合の爆弾数の範囲(隣接禁止、行・列・ブロックの個数、領域の個数範囲、特定マスの扱い)、数字が数えるマスの変更(十字、桂馬、距離2のリングなど)、爆弾の連結成分サイズの固定(grp)、爆弾数の倍数条件(mstep)。',
@@ -358,7 +360,7 @@ function buildContext(){const F='`'.repeat(3),src=(n,f)=>f?'  '+n+': '+String(f)
  '## 11. CHANGELOG',...CHANGELOG.map(x=>'- '+x)].join('\n')}
  
 /* ===== [GAME/UI] 画面は #setup(設定) と #game(盤面) の2つ。hidden切替なので設定は保持される ===== */
-let G=null,run=null,fm=0,LAST='',MODE='',TK=0;const AGE={},SEL=new Set();
+let G=null,run=null,fm=0,hm=0,LAST='',MODE='',TK=0;const AGE={},SEL=new Set();
 const v=id=>+$('#'+id).value,chk=id=>$('#'+id).checked,mode=()=>$('#mc').classList.contains('on')?'c':'f';
 const msg=t=>$('#msg').textContent=t;
 const show=id=>{$('#setup').hidden=id!='setup';$('#game').hidden=id!='game';scrollTo(0,0)};
@@ -374,21 +376,25 @@ function plan(ch){let R=Math.max(3,Math.min(24,v('R'))),C=Math.max(3,Math.min(24
  const N=R*C,M=ch?Math.max(1,Math.min(N-12,Math.round(N*ratio))):Math.max(1,Math.min(N-10,v('M')));
  const pool=Object.keys(RULES).filter(id=>SEL.has(id)),cfg={R,C,M,ids:[]};
  cfg.ids=ch?pick(pool,k,cfg):norm(pool,cfg);cfg.dropped=ch?0:pool.length-cfg.ids.length;
- /* チャレンジ: 選ばれた縛りが要求する倍数に爆弾数を合わせ、合わなくなった縛りは外す */
- if(ch){cfg.M=mfit(cfg.M,cfg.ids,N);cfg.ids=cfg.ids.filter(id=>!RULES[id].ok||RULES[id].ok(cfg))}
+ /* チャレンジ: 選ばれた縛りに合う最寄りの爆弾数(前後の近い方)に合わせ、合わなくなった縛りは外す */
+ if(ch){if(!mok(R,C,cfg.M,cfg.ids)){const{lo,hi}=mnear(R,C,cfg.M,cfg.ids,N-12),c=[lo,hi].filter(Boolean).sort((a,b)=>Math.abs(a-cfg.M)-Math.abs(b-cfg.M));cfg.M=c.length?c[0]:mfit(cfg.M,cfg.ids,N)}cfg.ids=cfg.ids.filter(id=>!RULES[id].ok||RULES[id].ok(cfg))}
  return cfg}
 /* フリープレイ: 選んだ縛りが今の盤面・爆弾数に合わないとき、理由を返す(スタートを止める) */
 function freeCfg(){const R=Math.max(3,Math.min(24,v('R')||3)),C=Math.max(3,Math.min(24,v('C')||3)),N=R*C;return{R,C,M:Math.max(1,Math.min(N-10,v('M')||1)),ids:[...SEL]}}
-function problems(){if(mode()!='f')return[];const cfg=freeCfg(),o=[];
- for(const id of SEL){const r=RULES[id],s=stepOf(r);
-  if(s>1&&cfg.M%s){const lo=Math.max(s,Math.floor(cfg.M/s)*s);o.push('「'+r.name+'」は爆弾数が'+s+'の倍数のときだけ使えます(いま'+cfg.M+'個 → '+lo+'個か'+(lo+s)+'個など)')}
-  else if(r.ok&&!r.ok(cfg))o.push('「'+r.name+'」: '+(r.why||'今の盤面・爆弾数では使えません'))}
+/* 爆弾数の統一判定: 全縛りが成り立つ爆弾数か / 前後の最寄り(フリープレイ表示とチャレンジ自動調整で共用) */
+const mok=(R,C,M,ids)=>ids.every(id=>{const r=RULES[id];return M%stepOf(r)==0&&(!r.ok||r.ok({R,C,M,ids}))});
+function mnear(R,C,M,ids,max){let lo=0,hi=0;for(let m=M-1;m>=1&&!lo;m--)if(mok(R,C,m,ids))lo=m;for(let m=M+1;m<=max&&!hi;m++)if(mok(R,C,m,ids))hi=m;return{lo,hi}}
+function problems(){if(mode()!='f')return[];const cfg=freeCfg(),{R,C,M}=cfg,max=Math.max(1,R*C-10),o=[],fx=[];
+ for(const id of SEL){const r=RULES[id];let f=0;for(let m=1;m<=max&&!f;m++)if(mok(R,C,m,[id]))f=1;
+  if(f)fx.push(id);else o.push('「'+r.name+'」: '+(r.why||'今の盤面では使えません'))}
+ if(fx.length&&!mok(R,C,M,fx)){const{lo,hi}=mnear(R,C,M,fx,max),a=[lo&&lo+'個',hi&&hi+'個'].filter(Boolean);
+  o.push(a.length?'爆弾数'+M+'個は選んだ縛りに合いません → '+a.join(' か '):'選んだ縛りに合う爆弾数がありません')}
  return o}
 function upd(){const p=problems();$('#mw').innerHTML=p.map(x=>'⚠ '+x).join('<br>');$('#go').disabled=p.length>0}
 function cancelGen(){TK++;$('#ld').hidden=true;show('setup')}
 async function start(nr){const ch=mode()=='c',tk=++TK;
  if(ch&&(nr||!run))run={streak:0,lives:v('L'),hints:v('H'),X:v('X')};if(!ch)run=null;
- const cfg=plan(ch);G=null;$('#g').innerHTML='';$('#st').innerHTML='';$('#nx').hidden=true;$('#hb').disabled=true;
+ const cfg=plan(ch);G=null;hm=0;$('#g').innerHTML='';$('#st').innerHTML='';$('#nx').hidden=true;$('#hb').disabled=true;
  $('#rv').textContent='🧩 縛り ('+cfg.ids.length+')';msg('');$('#ld').hidden=false;$('#ldt').textContent='ノーゲス盤面を探索中…';
  let res=null;
  try{res=await gen(cfg,{cancel:()=>tk!=TK,tick:(el,n)=>{$('#ldt').textContent='ノーゲス盤面を探索中… '+(el/1000|0)+'秒 / 候補 '+n+'件'}})}
@@ -405,18 +411,25 @@ function act(i,f){if(!G||G.over||G.done||G.st[i])return;G.hint=null;
  else flood(i);
  if(!G.over&&G.rev==G.N-G.cfg.M){G.done=1;if(run){run.streak++;msg(run.streak>=run.X?'🎉 目標達成! '+run.X+'連続クリア':'クリア! ('+run.streak+'/'+run.X+')')}else msg('🎉 クリア!')}
  draw()}
-function hintText(e){const s=e.src,w=e.mine?'爆弾':'安全',nm=id=>'縛り「'+RULES[id].name+'」';
- if(s.t=='n')return '青枠の数字の周りに、'+w+'と言い切れるマスがあります。';
- if(s.t=='r')return nm(s.id)+'から、'+w+'と言い切れるマスがあります。';
- if(s.t=='c')return '残り爆弾数から、'+w+'と言い切れるマスがあります。';
- const p=[];if(s.ns&&s.ns.length)p.push('青枠の数字');if(s.rs&&s.rs.length)p.push(s.rs.map(nm).join('と'));
- return (p.join('と')||'周りの状況')+'を組み合わせると、'+w+'と言い切れるマスが見つかります。'}
-function hint(){if(!G||G.over||G.done)return;if(run&&run.hints<=0)return msg('ヒントはもう使えません');
- const d=deduce(G.P,G.st,G.num,G.cfg.M);if(!d.length)return msg('いま確定できるマスはありません');
- const t=Math.min(...d.map(e=>e.tier)),c=d.filter(e=>e.tier==t),e=c[rnd()*c.length|0];
- if(run)run.hints--;G.hint=e;msg(hintText(e));draw()}
+/* ヒント: ON中に 数字マス/縛り(一覧内)/残り爆弾数 をタップ。その手がかりから分かることがあるかだけ教える(場所は教えない) */
+function hscan(){const{P,N,num,mines,fl,cfg}=G,st=G.st.slice(),out=[],seen=new Set();
+ for(let i=0;i<N;i++)if(fl[i]&&mines[i]&&!st[i])st[i]=2; /* 正しい旗=既知の爆弾 */
+ for(let r=0;r<60;r++){const d=deduce(P,st,num,cfg.M,undefined,1),mk=[];
+  for(const e of d){if(st[e.i])continue;const k=e.i+e.src.t+(e.src.id??e.src.i??'')+e.mine;if(!seen.has(k)){seen.add(k);out.push(e)}if(e.mine)mk.push(e.i)}
+  if(!mk.length)break;for(const i of mk)st[i]=2}
+ return out}
+function ask(k,key){if(!G||G.over||G.done)return;
+ if(run&&run.hints<=0)return msg('ヒントはもう使えません');
+ const m=hscan().filter(e=>{const s=e.src;return k=='n'?(s.t=='n'&&s.i==key)||(s.t=='x'&&s.ns.includes(key)):k=='r'?(s.t=='r'&&s.id==key)||(s.t=='x'&&s.rs.includes(key)):s.t=='c'});
+ if(run)run.hints--;
+ const who=k=='n'?'この数字':k=='r'?'この縛り':'残り爆弾数';let t;
+ if(!m.length){G.hint=null;t=who+'からは、いま分かることはありません'}
+ else{const a=m.some(e=>e.mine),b=m.some(e=>!e.mine),w=a&&b?'爆弾と安全の両方':a?'爆弾':'安全',x=k!='c'&&Math.min(...m.map(e=>e.tier))==3;
+  G.hint={ns:k=='n'?[key]:[],rs:k=='r'?[key]:[],c:k=='c'};
+  t=who+'から、'+w+'と言い切れるマスがあります'+(x?'(ほかの手がかりとの組み合わせ)':'')}
+ msg(t);if(k=='r')$('#mh').textContent=t;draw();if(k=='r')renderList()}
 function draw(){if(!G)return;const{cfg,st,fl,num,mines,over,hint:h}=G,{R,C}=cfg,s=Math.min(40,Math.floor(Math.min(620,innerWidth-40)/C));
- const ns=h?(h.src.t=='n'?[h.src.i]:h.src.ns||[]):[],hr=h?(h.src.t=='r'?[h.src.id]:h.src.rs||[]):[];
+ const ns=h?h.ns:[],hr=h?h.rs:[];
  let o='',expl=0,flg=0;
  for(let i=0;i<G.N;i++){let cl='c',t='';if(fl[i]&&!st[i])flg++;
   if(st[i]==1){cl+=' o';t=num[i]||'';if(t)cl+=' n'+Math.min(t,8)}
@@ -425,10 +438,10 @@ function draw(){if(!G)return;const{cfg,st,fl,num,mines,over,hint:h}=G,{R,C}=cfg,
   if(ns.includes(i))cl+=' hsrc';
   o+='<div class="'+cl+'" data-i="'+i+'">'+t+'</div>'}
  const g=$('#g');g.style.setProperty('--s',s+'px');g.style.gridTemplateColumns='repeat('+C+','+s+'px)';g.innerHTML=o;
- const ch=(t,c)=>'<span class="chip '+(c||'')+'">'+t+'</span>';
- $('#st').innerHTML=ch(R+'×'+C)+ch('💣 残り '+(cfg.M-expl-flg),h&&h.src.t=='c'?'hl':'')+(run?ch('連続 '+run.streak+'/'+run.X)+ch('❤ '+run.lives)+ch('💡 '+run.hints):'')+(G.gf?'':ch('⚠ ノーゲス未達'))+(G.gf&&!G.q?ch('品質条件未達'):'');
+ const ch=(t,c,k)=>'<span class="chip '+(c||'')+'"'+(k?' data-k="'+k+'"':'')+'>'+t+'</span>';
+ $('#st').innerHTML=ch(R+'×'+C)+ch('💣 残り '+(cfg.M-expl-flg),h&&h.c?'hl':'','c')+(run?ch('連続 '+run.streak+'/'+run.X)+ch('❤ '+run.lives)+ch('💡 '+run.hints):'')+(G.gf?'':ch('⚠ ノーゲス未達'))+(G.gf&&!G.q?ch('品質条件未達'):'');
  $('#rv').textContent='🧩 縛り ('+cfg.ids.length+')';$('#rv').className=hr.length?'hl':'';
- const fin=G.over||G.done;$('#hb').disabled=fin||(run&&run.hints<=0);$('#hb').textContent='💡 ヒント'+(run?' (残り'+run.hints+')':'');
+ const fin=G.over||G.done,out=run&&run.hints<=0;if(fin||out)hm=0;$('#hb').disabled=fin||out;$('#hb').classList.toggle('on',!!hm);$('#hb').textContent='💡 ヒント '+(hm?'ON':'OFF')+(run?' (残り'+run.hints+')':'');
  let lab=null,nr=0;if(!run)lab='新しい盤面';else if(G.over||(G.done&&run.streak>=run.X)){lab='もう一度挑戦';nr=1}else if(G.done)lab='次の盤面';
  const nx=$('#nx');nx.hidden=!lab;nx.textContent=lab||'';nx.dataset.nr=nr}
 /* ---- 縛りモーダル(pick=検索つき選択 / view=今の盤面の縛り) ---- */
@@ -436,10 +449,10 @@ const tags=r=>(r.nb?'<span class="tag">数字変更</span>':'')+(r.cons?'<span c
 const vis=()=>{const q=$('#mq').value.trim().toLowerCase();return Object.values(RULES).filter(r=>!q||(r.id+r.name+r.desc).toLowerCase().includes(q))};
 function renderList(){const L=$('#ml');
  if(MODE=='pick'){$('#mt').textContent='縛りを選ぶ ('+SEL.size+'/'+Object.keys(RULES).length+')';
-  L.innerHTML=vis().map(r=>{const b=blockers(r.id),d=b.length;return '<label class="ri'+(d?' dis':'')+'" data-rid="'+r.id+'"><input type="checkbox" data-id="'+r.id+'"'+(SEL.has(r.id)?' checked':'')+(d?' disabled':'')+'><div><b>'+r.name+'</b>'+tags(r)+'<div class="mut" style="margin:0">'+r.desc+'</div>'+(d?'<div style="color:#ef4b5f;font-size:12px">「'+b.map(x=>RULES[x].name).join('」「')+'」と併用不可</div>':'')+'</div></label>'}).join('')||'<p class="mut">該当する縛りがありません</p>'}
- else{const h=G&&G.hint,hr=h?(h.src.t=='r'?[h.src.id]:h.src.rs||[]):[];
+  L.innerHTML=vis().map(r=>{const d=blockers(r.id).length;return '<label class="ri'+(d?' dis':'')+'" data-rid="'+r.id+'"><input type="checkbox" data-id="'+r.id+'"'+(SEL.has(r.id)?' checked':'')+(d?' disabled':'')+'><div><b>'+r.name+'</b>'+tags(r)+'<div class="mut" style="margin:0">'+r.desc+'</div></div></label>'}).join('')||'<p class="mut">該当する縛りがありません</p>'}
+ else{const h=G&&G.hint,hr=h?h.rs:[];
   L.innerHTML=G.cfg.ids.map(id=>'<div class="ri '+(hr.includes(id)?'hl':'')+'" data-rid="'+id+'"><div><b>'+RULES[id].name+'</b>'+tags(RULES[id])+'<div class="mut" style="margin:0">'+RULES[id].desc+'</div></div></div>').join('')||'<p class="mut">この盤面に縛りはありません</p>'}}
-function openM(m){MODE=m;const p=m=='pick';if(!p)$('#mt').textContent='この盤面の縛り';$('#mq').hidden=$('#mfoot').hidden=!p;$('#mq').value='';$('#md').hidden=false;renderList()}
+function openM(m){MODE=m;const p=m=='pick';if(!p)$('#mt').textContent='この盤面の縛り';$('#mh').textContent=!p&&hm?'ヒントON: 縛りをタップすると、その縛りから分かることを教えます':'縛りを長押しすると、例の盤面が表示されます';$('#mq').hidden=$('#mfoot').hidden=!p;$('#mq').value='';$('#md').hidden=false;renderList()}
 function closeM(){$('#md').hidden=true;updSel();upd()}
 function updSel(){const n=[...SEL].map(id=>RULES[id].name);$('#sel').textContent=n.length?n.length+'件: '+n.join(' / '):'未選択(縛りなし)'}
 /* ---- 競合(併用不可)と例盤面 ---- */
@@ -485,10 +498,13 @@ window.addEventListener('load',()=>{
  $('#ml').onchange=e=>{const id=e.target.dataset.id;if(id){e.target.checked?SEL.add(id):SEL.delete(id);renderList()}};
  $('#ma').onclick=()=>{vis().forEach(r=>{if(!blockers(r.id).length)SEL.add(r.id)});renderList()};$('#mn').onclick=()=>{vis().forEach(r=>SEL.delete(r.id));renderList()};
  $('#go').onclick=()=>{if(problems().length)return upd();show('game');start(1)};$('#bk').onclick=cancelGen;$('#lc').onclick=cancelGen;
- $('#nx').onclick=()=>start(+$('#nx').dataset.nr);$('#hb').onclick=hint;
+ $('#nx').onclick=()=>start(+$('#nx').dataset.nr);
+ $('#hb').onclick=()=>{if(!G||G.over||G.done)return;hm=hm?0:1;msg(hm?'ヒントON: 数字のマス・縛り(🧩の中)・残り爆弾数をタップ'+(run?'(1回につきヒント1回消費)':''):'');draw()};
+ $('#st').onclick=e=>{if(hm&&e.target.closest('[data-k=c]'))ask('c')};
+ $('#ml').addEventListener('click',e=>{if(MODE!='view'||!hm)return;const t=e.target.closest('.ri');if(t)ask('r',t.dataset.rid)});
  $('#fo').onclick=()=>{fm=0;$('#fo').classList.add('on');$('#ff').classList.remove('on')};
  $('#ff').onclick=()=>{fm=1;$('#ff').classList.add('on');$('#fo').classList.remove('on')};
- $('#g').onclick=e=>{const i=e.target.dataset.i;if(i!==undefined)act(+i,fm)};
+ $('#g').onclick=e=>{const i=e.target.dataset.i;if(i===undefined)return;if(hm&&G&&G.st[+i]==1&&G.num[+i])return ask('n',+i);act(+i,fm)};
  $('#g').oncontextmenu=e=>{e.preventDefault();const i=e.target.dataset.i;if(i!==undefined)act(+i,1)};
  $('#cg').onclick=()=>{const t=ctx();$('#ctx').select();try{navigator.clipboard.writeText(t)}catch(e){}};
  $('#ct').onclick=async()=>{$('#ctx').value='検査中…(数十秒〜数分かかります)';await selfTest();ctx()};
