@@ -38,3 +38,7 @@ function longpress(el,sel,fn){let tm=0,fired=0;
  for(const n of['pointerup','pointerleave','pointercancel'])el.addEventListener(n,()=>clearTimeout(tm));
  el.addEventListener('click',e=>{if(fired){fired=0;e.preventDefault();e.stopImmediatePropagation()}},true);
  el.addEventListener('contextmenu',e=>{if(e.target.closest(sel))e.preventDefault()})}
+/* モーダル(#md 縛り / #ex 例盤面)が開いている間は、後ろの画面をスクロールさせない。CSSを触らず、ここで style を足す。 */
+try{if(typeof document!=='undefined'&&document.head&&document.createElement){const st=document.createElement('style');
+ st.textContent='html:has(#md:not([hidden])),html:has(#ex:not([hidden])),body:has(#md:not([hidden])),body:has(#ex:not([hidden])){overflow:hidden}#md,#md *,#ex,#ex *{overscroll-behavior:contain}';
+ document.head.appendChild(st)}}catch(e){}
