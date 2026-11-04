@@ -9,3 +9,4 @@
 - v0.6 CORE拡張: liar(数字が実際と1ズレる。各行・各列に正直な数字がちょうど1つ)フック, ルール liar
 - v0.7 ヒントをON/OFF式に(数字/縛り/残り爆弾数をタップ。正しい旗を既知爆弾として連鎖推論), 爆弾数の不一致は前後の近い値のみ表示(mok/mnear)
 - v0.8 ファイル分割: 単一HTML → js/core, js/game, js/ui, rules/(1ルール=1ファイル), css, build.py(単一HTML生成+rulesブロック自動同期), tools/headless.js(ブラウザ無し検査), tools/smoke-ui.js, 静的な context.md(構成と渡すファイルの表)。ゲームの挙動は変更なし。アプリ内の「context.md 自動生成」は「検査レポート」に置換。検査は爆弾数を mpick で自動選択するよう改善(爆弾数が多く要るルールが「適用外」になる問題を解消)。あわせて例盤面の乱択を500→20000回にし、lines の長押し例が約75%失敗していた問題を修正
+- 色つきマス2倍(colorDouble): 市松の色つきマスの爆弾を数字では2個として数える。CORE拡張[wt]: registry(wt検査・併用)/prep(P.w, ncount)/solver(重み付き制約)/board・modal(色表示)/play。liarと併用不可。
