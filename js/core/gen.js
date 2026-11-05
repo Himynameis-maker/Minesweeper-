@@ -10,8 +10,9 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
  const{R,C,M,ids}=cfg,N=R*C,P=prep(cfg),t0=performance.now(),kc=P.cons;
  if(P.grp&&M%P.grp)throw Error('爆弾数が'+P.grp+'の倍数ではありません');
  const byC=[...Array(N)].map(()=>[]);kc.forEach((k,q)=>k.cells.forEach(c=>byC[c].push(q)));
- const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp));
- const nec=ids.filter(id=>RULES[id].grp||(RULES[id].cons&&RULES[id].cons(R,C).length));
+ /*[iso]*/const iok=m=>{for(let i=0;i<N;i++)if(m[i]&&!P.adj8[i].some(y=>m[y]))return false;return true};
+ const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp))&&(!P.iso||iok(m));
+ const nec=ids.filter(id=>RULES[id].grp||RULES[id].iso||(RULES[id].cons&&RULES[id].cons(R,C).length));
  const LM=!!P.lie;if(LM&&R!=C)throw Error('縦と横が同じ盤面のみ');
  const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
  /* ---- [liar] 正直な数字: 各行・各列に1つ(安全マスのみ)。ほかの安全マスは±1ズレる(範囲外なら逆向き) ---- */
@@ -46,10 +47,30 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   while(g.length<n){const f=[];for(const c of g)for(const y of P.adj[c])if(!m[y]&&!sz.has(y)&&!f.includes(y)&&!P.adj[y].some(z=>m[z]&&!g.includes(z)))f.push(y);
    if(!f.length)return null;const y=f[rnd()*f.length|0];g.push(y);m[y]=1}
   return m};
- /* ---- 標準の配置サンプラ(密度ムラ)。grp持ちは gsample に切り替わる ---- */
+ /* ---- [iso] 孤立禁止: 8近傍でつながる2〜4個の塊を置いていく(isample)と、塊を壊さない山登り(imove) ---- */
+ const isample=(sz,w)=>{const m=new Uint8Array(N),cnt=kc.map(()=>0);
+  const can=c=>!sz.has(c)&&!m[c]&&byC[c].every(q=>cnt[q]<kc[q].hi);
+  const put=c=>{m[c]=1;byC[c].forEach(q=>cnt[q]++)};
+  for(let left=M;left>0;){
+   let n=left<=4?left:2+(rnd()*3|0);if(left>4&&left-n==1)n=n>2?n-1:n+1;
+   const a=[];for(let c=0;c<N;c++)if(can(c))a.push(c);if(!a.length)return null;
+   const g=[wpick(a,w)];put(g[0]);
+   while(g.length<n){const f=[];for(const c of g)for(const y of P.adj8[c])if(can(y)&&!f.includes(y))f.push(y);if(!f.length)return null;const y=wpick(f,w);g.push(y);put(y)}
+   left-=n}
+  return valid(m)?m:null};
+ const imove=(cur,a,Us,cs)=>{const sz=new Set([cs,...P.nb[cs]]),m=cur.slice(),x=a[rnd()*a.length|0],rm=[x];m[x]=0;
+  if(rnd()<.5){const zs=P.adj8[x].filter(y=>m[y]&&Us.has(y));if(zs.length){const z=zs[rnd()*zs.length|0];m[z]=0;rm.push(z)}}
+  const fr=c=>!m[c]&&Us.has(c)&&!sz.has(c)&&!rm.includes(c);
+  if(rm.length==1){const cand=[];for(const c of Us)if(fr(c)&&P.adj8[c].some(y=>m[y]))cand.push(c);
+   if(!cand.length)return null;m[cand[rnd()*cand.length|0]]=1;return m}
+  const c1s=[];for(const c of Us)if(fr(c))c1s.push(c);if(!c1s.length)return null;
+  const c1=c1s[rnd()*c1s.length|0],c2s=P.adj8[c1].filter(fr);if(!c2s.length)return null;
+  m[c1]=1;m[c2s[rnd()*c2s.length|0]]=1;return m};
+ /* ---- 標準の配置サンプラ(密度ムラ)。grp持ちは gsample、iso持ちは isample に切り替わる ---- */
  const sample=s=>{const sz=new Set([s,...P.nb[s]]),cx=[0,1,2].map(()=>[rnd()*R,rnd()*C,rnd()]),sg=Math.max(R,C)/3,w=[];
   for(let i=0;i<N;i++){let v=.25;for(const[y,x,a]of cx)v+=a*2*Math.exp(-(((i/C|0)-y)**2+(i%C-x)**2)/(2*sg*sg));w.push(v)}
   if(P.grp)return gsample(sz,w);
+  if(P.iso)return isample(sz,w);
   const m=new Uint8Array(N),cnt=kc.map(()=>0),cand=[];for(let i=0;i<N;i++)if(!sz.has(i))cand.push(i);
   for(let n=0;n<M;n++){const ok=cand.filter(c=>!m[c]&&byC[c].every(q=>cnt[q]<kc[q].hi));if(!ok.length)return null;
    let t=rnd()*ok.reduce((a,c)=>a+w[c],0),pick=ok[ok.length-1];for(const c of ok){t-=w[c];if(t<=0){pick=c;break}}
@@ -58,10 +79,11 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
  /* ---- 例盤面用(UIの長押し): 解けるかは見ず、OK例とNG例だけ作る ---- */
  if(o.sampleOnly){let ex=null,bad=null,bc=[];
   for(let k=0;k<20000&&!ex;k++)ex=sample(rnd()*N|0); /* 下限つき cons は当たりが薄い(lines で約0.05%)ので多めに試す */
-  for(let k=0;k<3000&&!bad&&(kc.length||P.grp);k++){const m=new Uint8Array(N);for(let n=0;n<M;){const c=rnd()*N|0;if(!m[c]){m[c]=1;n++}}
+  for(let k=0;k<3000&&!bad&&(kc.length||P.grp||P.iso);k++){const m=new Uint8Array(N);for(let n=0;n<M;){const c=rnd()*N|0;if(!m[c]){m[c]=1;n++}}
    const vi=kc.filter(q=>{let s=0;for(const c of q.cells)s+=m[c];return s<q.lo||s>q.hi});
    const gb=P.grp?gcomps(P,m).filter(q=>q.length!=P.grp).flat():[];
-   if(vi.length||gb.length){bad=m;bc=[...new Set([...vi.flatMap(q=>q.cells),...gb])]}}
+   const ib=P.iso?[...Array(N).keys()].filter(i=>m[i]&&!P.adj8[i].some(y=>m[y])):[];
+   if(vi.length||gb.length||ib.length){bad=m;bc=[...new Set([...vi.flatMap(q=>q.cells),...gb,...ib])]}}
   let L=null;if(LM&&ex)for(let k=0;k<50&&!L;k++)L=lstate(ex);
   return{P,mines:ex,bad,bc,L}}
  /* ---- 品質判定と本体ループ ---- */
@@ -79,7 +101,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   if(!a.length||!b.length){cur=null;continue}
   let m2=null,l2=cl;const lm=LM&&rnd()<.6?lmove(cur,cl,U):null;
   if(lm){m2=lm.m;l2=lm.L}
-  else{if(P.grp)m2=gmove(cur,a,new Set(U),cs);else{m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1}
+  else{if(P.grp)m2=gmove(cur,a,new Set(U),cs);else if(P.iso)m2=imove(cur,a,new Set(U),cs);else{m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1}
    if(m2&&LM){if(m2.some((x,i)=>x&&cl.hon[i]))m2=null;else l2=lstate(m2,cl.hon,cl.sg)}}
   if(!m2||!valid(m2)){if(++inv>40)cur=null;continue}
   const r2=sim(P,M,m2,cs,undefined,l2);if(r2.bug)throw Error('solver unsound');
