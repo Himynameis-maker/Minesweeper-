@@ -30,18 +30,18 @@ context.md            ← これ。CHANGELOG.md = 変更履歴。README.md = 人
 css/style.css         見た目のみ (4.8KB)
 js/core/              推論と生成。DOM非依存(node でも動く)
   util.js             rnd, D8/D4/KN, offs, gcd (0.5KB)
-  registry.js         RULES, reg, conflict, stepOf/mfit/mok/mnear/mpick (2KB)
-  prep.js             prep(cfg)→P(問題定義), gcomps (1.2KB)
-  solver.js           deduce(確定推論エンジン), sim(解き進めシミュ) (7KB)  ★全体制約の主戦場
-  gen.js              gen(ノーゲス盤面の生成・山登り・品質判定) (7.6KB)   ★配置様式の主戦場
-  selftest.js         selfTest(単体+併用ペア検査), buildReport (2KB)
+  registry.js         RULES, reg, conflict, stepOf/mfit/mok/mnear/mpick (2.1KB)
+  prep.js             prep(cfg)→P(問題定義), gcomps (1.8KB)
+  solver.js           deduce(確定推論エンジン), sim(解き進めシミュ) (9KB)  ★全体制約の主戦場
+  gen.js              gen(ノーゲス盤面の生成・山登り・品質判定) (11KB)   ★配置様式の主戦場
+  selftest.js         selfTest(単体+併用ペア検査), buildReport (2.1KB)
 js/game/              盤面の進行(DOMを読み書きする)
   state.js            グローバル状態 G/run/SEL..., $ v chk mode msg show (0.7KB)
   config.js           設定→cfg: norm, pick, plan, freeCfg, problems (2.9KB)
   play.js             start(gen呼び出し), flood, act, hscan, ask(ヒント) (3.7KB)
 js/ui/                描画と配線
   board.js            draw (1.7KB)
-  modal.js            縛りモーダル, tags(縛りのタグ), 例盤面 mini/exHtml, longpress (4.5KB)
+  modal.js            縛りモーダル, tags(縛りのタグ), 例盤面 mini/exHtml, longpress (5.4KB)
   main.js             upd, setMode, 検査レポート欄, 全イベント配線(load) (3.3KB)
 rules/                1ルール=1ファイル(ファイル名=id)。_始まりは読み込まれない
   _template.js        ひな形 (reg の全フック一覧つき)
@@ -79,6 +79,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
  mstep:2,                           // 任意: 爆弾数がこの倍数(2以上の整数。grpがあれば自動で grp の倍数)
  nb:(R,C,i)=>offs(R,C,i,D8),        // 任意: マスiの数字が数えるマス(省略=D8)
  cons:(R,C)=>[{cells:[0,1],lo:0,hi:1}], // 任意: 常に成り立つ制約。cells内の爆弾数は lo 以上 hi 以下
+ wt:(R,C,i)=>1,                    // 任意: マスiの爆弾が数字に数えられる個数(重み。色つきマスは2など。爆弾の総数は変わらない。同時に1つだけ)
  liar:true,                         // 任意: 数字が実際と±1ズレる(各行・各列に正直な数字が1つ。縦横同じ盤面のみ。同時に1つだけ)
  grp:4,                             // 任意: 爆弾の縦横連結成分が全てちょうどこの個数(同時に1つだけ)
  iso:true,                          // 任意: どの爆弾も8近傍に別の爆弾がある(孤立禁止。nb に関係なく常に8近傍)
@@ -90,6 +91,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 - `nb` を持つルールは同時に1つだけ(`excl:"num"` で防ぐ)。`grp` / `liar` も同様に1つだけ(conflict が自動で防ぐ)。
 - `grp` は「爆弾を縦横につながった grp 個ずつの組にし、組同士は縦横で触れない」。縦横に爆弾が隣り合うのを禁じる縛りとは `conflicts` にする。
 - `liar` は nb(十字/ナイト)や cons 系と併用できる。
+- `wt` は nb(十字/ナイト)と併用できる。`wt` 同士は併用不可(conflict が自動で防ぐ)。liar は「±1ズレ」の前提が個数なので併用不可(colorDouble が `conflicts:['liar']` を宣言している)。
 - `iso` は「爆弾があるマスだけに課す条件つき制約」なので cons では書けない。nb / cons / liar と併用できる。grp とは併用不可(組の中が必ずつながるので飾りになる。`conflicts` で防ぐ)。
 - `conn` も cons では書けない全体制約。nb / cons / liar / grp と併用できる。iso(飾りになる)・rect(成り立たない)とは併用不可。
 - cons だけで書ける形の例: rect(爆弾は1x1〜1x4の直線、斜めにも触れない)は「2x2 の枠は2個以下」「2x2 の対角は同時に爆弾にならない」「横5・縦5の窓は4個以下」だけで書ける(全部 hi のみ。下限なしなので第9節の生成制限を受けない)。
