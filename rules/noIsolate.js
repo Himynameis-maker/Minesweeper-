@@ -5,7 +5,7 @@
 reg({id:'noIsolate',name:'小さな塊',desc:'爆弾は縦横斜めにつながった2〜5個の塊になり、塊同士は縦横斜めで触れない(孤立した爆弾はない)',
  iso:5,
  // 上限: 塊が触れないよう空きが要るので、爆弾が盤面の約4割を超えると成り立ちにくく生成が極端に遅くなる(爆弾数で直る)
- ok:c=>c.M>=2&&c.M<=Math.floor(c.R*c.C*.4),
+ ok:c=>c.M>=2&&c.M<=Math.floor(c.R*c.C*.5),
  // groupBomb: 組が縦横の連結(4個)なので、塊のサイズ条件が組の斜め接触禁止だけになる。gsample/gmove が斜め接触を避けないので生成未対応
  // allConnected: 全体が1つにつながると塊が1個になり、爆弾数が5個以下に限られる
  conflicts:['groupBomb','allConnected']});
