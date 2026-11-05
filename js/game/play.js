@@ -13,14 +13,14 @@ async function start(nr){const ch=mode()=='c',tk=++TK;
  flood(res.start);msg(cfg.dropped?cfg.dropped+'件の縛りは条件に合わないため外しました':'');draw()}
 function flood(i){const q=[i],{st,fl,act:ac,mines,P}=G;while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;fl[x]=0;G.rev++;if(!ac[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}}
 function act(i,f){if(!G||G.over||G.done||G.st[i])return;G.hint=null;
- if(f){G.fl[i]^=1;return draw()}if(G.fl[i])return;
+ if(f){G.fl[i]=G.fl[i]==f?0:f;return draw()}if(G.fl[i])return; /* f: 0=開ける 1=旗 2=マーク。同じ種類をもう一度で外れ、別の種類なら置き換え */
  if(G.mines[i]){G.st[i]=2;if(run){run.lives--;if(run.lives<=0){G.over=1;msg('ゲームオーバー… 連続クリア '+run.streak+'回')}else msg('ミス! 残りライフ '+run.lives)}else{G.over=1;msg('爆発…')}}
  else flood(i);
  if(!G.over&&G.rev==G.N-G.cfg.M){G.done=1;if(run){run.streak++;msg(run.streak>=run.X?'🎉 目標達成! '+run.X+'連続クリア':'クリア! ('+run.streak+'/'+run.X+')')}else msg('🎉 クリア!')}
  draw()}
 /* ヒント: ON中に 数字マス/縛り(一覧内)/残り爆弾数 をタップ。その手がかりから分かることがあるかだけ教える(場所は教えない) */
 function hscan(){const{P,N,num,mines,fl,cfg}=G,st=G.st.slice(),out=[],seen=new Set();
- for(let i=0;i<N;i++)if(fl[i]&&mines[i]&&!st[i])st[i]=2; /* 正しい旗=既知の爆弾 */
+ for(let i=0;i<N;i++)if(fl[i]==1&&mines[i]&&!st[i])st[i]=2; /* 正しい旗=既知の爆弾(マークは対象外) */
  for(let r=0;r<60;r++){const d=deduce(P,st,num,cfg.M,undefined,1),mk=[];
   for(const e of d){if(st[e.i])continue;const k=e.i+e.src.t+(e.src.id??e.src.i??'')+e.mine;if(!seen.has(k)){seen.add(k);out.push(e)}if(e.mine)mk.push(e.i)}
   if(!mk.length)break;for(const i of mk)st[i]=2}
