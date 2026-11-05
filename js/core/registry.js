@@ -19,6 +19,6 @@ function reg(d){try{
  if(d.conflicts&&!Array.isArray(d.conflicts))throw'conflictsは配列';
  for(const k of['grp','mstep'])if(d[k]!==undefined&&!(Number.isInteger(d[k])&&d[k]>=2))throw k+'は2以上の整数';
  if(d.why!==undefined&&typeof d.why!='string')throw'whyは文字列';
- if(d.iso!==undefined&&d.iso!==true)throw'isoはtrue';
+ if(d.iso!==undefined&&d.iso!==true&&!(Number.isInteger(d.iso)&&d.iso>=3))throw'isoはtrueか3以上の整数';
  if(d.conn!==undefined&&d.conn!==true)throw'connはtrue';
  RULES[d.id]=d}catch(e){RULE_ERR.push((d&&d.id)+': '+e)}}

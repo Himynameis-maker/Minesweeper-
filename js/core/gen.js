@@ -5,12 +5,13 @@
    ノーゲスでない盤面は絶対に返さない(見つからなければ null)。
    品質条件: 推論の種類>=2, 手順3段以上, 開始開放<=50%, cons/grp持ちルールは外すと詰む(=縛りが飾りでない)。
    qms秒探索して品質条件を満たさなければ「ノーゲスだが品質未達」を許容、hard秒で打ち切り。
+   iso持ちは「8近傍でつながる塊(imax があれば2〜imax個。塊同士は8近傍で触れない)を置く」配置と「塊ごと動かす」山登り。
    新しい配置様式(例: ヘビ)のルールは、[grp] と同じ位置に「専用の sample と move」を足す(context.md 第6節)。 */
 async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
  const{R,C,M,ids}=cfg,N=R*C,P=prep(cfg),t0=performance.now(),kc=P.cons;
  if(P.grp&&M%P.grp)throw Error('爆弾数が'+P.grp+'の倍数ではありません');
  const byC=[...Array(N)].map(()=>[]);kc.forEach((k,q)=>k.cells.forEach(c=>byC[c].push(q)));
- /*[iso]*/const iok=m=>{for(let i=0;i<N;i++)if(m[i]&&!P.adj8[i].some(y=>m[y]))return false;return true};
+ /*[iso]*/const iok=m=>{if(P.imax)return ccomps(m).every(q=>q.length>=2&&q.length<=P.imax);for(let i=0;i<N;i++)if(m[i]&&!P.adj8[i].some(y=>m[y]))return false;return true};
  /*[conn]*/const ccomps=m=>{const seen=new Uint8Array(N),o=[];for(let i=0;i<N;i++)if(m[i]&&!seen[i]){const q=[i];seen[i]=1;for(let h=0;h<q.length;h++)for(const y of P.adj8[q[h]])if(m[y]&&!seen[y]){seen[y]=1;q.push(y)}o.push(q)}return o};
  /*[conn]*/const cconn=m=>ccomps(m).length<=1;
  const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp))&&(!P.iso||iok(m))&&(!P.conn||cconn(m));
@@ -49,18 +50,30 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   while(g.length<n){const f=[];for(const c of g)for(const y of P.adj[c])if(!m[y]&&!sz.has(y)&&!f.includes(y)&&!P.adj[y].some(z=>m[z]&&!g.includes(z)))f.push(y);
    if(!f.length)return null;const y=f[rnd()*f.length|0];g.push(y);m[y]=1}
   return m};
- /* ---- [iso] 孤立禁止: 8近傍でつながる2〜4個の塊を置いていく(isample)と、塊を壊さない山登り(imove) ---- */
- const isample=(sz,w)=>{const m=new Uint8Array(N),cnt=kc.map(()=>0);
-  const can=c=>!sz.has(c)&&!m[c]&&byC[c].every(q=>cnt[q]<kc[q].hi);
+ /* ---- [iso] 孤立禁止: 8近傍でつながる塊を置いていく(isample)と、塊を壊さない山登り(imove)。
+        iso:true は塊2〜4個(塊同士が触れてもよい)。iso:n(imax)は塊2〜n個で、塊同士は8近傍で触れない(触れると1つの塊になるため) ---- */
+ const isample=(sz,w)=>{const mx=P.imax||4,m=new Uint8Array(N),cnt=kc.map(()=>0),blk=new Uint8Array(N);
+  const can=c=>!sz.has(c)&&!m[c]&&!blk[c]&&byC[c].every(q=>cnt[q]<kc[q].hi);
   const put=c=>{m[c]=1;byC[c].forEach(q=>cnt[q]++)};
   for(let left=M;left>0;){
-   let n=left<=4?left:2+(rnd()*3|0);if(left>4&&left-n==1)n=n>2?n-1:n+1;
+   const ns=[];for(let k=2;k<=Math.min(mx,left);k++)if(left-k!=1)ns.push(k);if(!ns.length)return null;
+   const n=ns[rnd()*ns.length|0];
    const a=[];for(let c=0;c<N;c++)if(can(c))a.push(c);if(!a.length)return null;
    const g=[wpick(a,w)];put(g[0]);
    while(g.length<n){const f=[];for(const c of g)for(const y of P.adj8[c])if(can(y)&&!f.includes(y))f.push(y);if(!f.length)return null;const y=wpick(f,w);g.push(y);put(y)}
+   if(P.imax)for(const c of g){blk[c]=1;for(const y of P.adj8[c])blk[y]=1}
    left-=n}
   return valid(m)?m:null};
- const imove=(cur,a,Us,cs)=>{const sz=new Set([cs,...P.nb[cs]]),m=cur.slice(),x=a[rnd()*a.length|0],rm=[x];m[x]=0;
+ const imove=(cur,a,Us,cs)=>{const sz=new Set([cs,...P.nb[cs]]),m=cur.slice(),x=a[rnd()*a.length|0];
+  if(P.imax&&rnd()<.5){ /* 塊ごと、同じ大きさのまま別の場所(他の塊に触れない所)へ */
+   const cm=ccomps(cur).find(q=>q.includes(x));if(!cm)return null;for(const c of cm)m[c]=0;
+   const ban=new Uint8Array(N);for(let i=0;i<N;i++)if(m[i]){ban[i]=1;for(const y of P.adj8[i])ban[y]=1}
+   const fr=c=>!ban[c]&&!m[c]&&Us.has(c)&&!sz.has(c);
+   const cand=[];for(const c of Us)if(fr(c))cand.push(c);if(!cand.length)return null;
+   const g=[cand[rnd()*cand.length|0]];m[g[0]]=1;
+   while(g.length<cm.length){const f=[];for(const c of g)for(const y of P.adj8[c])if(fr(y)&&!f.includes(y))f.push(y);if(!f.length)return null;const y=f[rnd()*f.length|0];g.push(y);m[y]=1}
+   return m}
+  const rm=[x];m[x]=0;
   if(rnd()<.5){const zs=P.adj8[x].filter(y=>m[y]&&Us.has(y));if(zs.length){const z=zs[rnd()*zs.length|0];m[z]=0;rm.push(z)}}
   const fr=c=>!m[c]&&Us.has(c)&&!sz.has(c)&&!rm.includes(c);
   if(rm.length==1){const cand=[];for(const c of Us)if(fr(c)&&P.adj8[c].some(y=>m[y]))cand.push(c);
@@ -98,7 +111,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   for(let k=0;k<3000&&!bad&&(kc.length||P.grp||P.iso||P.conn);k++){const m=new Uint8Array(N);for(let n=0;n<M;){const c=rnd()*N|0;if(!m[c]){m[c]=1;n++}}
    const vi=kc.filter(q=>{let s=0;for(const c of q.cells)s+=m[c];return s<q.lo||s>q.hi});
    const gb=P.grp?gcomps(P,m).filter(q=>q.length!=P.grp).flat():[];
-   const ib=P.iso?[...Array(N).keys()].filter(i=>m[i]&&!P.adj8[i].some(y=>m[y])):[];
+   const ib=P.iso?ccomps(m).filter(q=>q.length<2||(P.imax&&q.length>P.imax)).flat():[];
    const cb=P.conn?(cc=>cc.length>1?cc.sort((p,q)=>q.length-p.length).slice(1).flat():[])(ccomps(m)):[];
    if(vi.length||gb.length||ib.length||cb.length){bad=m;bc=[...new Set([...vi.flatMap(q=>q.cells),...gb,...ib,...cb])]}}
   let L=null;if(LM&&ex)for(let k=0;k<50&&!L;k++)L=lstate(ex);

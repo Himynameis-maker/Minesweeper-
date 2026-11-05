@@ -25,9 +25,12 @@ function deduce(P,st,num,M,skip,all){
   if(v){if(reach(x,1,GN+1)>GN)return false;return reach(x,0,GN)>=GN}
   for(const y of P.adj[x])if(S[y]!=0&&reach(y,0,GN)<GN&&hb)return false;
   return true};
- /*[iso]*/const IM=!!P.iso&&P.iid!==skip; /* 孤立禁止: 爆弾の8近傍に「安全でない」マスが1つ以上要る(必要条件のみ) */
+ /*[iso]*/const IM=!!P.iso&&P.iid!==skip,IX=IM?P.imax:0; /* 孤立禁止: 爆弾の8近傍に「安全でない」マスが1つ以上要る。imax があれば確定爆弾の8近傍連結成分は imax 個以下(どちらも必要条件のみ) */
  /*[iso]*/const ichk=(x,v)=>{const A=P.adj8;
-  if(v)return A[x].some(y=>S[y]!=0);
+  if(v){if(!A[x].some(y=>S[y]!=0))return false;
+   if(IX){const q=[x];vis[x]=++sp;for(let h=0;h<q.length&&q.length<=IX;h++)for(const y of A[q[h]])if(vis[y]!=sp&&S[y]==1){vis[y]=sp;q.push(y)}
+    return q.length<=IX}
+   return true}
   for(const y of A[x])if(S[y]==1&&!A[y].some(z=>S[z]!=0))return false;
   return true};
  /*[conn]*/const CM=!!P.conn&&P.cnid!==skip; /* 手繋ぎ: 爆弾が全部8近傍でひと続き。必要条件: 確定爆弾が全て「安全でないマス」の同じ連結領域にあり、その領域は M マス以上 */
