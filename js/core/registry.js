@@ -20,4 +20,5 @@ function reg(d){try{
  for(const k of['grp','mstep'])if(d[k]!==undefined&&!(Number.isInteger(d[k])&&d[k]>=2))throw k+'は2以上の整数';
  if(d.why!==undefined&&typeof d.why!='string')throw'whyは文字列';
  if(d.iso!==undefined&&d.iso!==true)throw'isoはtrue';
+ if(d.conn!==undefined&&d.conn!==true)throw'connはtrue';
  RULES[d.id]=d}catch(e){RULE_ERR.push((d&&d.id)+': '+e)}}

@@ -12,7 +12,7 @@ async function selfTest(only){PAIR_NG.length=0;const ids=Object.keys(RULES),sel=
   try{if(!await gen(cfg,{qms:800,hard:4000}))PAIR_NG.push(a.id+'+'+b.id)}catch(e){PAIR_NG.push(a.id+'+'+b.id+'('+e.message+')')}}}
 /* 検査レポート(markdown)。ルール一覧は id/name/使用フックのみ(ソースは rules/<id>.js を別途渡す) */
 function buildReport(){
- const hk=r=>[r.nb&&'nb',r.wt&&'wt',r.cons&&'cons',r.ok&&'ok',r.grp&&'grp='+r.grp,r.liar&&'liar',r.iso&&'iso',r.mstep&&'mstep='+r.mstep,r.why&&'why',r.excl&&'excl='+r.excl,r.conflicts&&'conflicts='+r.conflicts.join(',')].filter(Boolean).join(' ');
+ const hk=r=>[r.nb&&'nb',r.wt&&'wt',r.cons&&'cons',r.ok&&'ok',r.grp&&'grp='+r.grp,r.liar&&'liar',r.iso&&'iso',r.conn&&'conn',r.mstep&&'mstep='+r.mstep,r.why&&'why',r.excl&&'excl='+r.excl,r.conflicts&&'conflicts='+r.conflicts.join(',')].filter(Boolean).join(' ');
  const rows=Object.values(RULES).map(r=>'| '+r.id+' | '+r.name+' | '+hk(r)+' | '+(TEST[r.id]||'未検査')+' |');
  return['# 検査レポート ('+new Date().toISOString().slice(0,10)+')','',
   '| id | name | hooks | 単体検査 |','|---|---|---|---|',...rows,'',
