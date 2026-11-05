@@ -18,6 +18,7 @@
 - フリープレイ: 盤面/爆弾数/縛りを自由指定、ミス=即終了。縛りが今の盤面・爆弾数に合わないとスタートを止める。
 - チャレンジ: X連続クリアが目標、縛りはプールから抽選、ライフ・ヒント回数あり。爆弾数は縛りに合う最寄り値へ自動調整。
 - ヒント: ON/OFF式。ON中に数字・縛り・残り爆弾数をタップすると、その手がかりから確定できるマスがあるかだけ答える(場所は教えない)。
+- 操作: モードは「開ける/旗/マーク」(`fm`=0/1/2)。マークは旗の色違いのメモで、残り爆弾数とヒント推論には影響しない(旗だけが「既知の爆弾」扱い)。同じ印をもう一度立てると外れ、別の印は置き換え。旗/マークの立っているマスは開けない。右クリックは選択中の印を立てる(開けるモード中は旗)。
 
 ## 2. ファイル構成
 
@@ -45,14 +46,14 @@ js/ui/                描画と配線
   main.js             upd, setMode, 検査レポート欄, 全イベント配線(load) (3.3KB)
 rules/                1ルール=1ファイル(ファイル名=id)。_始まりは読み込まれない
   _template.js        ひな形 (reg の全フック一覧つき)
-  noTouch cross knight lines liar groupBomb rect noIsolate allConnected .js
+  noTouch cross knight lines liar groupBomb rect noIsolate allConnected colorDouble .js
 tools/
   headless.js         ブラウザ無しで検査: node tools/headless.js [id...] | --combo a,b,c
   smoke-ui.js         偽DOMでUI一式を動かす: node tools/smoke-ui.js
 ```
 
 `P`(prep の結果): `{nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp, gid, adj(上下左右), iso, iid, imax(iso の塊サイズ上限。0=上限なし), conn, cnid, adj8(8近傍。iso か conn のときだけ), R, C, lie, lid, w}`。
-`G`(盤面状態, game): `{cfg,P,N,mines,act(実際の数),num(表示数字),st(0未開/1開/2爆発),fl,rev,over,done,hint}`。
+`G`(盤面状態, game): `{cfg,P,N,mines,act(実際の数),num(表示数字),st(0未開/1開/2爆発),fl(0なし/1旗/2マーク。真偽値として扱わず fl[i]==1 のように書く),rev,over,done,hint}`。
 
 ## 3. タスク別「渡すファイル」(コスト削減の要)
 
