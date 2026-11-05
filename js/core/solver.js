@@ -25,7 +25,12 @@ function deduce(P,st,num,M,skip,all){
   if(v){if(reach(x,1,GN+1)>GN)return false;return reach(x,0,GN)>=GN}
   for(const y of P.adj[x])if(S[y]!=0&&reach(y,0,GN)<GN&&hb)return false;
   return true};
- /*[grp]*/if(GN){S=new Uint8Array(N);vis=new Int32Array(N);for(let i=0;i<N;i++)S[i]=st[i]==1?0:st[i]==2?1:2}
+ /*[iso]*/const IM=!!P.iso&&P.iid!==skip; /* 孤立禁止: 爆弾の8近傍に「安全でない」マスが1つ以上要る(必要条件のみ) */
+ /*[iso]*/const ichk=(x,v)=>{const A=P.adj8;
+  if(v)return A[x].some(y=>S[y]!=0);
+  for(const y of A[x])if(S[y]==1&&!A[y].some(z=>S[z]!=0))return false;
+  return true};
+ /*[grp]*/if(GN||IM){S=new Uint8Array(N);vis=new Int32Array(N);for(let i=0;i<N;i++)S[i]=st[i]==1?0:st[i]==2?1:2}
  /*[liar]*/const HM=P.lie&&P.lid!==skip;let rH,cH,rU,cU,rX,cX;
  /*[liar]*/if(HM){const R0=P.R,C0=P.C;rH=new Int8Array(R0);cH=new Int8Array(C0);rU=new Int8Array(R0);cU=new Int8Array(C0);rX=new Int8Array(R0);cX=new Int8Array(C0);
   for(let i=0;i<N;i++){const r=i/C0|0,c=i%C0;if(st[i]==0){rX[r]=1;cX[c]=1}
@@ -35,6 +40,9 @@ function deduce(P,st,num,M,skip,all){
  /*[grp]*/if(GN){const gs={t:'r',id:P.gid};
   for(const x of unk){S[x]=1;if(!gchk(x,1)){S[x]=2;push(x,0,1,gs);continue}
    S[x]=0;const ok0=gchk(x,0);S[x]=2;if(!ok0)push(x,1,1,gs)}}
+ /*[iso]*/if(IM){const is={t:'r',id:P.iid};
+  for(const x of unk){S[x]=1;if(!ichk(x,1)){S[x]=2;push(x,0,1,is);continue}
+   S[x]=0;const ok0=ichk(x,0);S[x]=2;if(!ok0)push(x,1,1,is)}}
  if(out.length&&!all)return out;
  const par={},f=x=>par[x]===x?x:(par[x]=f(par[x]));
  for(const k of K)for(const c of k.cells)if(par[c]===undefined)par[c]=c;
@@ -53,12 +61,13 @@ function deduce(P,st,num,M,skip,all){
    for(const v of[0,1]){const bj=byCell[j],wj=byW[j];for(let q=0;q<bj.length;q++){bj[q].u-=wj[q];bj[q].a+=v*wj[q]}
     let bad=false;for(const k of bj)if(k.a>k.hi||k.a+k.u<k.lo)bad=true;
     /*[grp]*/if(!bad&&GN){S[g[j]]=v;if(!gchk(g[j],v))bad=true}
+    /*[iso]*/if(!bad&&IM){S[g[j]]=v;if(!ichk(g[j],v))bad=true}
     const dec=[];
     /*[liar]*/if(!bad&&HM){const C0=P.C;for(const k of byCell[j])if(k.y>=0&&k.u==0){const r=k.y/C0|0,c=k.y%C0,h=k.a==k.hv;rU[r]--;cU[c]--;if(h){rH[r]++;cH[c]++}dec.push([r,c,h])}
      for(const[r,c]of dec)if(rH[r]>1||cH[c]>1||rH[r]+rU[r]+rX[r]<1||cH[c]+cU[c]+cX[c]<1)bad=true}
     if(!bad){a[j]=v;cnt+=v;rec(j+1);cnt-=v}
     for(const[r,c,h]of dec){rU[r]++;cU[c]++;if(h){rH[r]--;cH[c]--}}
-    /*[grp]*/if(GN)S[g[j]]=2;
+    /*[grp]*/if(GN||IM)S[g[j]]=2;
     for(let q=0;q<bj.length;q++){bj[q].u+=wj[q];bj[q].a-=v*wj[q]}}};
   rec(0);
   if(over||!ks.some(x=>x)){ks.fill(1);comps.push({cells:g,ks,mk:g.map(()=>ks),sk:g.map(()=>ks),n})}
@@ -68,7 +77,7 @@ function deduce(P,st,num,M,skip,all){
   for(let k=0;k<=fn;k++){mk[k]=k>=1?1:0;sk[k]=k<=fn-1?1:0}
   comps.push({cells:fr,ks,mk:fr.map(()=>mk),sk:fr.map(()=>sk),n:fn,free:1})}
  const conv=(A,B)=>{const r=new Uint8Array(A.length+B.length-1);for(let i=0;i<A.length;i++)if(A[i])for(let j=0;j<B.length;j++)if(B[j])r[i+j]=1;return r};
- const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[]),...(HM?[P.lid]:[])])]}};
+ const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[]),...(IM?[P.iid]:[]),...(HM?[P.lid]:[])])]}};
  comps.forEach((cj,j)=>{let O=Uint8Array.of(1);comps.forEach((c,q)=>{if(q!=j)O=conv(O,c.ks)});
   cj.cells.forEach((x,p)=>{let m=0,s=0;
    for(let k=0;k<=cj.n;k++)if(T-k>=0&&T-k<O.length&&O[T-k]){if(cj.mk[p][k])m=1;if(cj.sk[p][k])s=1}
