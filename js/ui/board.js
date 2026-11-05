@@ -4,10 +4,10 @@ const WTST=' style="background-image:linear-gradient(rgba(255,150,0,.28),rgba(25
 function draw(){if(!G)return;const{cfg,st,fl,num,mines,over,hint:h}=G,{R,C}=cfg,s=Math.min(40,Math.floor(Math.min(620,innerWidth-40)/C));
  const ns=h?h.ns:[],hr=h?h.rs:[],wt=G.P.w;
  let o='',expl=0,flg=0;
- for(let i=0;i<G.N;i++){let cl='c',t='';if(fl[i]&&!st[i])flg++;
+ for(let i=0;i<G.N;i++){let cl='c',t='';if(fl[i]==1&&!st[i])flg++; /* 残り爆弾数に数えるのは旗(1)だけ。マーク(2)は数えない */
   if(st[i]==1){cl+=' o';t=num[i]||'';if(t)cl+=' n'+Math.min(t,8)}
   else if(st[i]==2){cl+=' x';t='💥';expl++}
-  else if(over&&mines[i]){cl+=' o';t='💣'}else if(fl[i])t='🚩';
+  else if(over&&mines[i]){cl+=' o';t='💣'}else if(fl[i])t=fl[i]==2?'<span class="mk">🚩</span>':'🚩';
   if(ns.includes(i))cl+=' hsrc';
   o+='<div class="'+cl+'" data-i="'+i+'"'+(wt&&wt[i]>1?WTST:'')+'>'+t+'</div>'}
  const g=$('#g');g.style.setProperty('--s',s+'px');g.style.gridTemplateColumns='repeat('+C+','+s+'px)';g.innerHTML=o;
