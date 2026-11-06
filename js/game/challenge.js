@@ -3,7 +3,7 @@
 const CHALLENGE={
  title:'🔥 チャレンジ',
  wins:3,                 // 何盤面を連続でクリアすれば達成か
- missResetsStreak:true,  // true=ミスすると連続クリア数が0に戻る / false=ミスしてもクリア数は残る(累計)
+ missResetsStreak:false,  // true=ミスすると連続クリア数が0に戻る / false=ミスしてもクリア数は残る(累計)
  lives:3,                // ミスできる回数(挑戦全体の合計)
  hints:5,                // ヒント回数(1盤面ごと。次の盤面で回復)
  sizeMin:6,sizeMax:8,    // 盤面の一辺
