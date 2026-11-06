@@ -6,7 +6,7 @@ const CHALLENGE={
  missResetsStreak:false, // false=累計(ミスしてもクリア数は残る) / true=ミスすると連続クリア数が0に戻る
  lives:3,                // ミスできる回数(挑戦全体の合計)
  hints:5,                // ヒント回数(1盤面ごと。次の盤面で回復)
- sizeMin:6,sizeMax:8,    // 盤面の一辺
+ sizeMin:7,sizeMax:10,    // 盤面の一辺
  square:true,            // true=縦横同じ(6x6〜8x8) / false=縦横それぞれ別に抽選
  bombMin:.30,bombMax:.40,// 爆弾率(縛りに合わなければ前後どちらかにずれる)
  rulesMin:1,rulesMax:3,  // 縛りの数
