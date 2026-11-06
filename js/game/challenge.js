@@ -4,7 +4,7 @@ const CHALLENGE={
  title:'🔥 チャレンジ',
  wins:3,                 // 何盤面を連続でクリアすれば達成か
  missResetsStreak:false, // false=累計(ミスしてもクリア数は残る) / true=ミスすると連続クリア数が0に戻る
- lives:3,                // ミスできる回数(挑戦全体の合計)
+ lives:2,                // ミスできる回数(挑戦全体の合計)
  hints:5,                // ヒント回数(1盤面ごと。次の盤面で回復)
  sizeMin:6,sizeMax:9,    // 盤面の一辺
  square:true,            // true=縦横同じ(6x6〜8x8) / false=縦横それぞれ別に抽選
@@ -24,7 +24,7 @@ function chDescHtml(){const c=CHALLENGE,pc=x=>Math.round(x*100),rg=(a,b,u)=>a==b
   '縛り・盤面・爆弾数はぜんぶランダム。',
   '盤面は'+sz+'、爆弾は'+rg(pc(c.bombMin),pc(c.bombMax),'%')+'くらい、縛りは'+rg(c.rulesMin,c.rulesMax,'個')+'。縛りに合わない爆弾数のときは、その限りでない。',
   c.missResetsStreak?c.wins+'盤面を連続でクリアできたら勝ち! ミスすると連続記録はリセットされる。':'合計'+c.wins+'盤面クリアできたら勝ち!',
-  'ミスは全部で'+c.lives+'回までOK。ヒントは1盤面ごとに'+c.hints+'回まで使えるよ。',
+  'ミスは全部で2回までOK。ヒントは1盤面ごとに'+c.hints+'回まで使えるよ。',
   'クリアしてもミスしても次の盤面へ。',
   '盤面づくりが'+c.regenSec+'秒を超えたら、「引き直す」ボタンが出るよ。'
  ].map(t=>'<p>'+t+'</p>').join('')}
