@@ -13,7 +13,7 @@ function draw(){if(!G)return;const{cfg,st,fl,num,mines,over,hint:h}=G,{R,C}=cfg,
  const g=$('#g');g.style.setProperty('--s',s+'px');g.style.gridTemplateColumns='repeat('+C+','+s+'px)';g.innerHTML=o;
  const ch=(t,c,k)=>'<span class="chip '+(c||'')+'"'+(k?' data-k="'+k+'"':'')+'>'+t+'</span>';
  /* チャレンジ: 第N盤面 / 連続クリア(●=クリア済) / ライフ / この盤面のヒント残り */
- const rc=run?ch('第'+run.stage+'盤面')+ch('連続 '+Array.from({length:run.X},(_,k)=>k<run.streak?'●':'○').join(''))+ch('❤ '+run.lives+'/'+CHALLENGE.lives)+ch('💡 '+run.hints+'/'+CHALLENGE.hints):'';
+ const rc=run?ch((CHALLENGE.missResetsStreak?'✅ 連続クリア ':'✅ クリア ')+run.streak+'/'+run.X,'clr')+ch('第'+run.stage+'盤面')+ch('❤ '+run.lives+'/'+CHALLENGE.lives)+ch('💡 '+run.hints+'/'+CHALLENGE.hints):'';
  $('#st').innerHTML=ch(R+'×'+C)+ch('💣 残り '+(cfg.M-expl-flg),h&&h.c?'hl':'','c')+rc+(G.gf?'':ch('⚠ ノーゲス未達'))+(G.gf&&!G.q?ch('品質条件未達'):'');
  $('#rv').textContent='🧩 縛り ('+cfg.ids.length+')';$('#rv').className=hr.length?'hl':'';
  const fin=G.over||G.done,out=run&&run.hints<=0;if(fin||out)hm=0;$('#hb').disabled=fin||out;$('#hb').classList.toggle('on',!!hm);$('#hb').textContent='💡 ヒント '+(hm?'ON':'OFF')+(run?' (残り'+run.hints+')':'');
