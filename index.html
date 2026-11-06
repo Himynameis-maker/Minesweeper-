@@ -7,12 +7,13 @@
 <section id="setup">
  <h1>Minesweeper <span>Plus</span></h1>
  <p class="sub">ノーゲス盤面 × ランダム縛り</p>
- <div class="card"><h3>モード</h3><div class="seg"><button id="mf" class="on">フリープレイ</button><button id="mc">チャレンジ</button></div></div>
- <div class="card"><h3>盤面</h3><div class="row">
+ <div class="card"><h3>モード</h3><div class="seg"><button id="mf" class="on">フリープレイ</button><button id="mc">チャレンジ</button><button id="ms">シード</button></div></div>
+ <div class="card" id="sdc" hidden><h3>シード</h3><input type="search" id="sd" placeholder="フリープレイでコピーしたシードを貼り付け" autocomplete="off" spellcheck="false"><p class="mut">縛り・盤面・爆弾数も含めて、完全に同じ盤面で遊べます</p></div>
+ <div class="card" id="bc"><h3>盤面</h3><div class="row">
   <label class="fld">縦<input id="R" type="number" value="7" min="3" max="24"></label>
   <label class="fld">横<input id="C" type="number" value="7" min="3" max="24"></label>
   <label class="fld">爆弾数<input id="M" type="number" value="8" min="1"></label></div></div>
- <div class="card"><h3>縛り</h3><button id="pk" style="width:100%">🧩 縛りを選ぶ</button><p class="mut" id="sel"></p><p class="mut" id="rcap"></p></div>
+ <div class="card" id="rc"><h3>縛り</h3><button id="pk" style="width:100%">🧩 縛りを選ぶ</button><p class="mut" id="sel"></p><p class="mut" id="rcap"></p></div>
  <div class="card" id="chs" hidden><h3>チャレンジ設定</h3><div class="row">
   <label class="fld">目標連続クリア<input id="X" type="number" value="3" min="1"></label>
   <label class="fld">ミス許容<input id="L" type="number" value="1" min="1"></label>
@@ -32,7 +33,7 @@
   <textarea id="ctx" readonly></textarea></details>
 </section>
 <section id="game" hidden>
- <div class="row top"><button id="bk">← 設定に戻る</button><button id="rv">🧩 縛り</button></div>
+ <div class="row top"><button id="bk">← 設定に戻る</button><div class="tg"><button id="sc" class="sm" hidden>📋 シード</button><button id="rv">🧩 縛り</button></div></div>
  <div class="chips" id="st"></div>
  <div id="ld" class="card" hidden style="text-align:center"><div id="ldt"></div><button id="lc" style="margin-top:8px">キャンセルして設定に戻る</button></div>
  <div id="msg"></div>
@@ -73,6 +74,7 @@
 <!-- GAME: 設定→盤面設定、盤面の進行 -->
 <script src="js/game/state.js"></script>
 <script src="js/game/config.js"></script>
+<script src="js/game/seed.js"></script>
 <script src="js/game/play.js"></script>
 <!-- UI: 描画・モーダル・イベント配線 -->
 <script src="js/ui/board.js"></script>
