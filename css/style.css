@@ -17,12 +17,13 @@ summary{cursor:pointer;font-weight:600}
 .tg{display:flex;gap:8px;align-items:center}
 input[type=number],input[type=search]{font:inherit;font-size:16px;color:var(--fg);background:var(--o);border:1px solid var(--l);border-radius:10px;padding:8px 10px;width:84px}
 input[type=search]{width:100%;margin-top:8px}
+input[type=text]{font:inherit;font-size:16px;color:var(--fg);background:var(--o);border:1px solid var(--l);border-radius:10px;padding:8px 10px;width:100%}
 button{font:inherit;color:var(--fg);background:var(--o);border:1px solid var(--l);border-radius:12px;padding:10px 14px;cursor:pointer;transition:transform .08s}
 button:active{transform:scale(.97)}button:disabled{opacity:.4}
 .pri{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border:0;font-weight:700}
 .big{width:100%;padding:15px;font-size:17px;border-radius:14px}.grow{flex:1}
 .seg{display:flex;background:var(--o);border:1px solid var(--l);border-radius:14px;padding:3px;gap:3px}
-.seg button{flex:1;border:0;background:transparent;border-radius:11px}
+.seg button{flex:1;border:0;background:transparent;border-radius:11px;padding:10px 4px}
 .seg button.on{background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.18);font-weight:700}
 .top{justify-content:space-between;align-items:center}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
