@@ -24,7 +24,7 @@ const driver=`
  $('#mq').value='十字';$('#mq').oninput();ok($('#ml').innerHTML.includes('cross')&&!$('#ml').innerHTML.includes('knight'),'検索で絞れる');
  $('#mq').value='';$('#mok').onclick();
  for(const id of Object.keys(RULES)){
-  SEL.clear();SEL.add(id);$('#R').value=7;$('#C').value=7;$('#M').value=8;updSel();upd();
+  SEL.clear();SEL.add(id);$('#R').value=7;$('#C').value=7;$('#M').value=mpick(7,7,8,[id])||8;updSel();upd(); /* 爆弾数は縛りが成り立つ最小値(tidy のように範囲が決まっているルール用。ほかは8のまま) */
   ok(!$('#go').disabled,id+': スタート可');
   $('#go').onclick();await wait(()=>G&&!G.over&&$('#g').innerHTML.length>0);
   ok(G.cfg.ids.includes(id)&&G.rev>0,id+': 盤面生成と自動オープン');
@@ -43,7 +43,7 @@ const driver=`
  ok(run.lives==K0.lives&&run.hints==K0.hints&&run.stage==1&&run.streak==0,'チャレンジ: 初期状態');
  let bad=0;for(let k=0;k<300;k++){const f=chPlan(),n=f.R*f.C;if(f.R<K0.sizeMin||f.R>K0.sizeMax||f.C<K0.sizeMin||f.C>K0.sizeMax||f.M<1||f.M>n-12||f.ids.length>K0.rulesMax||!mok(f.R,f.C,f.M,f.ids))bad++}
  ok(bad==0,'チャレンジ: 抽選300回でサイズ・爆弾数・縛りが整合');
- /* 以降は生成を軽くするため、上のフリープレイ検査で通っている条件(7x7・爆弾8個・縛り1個)に固定する */
+ /* 以降は生成を軽くするため、7x7・爆弾8個・縛り1個に固定する(爆弾8個で使えないルール=tidy などは抽選から外れる) */
  Object.assign(CHALLENGE,{sizeMin:7,sizeMax:7,bombMin:8/49,bombMax:8/49,rulesMin:1,rulesMax:1});console.log('--- チャレンジ通し(7x7・爆弾8・縛り1個に固定) ---');
  const ready=async()=>{const t=Date.now();while(!(G&&$('#g').innerHTML.length>0)){if(Date.now()-t>120000)throw Error('timeout: チャレンジの盤面が出ない');if(!G&&!$('#rg').hidden&&$('#ldt').textContent.includes('見つからなかった')){console.log('  (生成失敗 → 引き直し)');$('#rg').onclick()}await sleep(50)}};
  const clearAll=()=>{for(let i=0;i<G.N;i++)if(!G.mines[i]&&!G.st[i]&&!G.done)act(i,0)};
