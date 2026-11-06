@@ -13,7 +13,7 @@ async function start(nr,sd){const ch=!sd&&mode()=='c',tk=++TK;
   if(!res)return msg('ノーゲスの盤面が見つかりませんでした(条件が厳しすぎる可能性)。「設定に戻る」で条件を変えてください')}
  begin(cfg,res)}
 function begin(cfg,res){const P=prep(cfg),N=cfg.R*cfg.C,act=P.nb.map((_,i)=>ncount(P,res.mines,i)),num=res.L?res.L.sh:act;
- G={cfg,P,N,mines:res.mines,act,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,hint:null,seed:run?'':encodeSeed(cfg,res)};
+ G={cfg,P,N,mines:res.mines,act,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,hint:null,seed:run?'':(()=>{try{return encodeSeed(cfg,res)}catch(e){return ''}})()};
  $('#sc').hidden=!G.seed; /* シードのコピーボタンはフリープレイ(と復元した盤面)だけ */
  flood(res.start);msg(cfg.dropped?cfg.dropped+'件の縛りは条件に合わないため外しました':'');draw()}
 function flood(i){const q=[i],{st,fl,act:ac,mines,P}=G;while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;fl[x]=0;G.rev++;if(!ac[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}}
