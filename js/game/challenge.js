@@ -3,7 +3,7 @@
 const CHALLENGE={
  title:'🔥 チャレンジ',
  wins:3,                 // 何盤面を連続でクリアすれば達成か
- missResetsStreak:false,  // true=ミスすると連続クリア数が0に戻る / false=ミスしてもクリア数は残る(累計)
+ missResetsStreak:true,  // true=ミスすると連続クリア数が0に戻る / false=ミスしてもクリア数は残る(累計)
  lives:3,                // ミスできる回数(挑戦全体の合計)
  hints:5,                // ヒント回数(1盤面ごと。次の盤面で回復)
  sizeMin:6,sizeMax:8,    // 盤面の一辺
@@ -42,15 +42,6 @@ function chClear(){hm=0;run.streak++;run.total++;
  chSchedule()}
 /* 終了(達成/ゲームオーバー)なら、最後の盤面を少し見せてから演出を出す */
 function chSchedule(){if(!run.end)return;const r=run;setTimeout(()=>{if(run===r&&!$('#game').hidden)chEnd()},CHALLENGE.endDelayMs)}
-/* 状態バー(#chb)・次へボタン・ヒントボタンを run に合わせる。draw() のあとに呼ぶ */
-function chUi(){const bar=$('#chb');
- if(!run){bar.hidden=true;$('#hb').textContent='💡 ヒント';return}
- const c=CHALLENGE,dots=Array.from({length:run.X},(_,k)=>k<run.streak?'●':'○').join('');
- bar.hidden=false;
- bar.innerHTML='<span class="chip">第'+run.stage+'盤面</span><span class="chip">'+dots+'</span><span class="chip">'+'❤️'.repeat(Math.max(0,run.lives))+'🖤'.repeat(Math.max(0,c.lives-run.lives))+'</span><span class="chip">💡 '+run.hints+'/'+c.hints+'</span>';
- const fin=!!G&&(G.over||G.done);
- $('#nx').hidden=!fin||!!run.end;$('#nx').dataset.nr=0;$('#nx').textContent='次の盤面 →';
- $('#hb').textContent='💡 ヒント ('+run.hints+')';$('#hb').disabled=!G||fin||run.hints<=0}
 /* ---- 終了演出 ---- */
 function chFx(win){const e=win?['🎉','✨','🎊','⭐','🏆']:['💣','💥','💨'];let h='';
  for(let k=0;k<(win?28:14);k++)h+='<span class="pc" style="left:'+(rnd()*100|0)+'%;font-size:'+(16+rnd()*18|0)+'px;animation-duration:'+(2.2+rnd()*2.2).toFixed(1)+'s;animation-delay:'+(rnd()*1.2).toFixed(1)+'s">'+e[rnd()*e.length|0]+'</span>';
