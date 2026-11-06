@@ -6,6 +6,7 @@
    品質条件: 推論の種類>=2, 手順3段以上, 開始開放<=50%, cons/grp持ちルールは外すと詰む(=縛りが飾りでない)。
    qms秒探索して品質条件を満たさなければ「ノーゲスだが品質未達」を許容、hard秒で打ち切り。
    iso持ちは「8近傍でつながる塊(imax があれば2〜imax個。塊同士は8近傍で触れない)を置く」配置と「塊ごと動かす」山登り。
+   下限つき cons(lo>0。例: tidy)は、爆弾を撒いてから違反を min-conflicts で直すサンプラ(lsample)と、valid を保つ swap の山登り(smove)を使う。
    新しい配置様式(例: ヘビ)のルールは、[grp] と同じ位置に「専用の sample と move」を足す(context.md 第6節)。 */
 async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
  const{R,C,M,ids}=cfg,N=R*C,P=prep(cfg),t0=performance.now(),kc=P.cons;
@@ -94,12 +95,45 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
    const cand=[];for(const c of Us)if(!m[c]&&c!=x&&!sz.has(c)&&P.adj8[c].some(y=>m[y]))cand.push(c);
    if(!cand.length)continue;m[cand[rnd()*cand.length|0]]=1;return m}
   return null};
+ /* ---- [lo] 下限つき cons(tidy など): 爆弾M個を密度ムラで撒いてから、違反中の制約を min-conflicts で直す(lsample)と、
+        「爆弾1個を別の安全マスへ」を valid を保つものが見つかるまで試す山登り(smove)。
+        標準サンプラは上限しか見ず、move も valid を満たさないと棄却されるため、下限が厳しい cons はこちらに切り替わる。
+        grp/iso/conn と併用のときは各専用サンプラが優先(下限は見ない) ---- */
+ const LO=kc.some(k=>k.lo>0);
+ const lsample=(sz,w)=>{const m=new Uint8Array(N),K=kc.length,cnt=new Int16Array(K),fr=[];
+  for(let i=0;i<N;i++)if(!sz.has(i))fr.push(i);if(fr.length<M)return null;
+  const key=new Float64Array(N);for(const c of fr)key[c]=Math.log(rnd()+1e-12)/w[c];
+  fr.slice().sort((p,q)=>key[q]-key[p]).slice(0,M).forEach(c=>m[c]=1);
+  for(let q=0;q<K;q++){let s=0;for(const c of kc[q].cells)s+=m[c];cnt[q]=s}
+  const v=q=>{const s=cnt[q],k=kc[q];return s<k.lo?k.lo-s:s>k.hi?s-k.hi:0};
+  const flip=(c,d)=>{m[c]=d>0?1:0;for(const q of byC[c])cnt[q]+=d};
+  const sum=qs=>{let t=0;for(const q of qs)t+=v(q);return t};
+  for(let step=0;step<60*N;step++){
+   const bad=[];for(let q=0;q<K;q++)if(v(q))bad.push(q);
+   if(!bad.length)return valid(m)?m:null;
+   const q=bad[rnd()*bad.length|0],need=cnt[q]<kc[q].lo,A=kc[q].cells.filter(c=>need?(!m[c]&&!sz.has(c)):m[c]);
+   if(!A.length)return null;
+   const want=need?1:0;let best=null,bd=1e9;
+   for(const a of A)for(let t=0;t<6;t++){const b=fr[rnd()*fr.length|0];if(m[b]!=want)continue;
+    const qs=new Set([...byC[a],...byC[b]]),b0=sum(qs);
+    flip(a,need?1:-1);flip(b,need?-1:1);const d=sum(qs)-b0;flip(a,need?-1:1);flip(b,need?1:-1);
+    const dd=d+rnd()*.5;if(dd<bd){bd=dd;best=[a,b]}}
+   if(!best||rnd()<.08){const a=A[rnd()*A.length|0],ps=fr.filter(c=>m[c]==want);if(!ps.length)return null;best=[a,ps[rnd()*ps.length|0]]}
+   flip(best[0],need?1:-1);flip(best[1],need?-1:1)}
+  return null};
+ const smove=(cur,a,b)=>{for(let t=0;t<80;t++){const m=cur.slice(),n=t<50?1:2;let ok=true;
+   for(let k=0;k<n&&ok;k++){const xs=a.filter(c=>m[c]),x=xs[rnd()*xs.length|0];if(x==null){ok=false;break}
+    let ys=b.filter(c=>!m[c]);if(t%2&&ys.length){const r=x/C|0,c=x%C,nr=ys.filter(y=>Math.abs((y/C|0)-r)<=2&&Math.abs(y%C-c)<=2);if(nr.length)ys=nr}
+    const y=ys[rnd()*ys.length|0];if(y==null){ok=false;break}m[x]=0;m[y]=1}
+   if(ok&&valid(m))return m}
+  return null};
  /* ---- 標準の配置サンプラ(密度ムラ)。grp持ちは gsample、iso持ちは isample、conn持ちは csample に切り替わる ---- */
  const sample=s=>{const sz=new Set([s,...P.nb[s]]),cx=[0,1,2].map(()=>[rnd()*R,rnd()*C,rnd()]),sg=Math.max(R,C)/3,w=[];
   for(let i=0;i<N;i++){let v=.25;for(const[y,x,a]of cx)v+=a*2*Math.exp(-(((i/C|0)-y)**2+(i%C-x)**2)/(2*sg*sg));w.push(v)}
   if(P.grp)return gsample(sz,w);
   if(P.iso)return isample(sz,w);
   if(P.conn)return csample(sz,w);
+  if(LO)return lsample(sz,w);
   const m=new Uint8Array(N),cnt=kc.map(()=>0),cand=[];for(let i=0;i<N;i++)if(!sz.has(i))cand.push(i);
   for(let n=0;n<M;n++){const ok=cand.filter(c=>!m[c]&&byC[c].every(q=>cnt[q]<kc[q].hi));if(!ok.length)return null;
    let t=rnd()*ok.reduce((a,c)=>a+w[c],0),pick=ok[ok.length-1];for(const c of ok){t-=w[c];if(t<=0){pick=c;break}}
@@ -131,7 +165,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   if(!a.length||!b.length){cur=null;continue}
   let m2=null,l2=cl;const lm=LM&&rnd()<.6?lmove(cur,cl,U):null;
   if(lm){m2=lm.m;l2=lm.L}
-  else{if(P.grp)m2=gmove(cur,a,new Set(U),cs);else if(P.iso)m2=imove(cur,a,new Set(U),cs);else if(P.conn)m2=cmove(cur,a,new Set(U),cs);else{m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1}
+  else{if(P.grp)m2=gmove(cur,a,new Set(U),cs);else if(P.iso)m2=imove(cur,a,new Set(U),cs);else if(P.conn)m2=cmove(cur,a,new Set(U),cs);else if(LO)m2=smove(cur,a,b);else{m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1}
    if(m2&&LM){if(m2.some((x,i)=>x&&cl.hon[i]))m2=null;else l2=lstate(m2,cl.hon,cl.sg)}}
   if(!m2||!valid(m2)){if(++inv>40)cur=null;continue}
   const r2=sim(P,M,m2,cs,undefined,l2);if(r2.bug)throw Error('solver unsound');
