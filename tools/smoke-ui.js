@@ -43,7 +43,7 @@ const driver=`
   $('#ms').onclick();ok(mode()=='s'&&!$('#sdc').hidden&&$('#bc').hidden&&$('#rc').hidden,'シードモード: 入力欄が出て盤面・縛り欄が隠れる');
   $('#sd').value='';upd();ok($('#go').disabled,'シード空ならスタート不可');
   $('#sd').value='v1.zzz';upd();$('#go').onclick();ok($('#mw').textContent.includes('読み込めません'),'不正なシードは断る');
-  $('#sd').value=' '+s0+'\n';upd();ok(!$('#go').disabled,'シード入力でスタート可');$('#go').onclick();await wait(()=>G&&$('#g').innerHTML.length>0);
+  $('#sd').value=' '+s0+'\\n';upd();ok(!$('#go').disabled,'シード入力でスタート可');$('#go').onclick();await wait(()=>G&&$('#g').innerHTML.length>0);
   ok(G.seed==s0&&Array.from(G.mines).every((x,i)=>x==m0[i])&&Array.from(G.num).every((x,i)=>x==n0[i])&&!run,'シードから完全に同じ盤面で始まる(フリープレイ扱い)');
   $('#bk').onclick();$('#mf').onclick();ok(mode()=='f'&&$('#sdc').hidden&&!$('#bc').hidden,'フリープレイに戻すと元の欄に戻る')}
  SEL.clear();Object.keys(RULES).forEach(i=>SEL.add(i));$('#mc').onclick();$('#go').onclick();await wait(()=>G&&$('#g').innerHTML.length>0);
