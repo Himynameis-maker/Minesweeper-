@@ -22,7 +22,7 @@ function chDescHtml(){const c=CHALLENGE,pc=x=>Math.round(x*100),rg=(a,b,u)=>a==b
  sz=c.square?c.sizeMin+'×'+c.sizeMin+(c.sizeMin==c.sizeMax?'':'〜'+c.sizeMax+'×'+c.sizeMax):'縦横それぞれ'+rg(c.sizeMin,c.sizeMax,'マス');
  return[
   '縛り・盤面・爆弾数は全てランダム。',
-  '盤面は'+sz+'、爆弾は'+rg(pc(c.bombMin),pc(c.bombMax),'%')+'くらい、縛りは'+rg(c.rulesMin,c.rulesMax,'個')+'。縛りに合わない爆弾数のときは、前後どちらかにずれる。',
+  '盤面は'+sz+'、爆弾は'+rg(pc(c.bombMin),pc(c.bombMax),'%')+'くらい、縛りは'+rg(c.rulesMin,c.rulesMax,'個')+'。縛りに合わない爆弾数のときは、その限りではない。',
   c.wins+'盤面'+(c.missResetsStreak?'を連続でクリアできたら勝ち! ミスすると連続記録はリセットされるので注意。':'をクリアできたら勝ち!'),
   'ミスは全部で'+c.lives+'回までOK。ヒントは1盤面ごとに'+c.hints+'回まで使えるよ。',
   'クリアしてもミスしても次の盤面へ。',
