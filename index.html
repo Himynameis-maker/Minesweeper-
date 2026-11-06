@@ -7,14 +7,12 @@
 <section id="setup">
  <h1>Minesweeper <span>Plus</span></h1>
  <p class="sub">ノーゲス盤面 × ランダム縛り</p>
- <div class="card"><h3>モード</h3><div class="seg"><button id="mf" class="on">フリープレイ</button><button id="mc">チャレンジ</button><button id="mcd">盤面コード</button></div></div>
- <div class="card" id="cb"><h3>盤面</h3><div class="row">
+ <div class="card"><h3>モード</h3><div class="seg"><button id="mf" class="on">フリープレイ</button><button id="mc">チャレンジ</button></div></div>
+ <div class="card"><h3>盤面</h3><div class="row">
   <label class="fld">縦<input id="R" type="number" value="7" min="3" max="24"></label>
   <label class="fld">横<input id="C" type="number" value="7" min="3" max="24"></label>
   <label class="fld">爆弾数<input id="M" type="number" value="8" min="1"></label></div></div>
- <div class="card" id="cr"><h3>縛り</h3><button id="pk" style="width:100%">🧩 縛りを選ぶ</button><p class="mut" id="sel"></p><p class="mut" id="rcap"></p></div>
- <div class="card" id="cds" hidden><h3>盤面コード</h3><input type="text" id="cdi" placeholder="MS1.7x7.…" autocomplete="off" spellcheck="false">
-  <p class="mut">遊んだ盤面の「📋 コード」で取れます。縛り・盤面・爆弾数はコードに入っているので、貼るだけで同じ盤面になります。</p></div>
+ <div class="card"><h3>縛り</h3><button id="pk" style="width:100%">🧩 縛りを選ぶ</button><p class="mut" id="sel"></p><p class="mut" id="rcap"></p></div>
  <div class="card" id="chs" hidden><h3>チャレンジ設定</h3><div class="row">
   <label class="fld">目標連続クリア<input id="X" type="number" value="3" min="1"></label>
   <label class="fld">ミス許容<input id="L" type="number" value="1" min="1"></label>
@@ -34,13 +32,13 @@
   <textarea id="ctx" readonly></textarea></details>
 </section>
 <section id="game" hidden>
- <div class="row top"><button id="bk">← 設定に戻る</button><button id="cp">📋 コード</button><button id="rv">🧩 縛り</button></div>
+ <div class="row top"><button id="bk">← 設定に戻る</button><button id="rv">🧩 縛り</button></div>
  <div class="chips" id="st"></div>
  <div id="ld" class="card" hidden style="text-align:center"><div id="ldt"></div><button id="lc" style="margin-top:8px">キャンセルして設定に戻る</button></div>
  <div id="msg"></div>
  <div id="g"></div>
  <div class="seg" style="margin-bottom:10px"><button id="fo" class="on">⛏ 開ける</button><button id="ff">🚩 旗</button><button id="fk"><span class="mk">🚩</span> マーク</button></div>
- <div class="row"><button id="hb" class="grow">💡 ヒント</button><button id="rp" class="grow" hidden>同じ盤面でもう一度</button><button id="nx" class="pri grow" hidden>次の盤面</button></div>
+ <div class="row"><button id="hb" class="grow">💡 ヒント</button><button id="nx" class="pri grow" hidden>次の盤面</button></div>
 </section></div>
 <div id="md" hidden><div id="mb">
  <div class="row"><b id="mt"></b><button id="mx">閉じる</button></div>
@@ -77,7 +75,6 @@
 <script src="js/game/state.js"></script>
 <script src="js/game/config.js"></script>
 <script src="js/game/play.js"></script>
-<script src="js/game/code.js"></script>
 <!-- UI: 描画・モーダル・イベント配線 -->
 <script src="js/ui/board.js"></script>
 <script src="js/ui/modal.js"></script>
