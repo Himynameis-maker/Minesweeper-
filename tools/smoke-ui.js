@@ -1,13 +1,13 @@
 /* UI(js/game, js/ui)を偽DOMで読み込んで一通り動かすスモークテスト。ブラウザ不要。
    使い方: node tools/smoke-ui.js
-   見るのは「例外が出ない / 盤面が作られる / 開ける・旗・ヒント・縛りモーダル・例盤面が動く」まで。見た目は確認できない。 */
+   見るのは「例外が出ない / 盤面が作られる / 開ける・旗・ヒント・縛りモーダル・例盤面が動く / チャレンジの通し(抽選範囲・ヒント・ミス・クリア・達成・ゲームオーバー・引き直し・ウィンストリーク)」まで。見た目は確認できない。 */
 const fs=require('fs'),path=require('path'),vm=require('vm');
 const root=path.join(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const srcs=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m=>m[1]);
 const rules=fs.readdirSync(path.join(root,'rules')).filter(f=>f.endsWith('.js')&&!f.startsWith('_')).map(f=>'rules/'+f);
 const list=srcs.filter(f=>!f.startsWith('rules/')).flatMap(f=>f=='js/game/state.js'?[...rules,f]:[f]);
 const code=list.map(f=>fs.readFileSync(path.join(root,f),'utf8')).join('\n');
-const defaults={R:7,C:7,M:8,X:3,L:1,H:3,K:1};
+const defaults={R:7,C:7,M:8},LS={};
 const els={},loads=[];
 function El(id){this.id=id;this.value=defaults[id]??'';this.checked=false;this.hidden=false;this.innerHTML='';this.textContent='';this.className='';this.dataset={};this.disabled=false;
  const on=new Set(id=='mf'||id=='fo'?['on']:[]);
@@ -36,6 +36,41 @@ const driver=`
   $('#bk').onclick()}
  SEL.clear();Object.keys(RULES).forEach(i=>SEL.add(i));$('#mc').onclick();$('#go').onclick();await wait(()=>G&&$('#g').innerHTML.length>0);
  ok(run&&G,'チャレンジ開始(縛り '+G.cfg.ids.join('+')+')');
+ /* ---- チャレンジの通し ---- */
+ const K0=CHALLENGE,sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ ok((!K0.square||G.cfg.R==G.cfg.C)&&G.cfg.R>=K0.sizeMin&&G.cfg.R<=K0.sizeMax&&G.cfg.C>=K0.sizeMin&&G.cfg.C<=K0.sizeMax,'チャレンジ: 盤面サイズが範囲内');
+ ok(G.cfg.ids.length>=K0.rulesMin&&G.cfg.ids.length<=K0.rulesMax,'チャレンジ: 縛りの数が範囲内');
+ ok(run.lives==K0.lives&&run.hints==K0.hints&&run.stage==1&&run.streak==0,'チャレンジ: 初期状態');
+ let bad=0;for(let k=0;k<300;k++){const f=chPlan(),n=f.R*f.C;if(f.R<K0.sizeMin||f.R>K0.sizeMax||f.C<K0.sizeMin||f.C>K0.sizeMax||f.M<1||f.M>n-12||f.ids.length>K0.rulesMax||!mok(f.R,f.C,f.M,f.ids))bad++}
+ ok(bad==0,'チャレンジ: 抽選300回でサイズ・爆弾数・縛りが整合');
+ /* 以降は生成を軽くするため、盤面を小さく・爆弾を少なめに固定する */
+ Object.assign(CHALLENGE,{sizeMin:6,sizeMax:6,bombMin:.2,bombMax:.2});
+ const ready=async()=>{const t=Date.now();while(!(G&&$('#g').innerHTML.length>0)){if(Date.now()-t>240000)throw Error('timeout: チャレンジの盤面が出ない');if(!G&&!$('#rg').hidden&&$('#ldt').textContent.includes('見つからなかった'))$('#rg').onclick();await sleep(50)}};
+ const clearAll=()=>{for(let i=0;i<G.N;i++)if(!G.mines[i]&&!G.st[i]&&!G.done)act(i,0)};
+ const missOne=()=>{const i=[...Array(G.N).keys()].find(i=>G.mines[i]&&!G.st[i]);act(i,0)};
+ const next=async()=>{ok(!$('#nx').hidden&&$('#nx').textContent=='次の盤面','チャレンジ: 次の盤面ボタンが出る');$('#nx').onclick();await ready()};
+ $('#rg').onclick();await ready();
+ ok(run.stage==1&&run.lives==K0.lives,'チャレンジ: 引き直しても盤面番号は進まない');
+ for(let k=0;k<K0.hints;k++)ask('c');
+ ok(run.hints==0&&$('#hb').disabled,'チャレンジ: ヒントを使い切ると押せない');
+ ask('c');ok(run.hints==0,'チャレンジ: ヒントは0より減らない');
+ clearAll();ok(G.done&&run.streak==1&&!run.end,'チャレンジ: 1盤面クリア');
+ await next();ok(run.stage==2&&run.hints==K0.hints,'チャレンジ: 次の盤面でヒントが回復');
+ missOne();ok(G.over&&run.lives==K0.lives-1,'チャレンジ: ミスでライフ-1・盤面は終了');
+ ok(run.streak==(K0.missResetsStreak?0:1),'チャレンジ: ミス時のクリア数が設定どおり');
+ await next();
+ let guard=0;while(!run.end&&guard++<8){clearAll();if(!run.end)await next()}
+ ok(run.end=='win'&&$('#nx').hidden,'チャレンジ: 目標に達すると達成(次へボタンなし)');
+ await wait(()=>!$('#fin').hidden,5000);
+ ok($('#fint').textContent.includes('達成')&&chStreak()==1,'チャレンジ: 達成演出とウィンストリーク+1');
+ $('#finr').onclick();await ready();
+ ok(run.stage==1&&run.lives==K0.lives&&run.streak==0&&$('#fin').hidden,'チャレンジ: もう一度挑戦で新しい挑戦');
+ for(let k=0;k<K0.lives;k++){missOne();if(k<K0.lives-1){ok(!run.end,'チャレンジ: ライフが残っていれば続く');await next()}}
+ ok(run.end=='lose'&&run.lives==0,'チャレンジ: ライフ0でゲームオーバー');
+ await wait(()=>!$('#fin').hidden,5000);
+ ok($('#fin').className=='lose'&&chStreak()==0,'チャレンジ: ゲームオーバー演出とウィンストリーク0');
+ $('#finb').onclick();ok($('#fin').hidden&&!$('#setup').hidden&&$('#chw').innerHTML.includes('<b>0</b>'),'チャレンジ: タイトルへ戻る');
  return log})()`;
-const ctx=vm.createContext({document,window,performance,setTimeout,console,Date,Uint8Array,Int8Array,Int32Array,innerWidth:400,scrollTo(){},navigator:{},loads});
+const localStorage={getItem:k=>LS[k]??null,setItem:(k,v)=>{LS[k]=String(v)}};
+const ctx=vm.createContext({localStorage,document,window,performance,setTimeout,console,Date,Uint8Array,Int8Array,Int32Array,innerWidth:400,scrollTo(){},navigator:{},loads});
 vm.runInContext(code+'\n'+driver,ctx).then(l=>{l.forEach(x=>console.log(x));console.log('SMOKE OK');process.exit(0)},e=>{console.error(e);process.exit(1)});
