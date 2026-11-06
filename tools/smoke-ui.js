@@ -17,6 +17,8 @@ const document={querySelector:s=>els[s]||(els[s]=new El(s.replace(/^#/,''))),cre
 const window={addEventListener:(t,f)=>t=='load'&&loads.push(f)};
 const driver=`
 (async()=>{const log=[],ok=(c,m)=>{if(!c)throw Error('FAIL: '+m);log.push('ok: '+m)};
+ /* 深い比較(typed array 対応。dropped は盤面に関係しないので無視) */
+ const eqv=(a,b)=>{if(a===b)return true;if(a&&b&&typeof a=='object'&&typeof b=='object'){if(ArrayBuffer.isView(a))return ArrayBuffer.isView(b)&&a.constructor.name==b.constructor.name&&a.length==b.length&&a.every((x,i)=>x==b[i]);const f=o=>Object.keys(o).filter(k=>k!='dropped'),ka=f(a),kb=f(b);return Array.isArray(a)==Array.isArray(b)&&ka.length==kb.length&&ka.every(k=>eqv(a[k],b[k]))}return a!==a&&b!==b};
  const wait=async(f,ms=30000)=>{const t=Date.now();while(!f()){if(Date.now()-t>ms)throw Error('timeout');await new Promise(r=>setTimeout(r,50))}};
  loads.forEach(f=>f());ok(RULE_ERR.length==0,'ルール登録エラーなし');
  ok($('#ctx').value.includes('検査レポート'),'レポート欄が初期表示される');
@@ -29,7 +31,7 @@ const driver=`
   $('#go').onclick();await wait(()=>G&&!G.over&&$('#g').innerHTML.length>0);
   ok(G.cfg.ids.includes(id)&&G.rev>0,id+': 盤面生成と自動オープン');
   ok(G.seed&&G.seed.startsWith('v1.')&&!$('#sc').hidden,id+': シードが出る');
-  {const sd=decodeSeed(G.seed);ok(sd&&sd.cfg.ids+''==G.cfg.ids+''&&sd.cfg.M==G.cfg.M&&sd.res.start>=0&&sd.res.mines.every((x,i)=>x==G.mines[i])&&(!G.num||!sd.res.L||sd.res.L.sh.every((x,i)=>x==G.num[i])),id+': シード往復(爆弾配置・隠れ状態が一致)')}
+  {const sd=decodeSeed(G.seed),g0=G;ok(!!sd,id+': シードが読める');begin(sd.cfg,sd.res);const g1=G;G=g0;draw();ok(eqv(g0,g1),id+': シードから作り直した G が完全一致(盤面を決める情報は res と cfg だけで足りている)')}
   const safe=[...Array(G.N).keys()].find(i=>!G.mines[i]&&!G.st[i]);const r0=G.rev;act(safe,0);ok(G.rev>r0||G.done,id+': 安全マスを開ける');
   const f=[...Array(G.N).keys()].find(i=>!G.st[i]);act(f,1);ok(G.fl[f]==1,id+': 旗');
   $('#hb').onclick();ok(hm==1,id+': ヒントON');ask('c');ask('r',id);$('#hb').onclick();
