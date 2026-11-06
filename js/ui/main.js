@@ -20,7 +20,7 @@ window.addEventListener('load',()=>{
  $('#go').onclick=()=>{if(problems().length)return upd();show('game');start(1)};$('#bk').onclick=cancelGen;$('#lc').onclick=cancelGen;
  $('#nx').onclick=()=>start(+$('#nx').dataset.nr);
  $('#rg').onclick=()=>start(0,1);$('#finr').onclick=()=>start(1);$('#finb').onclick=chLeave;
- $('#hb').onclick=()=>{if(!G||G.over||G.done)return;hm=hm?0:1;msg(hm?'ヒントON: 数字のマス・縛り(🧩の中)・残り爆弾数をタップ'+(run?'(1回タップでヒント1回消費・この盤面あと'+run.hints+'回)':''):'');draw();chUi()};
+ $('#hb').onclick=()=>{if(!G||G.over||G.done)return;hm=hm?0:1;msg(hm?'ヒントON: 数字のマス・縛り(🧩の中)・残り爆弾数をタップ'+(run?'(1回タップでヒント1回消費・この盤面あと'+run.hints+'回)':''):'');draw()};
  $('#st').onclick=e=>{if(hm&&e.target.closest('[data-k=c]'))ask('c')};
  $('#ml').addEventListener('click',e=>{if(MODE!='view'||!hm)return;const t=e.target.closest('.ri');if(t)ask('r',t.dataset.rid)});
  const setFm=n=>{fm=n;['#fo','#ff','#fk'].forEach((s,k)=>$(s).classList.toggle('on',k==n))};
