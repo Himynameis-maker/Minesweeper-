@@ -8,13 +8,9 @@ async function start(nr){const ch=mode()=='c',tk=++TK;
  catch(e){if(tk==TK){$('#ld').hidden=true;msg('内部エラー: '+e.message)}return}
  if(tk!=TK)return;$('#ld').hidden=true;
  if(!res)return msg('ノーゲスの盤面が見つかりませんでした(条件が厳しすぎる可能性)。「設定に戻る」で条件を変えてください');
- begin(cfg,res)}
-/* 盤面を確定して開始。gen の結果も盤面コード(code.js)もここを通る。res={mines,start,L?,gf,q,fc?}。sc=開始マス、fc=コード盤面(「新しい盤面」を出さない) */
-function begin(cfg,res){hm=0;const P=prep(cfg),N=cfg.R*cfg.C,act=P.nb.map((_,i)=>ncount(P,res.mines,i)),num=res.L?res.L.sh:act;
- G={cfg,P,N,mines:res.mines,act,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,sc:res.start,fc:res.fc,hint:null};
+ const P=prep(cfg),N=cfg.R*cfg.C,act=P.nb.map((_,i)=>ncount(P,res.mines,i)),num=res.L?res.L.sh:act;
+ G={cfg,P,N,mines:res.mines,act,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,hint:null};
  flood(res.start);msg(cfg.dropped?cfg.dropped+'件の縛りは条件に合わないため外しました':'');draw()}
-/* 同じ盤面でもう一度(生成も検証もしない。G が持つ盤面をそのまま使う) */
-function replay(){if(!G)return;const{cfg,mines,sc,num,act,gf,q,fc}=G;begin(cfg,{mines,start:sc,L:num===act?null:{sh:num},gf,q,fc})}
 function flood(i){const q=[i],{st,fl,act:ac,mines,P}=G;while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;fl[x]=0;G.rev++;if(!ac[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}}
 function act(i,f){if(!G||G.over||G.done||G.st[i])return;G.hint=null;
  if(f){G.fl[i]=G.fl[i]==f?0:f;return draw()}if(G.fl[i])return; /* f: 0=開ける 1=旗 2=マーク。同じ種類をもう一度で外れ、別の種類なら置き換え */
