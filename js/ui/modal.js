@@ -23,6 +23,7 @@ function mini(P,m,o){o=o||{};let h='<div class="mini">';
 async function exHtml(id){if(exCache[id])return exCache[id];const r=RULES[id];
  let h='<h4 style="margin:14px 0 2px">'+r.name+'</h4><p class="mut" style="margin:0 0 6px">'+r.desc+'</p>',cfg=null;
  for(const M of[8,12,16]){const c={R:7,C:7,M,ids:[id]};if(M%stepOf(r)==0&&(!r.ok||r.ok(c))){cfg=c;break}}
+ if(!cfg){const M=mpick(7,7,8,[id]);if(M)cfg={R:7,C:7,M,ids:[id]}} /* 8/12/16 が ok に合わないルール(tidy は爆弾4〜6割=7x7で20〜29個)は、成り立つ最小の爆弾数にする */
  const e=cfg&&await gen(cfg,{sampleOnly:1});
  if(!e||!e.mines)return h+'<p class="mut">例の盤面を作れませんでした</p>';
  h+='<div class="mut">OK例'+(r.nb?'(数字はこのルールで数えた値)':'')+'</div>'+mini(e.P,e.mines,{sh:e.L&&e.L.sh,hon:e.L&&e.L.hon});
