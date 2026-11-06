@@ -16,7 +16,7 @@ function El(id){this.id=id;this.value=defaults[id]??'';this.checked=false;this.h
 const document={querySelector:s=>els[s]||(els[s]=new El(s.replace(/^#/,''))),createElement:()=>new El('a')};
 const window={addEventListener:(t,f)=>t=='load'&&loads.push(f)};
 const driver=`
-(async()=>{const log=[],ok=(c,m)=>{if(!c)throw Error('FAIL: '+m);log.push('ok: '+m)};
+(async()=>{const log=[],ok=(c,m)=>{if(!c)throw Error('FAIL: '+m);log.push('ok: '+m);console.log('ok: '+m)};
  const wait=async(f,ms=30000)=>{const t=Date.now();while(!f()){if(Date.now()-t>ms)throw Error('timeout');await new Promise(r=>setTimeout(r,50))}};
  loads.forEach(f=>f());ok(RULE_ERR.length==0,'ルール登録エラーなし');
  ok($('#ctx').value.includes('検査レポート'),'レポート欄が初期表示される');
@@ -43,12 +43,12 @@ const driver=`
  ok(run.lives==K0.lives&&run.hints==K0.hints&&run.stage==1&&run.streak==0,'チャレンジ: 初期状態');
  let bad=0;for(let k=0;k<300;k++){const f=chPlan(),n=f.R*f.C;if(f.R<K0.sizeMin||f.R>K0.sizeMax||f.C<K0.sizeMin||f.C>K0.sizeMax||f.M<1||f.M>n-12||f.ids.length>K0.rulesMax||!mok(f.R,f.C,f.M,f.ids))bad++}
  ok(bad==0,'チャレンジ: 抽選300回でサイズ・爆弾数・縛りが整合');
- /* 以降は生成を軽くするため、盤面を小さく・爆弾を少なめに固定する */
- Object.assign(CHALLENGE,{sizeMin:6,sizeMax:6,bombMin:.2,bombMax:.2});
- const ready=async()=>{const t=Date.now();while(!(G&&$('#g').innerHTML.length>0)){if(Date.now()-t>240000)throw Error('timeout: チャレンジの盤面が出ない');if(!G&&!$('#rg').hidden&&$('#ldt').textContent.includes('見つからなかった'))$('#rg').onclick();await sleep(50)}};
+ /* 以降は生成を軽くするため、上のフリープレイ検査で通っている条件(7x7・爆弾8個・縛り1個)に固定する */
+ Object.assign(CHALLENGE,{sizeMin:7,sizeMax:7,bombMin:8/49,bombMax:8/49,rulesMin:1,rulesMax:1});console.log('--- チャレンジ通し(7x7・爆弾8・縛り1個に固定) ---');
+ const ready=async()=>{const t=Date.now();while(!(G&&$('#g').innerHTML.length>0)){if(Date.now()-t>120000)throw Error('timeout: チャレンジの盤面が出ない');if(!G&&!$('#rg').hidden&&$('#ldt').textContent.includes('見つからなかった')){console.log('  (生成失敗 → 引き直し)');$('#rg').onclick()}await sleep(50)}};
  const clearAll=()=>{for(let i=0;i<G.N;i++)if(!G.mines[i]&&!G.st[i]&&!G.done)act(i,0)};
  const missOne=()=>{const i=[...Array(G.N).keys()].find(i=>G.mines[i]&&!G.st[i]);act(i,0)};
- const next=async()=>{ok(!$('#nx').hidden&&$('#nx').textContent=='次の盤面','チャレンジ: 次の盤面ボタンが出る');$('#nx').onclick();await ready()};
+ const next=async()=>{ok(!$('#nx').hidden&&$('#nx').textContent=='次の盤面','チャレンジ: 次の盤面ボタンが出る');console.log('  次の盤面を生成中…');$('#nx').onclick();await ready()};
  $('#rg').onclick();await ready();
  ok(run.stage==1&&run.lives==K0.lives,'チャレンジ: 引き直しても盤面番号は進まない');
  for(let k=0;k<K0.hints;k++)ask('c');
@@ -73,4 +73,4 @@ const driver=`
  return log})()`;
 const localStorage={getItem:k=>LS[k]??null,setItem:(k,v)=>{LS[k]=String(v)}};
 const ctx=vm.createContext({localStorage,document,window,performance,setTimeout,console,Date,Uint8Array,Int8Array,Int32Array,innerWidth:400,scrollTo(){},navigator:{},loads});
-vm.runInContext(code+'\n'+driver,ctx).then(l=>{l.forEach(x=>console.log(x));console.log('SMOKE OK');process.exit(0)},e=>{console.error(e);process.exit(1)});
+vm.runInContext(code+'\n'+driver,ctx).then(l=>{console.log('SMOKE OK');process.exit(0)},e=>{console.error(e);process.exit(1)});
