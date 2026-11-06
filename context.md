@@ -47,13 +47,13 @@ js/ui/                描画と配線
   main.js             upd, setMode, 検査レポート欄, 全イベント配線(load) (3.3KB)
 rules/                1ルール=1ファイル(ファイル名=id)。_始まりは読み込まれない
   _template.js        ひな形 (reg の全フック一覧つき)
-  noTouch cross crossScan knight lines liar groupBomb rect noIsolate allConnected colorDouble tidy .js
+  noTouch cross crossScan knight lines liar liar2 groupBomb rect noIsolate allConnected colorDouble tidy .js
 tools/
   headless.js         ブラウザ無しで検査: node tools/headless.js [id...] | --combo a,b,c
   smoke-ui.js         偽DOMでUI一式+チャレンジの通し(抽選範囲/ヒント/ミス/達成/ゲームオーバー/引き直し/ウィンストリーク)を動かす: node tools/smoke-ui.js
 ```
 
-`P`(prep の結果): `{nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp, gid, adj(上下左右), iso, iid, imax(iso の塊サイズ上限。0=上限なし), conn, cnid, adj8(8近傍。iso か conn のときだけ), R, C, lie, lid, w, probe/pid(probe推論を使うルールの有無とid)}`。
+`P`(prep の結果): `{nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp, gid, adj(上下左右), iso, iid, imax(iso の塊サイズ上限。0=上限なし), conn, cnid, adj8(8近傍。iso か conn のときだけ), R, C, lie(0=なし/1=各行列に正直1つ/2=各行列に嘘1つ), lid, w, probe/pid(probe推論を使うルールの有無とid)}`。
 `run`(チャレンジ進行。フリープレイは null): `{streak(クリア数。board.js が読む), lives, hints(この盤面の残り), X(目標盤面数), stage(今の盤面番号), total(挑戦中の累計クリア), prev(挑戦開始時のウィンストリーク), end(''|'win'|'lose')}`。
 `G`(盤面状態, game): `{cfg,P,N,mines,act(実際の数),num(表示数字),st(0未開/1開/2爆発),fl(0なし/1旗/2マーク。真偽値として扱わず fl[i]==1 のように書く),rev,over,done,hint}`。
 
@@ -85,6 +85,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
  cons:(R,C)=>[{cells:[0,1],lo:0,hi:1}], // 任意: 常に成り立つ制約。cells内の爆弾数は lo 以上 hi 以下
  wt:(R,C,i)=>1,                    // 任意: マスiの爆弾が数字に数えられる個数(重み。色つきマスは2など。爆弾の総数は変わらない。同時に1つだけ)
  liar:true,                         // 任意: 数字が実際と±1ズレる(各行・各列に正直な数字が1つ。縦横同じ盤面のみ。同時に1つだけ)
+ liar:2,                            // 任意: liar の逆版。各行・各列に嘘の数字が1つだけ(嘘は実際と±1ズレ)、ほかは全部正直。true か 2 のどちらか1つ(liar と liar2 は併用不可)
  grp:4,                             // 任意: 爆弾の縦横連結成分が全てちょうどこの個数(同時に1つだけ)
  iso:true,                          // 任意: どの爆弾も8近傍に別の爆弾がある(孤立禁止。nb に関係なく常に8近傍)
  iso:4,                             // 任意: iso の数値版。8近傍でつながった塊が全て2〜n個(nは3以上の整数)で、塊同士は触れない。true か数値のどちらか1つ
@@ -94,10 +95,11 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 ```
 
 - `cons` は盤面サイズ(R,C)だけから決まる静的制約。配置は必ず全 cons を満たし、ソルバも同じ制約で推論する。
-- `nb` を持つルールは同時に1つだけ(`excl:"num"` で防ぐ)。`grp` / `liar` も同様に1つだけ(conflict が自動で防ぐ)。
+- `nb` を持つルールは同時に1つだけ(`excl:"num"` で防ぐ)。`grp` / `liar`(`liar:true` と `liar:2` を合わせて)も同様に1つだけ(conflict が自動で防ぐ)。
 - `grp` は「爆弾を縦横につながった grp 個ずつの組にし、組同士は縦横で触れない」。縦横に爆弾が隣り合うのを禁じる縛りとは `conflicts` にする。
-- `liar` は nb(十字/ナイト)や cons 系と併用できる。
-- `wt` は nb(十字/ナイト)と併用できる。`wt` 同士は併用不可(conflict が自動で防ぐ)。liar は「±1ズレ」の前提が個数なので併用不可(colorDouble が `conflicts:['liar']` を宣言している)。
+- `liar` は nb(十字/ナイト)や cons 系と併用できる。`liar:2`(liar2。嘘つき数字2)も同じ。実装は liar と共通で、違いは「各行・各列に1つだけの特別マス」が正直(liar)か嘘(liar2)かだけ(solver の `LV`、gen の `hon[]` の解釈。第7節)。
+- liar 系と `wt` は併用不可。registry の `conflict` が `wt`×`liar`(`liar:true`/`liar:2` どちらも)を常に併用不可にするので、wt 側で `conflicts` を書かなくてよい(colorDouble の `conflicts:['liar']` は重複だが残してよい)。
+- `wt` は nb(十字/ナイト)と併用できる。`wt` 同士は併用不可(conflict が自動で防ぐ)。liar / liar2 は「±1ズレ」の前提が個数なので併用不可(registry の `conflict` が自動で防ぐ。colorDouble の `conflicts:['liar']` は重複)。
 - `iso` は「爆弾があるマスだけに課す条件つき制約」なので cons では書けない。nb / cons / liar と併用できる。`iso:true` は grp とは併用不可(組の中が必ずつながるので飾りになる。`conflicts` で防ぐ)。
 - `iso:n`(例: noIsolate の `iso:4`)は、塊を「爆弾の8近傍連結成分」で決め、全ての塊が2〜n個。「塊同士が触れない」は定義から自動で成り立つので別に書かない(触れたら同じ塊)。grp とは併用不可(組の斜め接触も禁止になるが gsample/gmove が未対応。要望があれば `adj` を `adj8` にして対応可)、conn とは併用不可(全体が1塊になり爆弾数が n 個以下に限られる)。爆弾が盤面の約4.5割を超えると生成が極端に遅いので、ルール側の `ok` で上限を付ける。
 - `conn` も cons では書けない全体制約。nb / cons / liar / grp と併用できる。iso:true(飾りになる)・iso:n(爆弾数が n 個以下に限られる)・rect(成り立たない)とは併用不可。
@@ -138,11 +140,12 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 | 爆弾全体が8近傍でひと続き | `conn` だけ(実装済み) |
 | 爆弾の連結成分は直線のみ・斜め不可 | `cons` だけ(rect。下限なしなので生成可) |
 | 爆弾全体が1つのヘビ(自己に縦横で触れない) | **CORE拡張**: 新しい全体制約(連結性)。[grp] と同型 |
+| 「各行・各列に正直な数字が1つ」の逆(嘘が各行列に1つ)など、特別マスの意味だけ変える | `liar:2` だけ(実装済み。liar2) |
 | 数字が「色つきマス or 色なしマス」の爆弾数 | **CORE拡張**: 盤面の色分け(静的パターン)+ 数字が2択(選言)の推論。[liar] と同型(盤面ごとの隠れ状態を gen が持つ) |
 | 偶奇だけの数字 / 範囲で出る数字 / 数字が複数 | **CORE拡張**: 数字の意味変更(solver の数字制約の作り方、sim の num、draw) |
 | プレイ中に状態が動く / lo,hi で書けない制約 | **CORE拡張(大)**: 要相談 |
 
-**CORE拡張で触る場所**(既存の拡張は行頭の `[grp]` `[liar]` `[iso]` `[conn]` `[wt]` の印で探す。新フックは同じ位置に並べる):
+**CORE拡張で触る場所**(既存の拡張は行頭の `[grp]` `[liar]` `[iso]` `[conn]` `[wt]` の印で探す。新フックは同じ位置に並べる。liar 系は `P.lie`=1/2 で分岐する: solver は `LV=P.lie==2`、gen も `LV`。`L.hon[]` は「特別マス」の集合で、liar では正直マス・liar2 では嘘マス。`mkShown` が `!!hon[i]!==LV` なら正直、それ以外は ±1 ズレ):
 
 1. `registry.js` — `reg` に新フィールドの検査、`conflict` に併用不可、`stepOf`(爆弾数の倍数があるなら)。
 2. `prep.js` — `prep` で P に必要情報を載せる(例: grp は `adj`)。
@@ -175,7 +178,8 @@ python3 build.py                           # rules ブロック同期 + dist 生
   - ヒント(`all=1`)の根拠 `why` は近似(そのマスに触れる数字とルールを挙げるだけ。probe の推論は離れた制約も使う)。
   - 併用ペア(tidy+◯◯): tidy の `conflicts` は現在 crossScan / noTouch / rect / allConnected / groupBomb / noIsolate(理由は tidy.js 冒頭のコメント。crossScan は腕2マスの十字 nb で、開始マスの安全領域が一直線に5マス並ぶため)。cross+tidy と liar+tidy は、検査で1回生成失敗・次の検査では失敗なし(2026-11-06)で未確定なので `conflicts` に入れていない(フリープレイで各10回ほど生成して成功率を見て決める)。このうち noTouch は、3連版では「ほぼ市松に固定」で生成失敗していたが、4連では緩むので縦横だけの隣接禁止なら両立する可能性が高い【未検査】(noTouch.js で確認できたら外す)。rect は、爆弾が4マス間隔・半ずらしの格子にほぼ固定され盤面が似通うので除外している。他の併用ペアは、この solver で検査してから `conflicts` を決める。
 - 大盤面+高密度では探索が長引き、上限(約2分)で失敗することがある。生成中は経過表示とキャンセルボタンがある。
-- liar: 全未開マスを1成分として列挙するので、盤面が大きいと推論が打ち切られ(安全側)生成が難航する。tidy との併用は、検査で1回生成失敗・次の検査では失敗なし(2026-11-06)で未確定(`conflicts` には入れていない)。
+- liar / liar2: 全未開マスを1成分として列挙するので、盤面が大きいと推論が打ち切られ(安全側)生成が難航する。tidy との併用は、検査で1回生成失敗・次の検査では失敗なし(2026-11-06)で未確定(`conflicts` には入れていない)。
+- liar2(2026-11-07 追加): 自前ハーネス(5x5/M5, 6x6/M7, 7x7/M10 を各8回。liar2 単体、+十字 nb、+各行2個以下の cons)で生成 全成功・solver unsound なし・各行各列にちょうど1つの嘘を確認。`node tools/headless.js liar2`(全ペア)と `node tools/smoke-ui.js` は**未実行**(tools/ を持っていないため)。併用ペアのNGは、そのレポートを見て `conflicts` か gen 改善を決める。推論の弱点は liar と同じ(全列挙が打ち切られると安全側に諦める)。嘘が1つしかない分、確定できる情報は liar より多いはずだが、その行列制約(嘘を使い切った行の残りは全部正直)は全列挙の中でしか効かない。大盤面で難航するなら、行・列の嘘数が確定したときに残りの数字制約を `[d,d]` に締める伝播を足す(必要条件のみ・sound のまま足せる)。
 - grp の推論は局所的(grp マス以内)な必要条件のみ。
 - conn の推論は「確定爆弾が全て、安全でないマスの同じ連結領域にあり、その領域が M マス以上」という必要条件のみ。生成は鎖っぽく育てるサンプラ(`csample`)と、切れない爆弾を付け替える move(`cmove`)。lines のような下限つき cons と併用すると、品質条件を満たす盤面が出にくく遅い(品質未達の盤面で妥協することがある)。
 - iso の推論は「爆弾にするには8近傍に安全でないマスが要る」という必要条件のみ。`iso:n` ではさらに「確定爆弾の8近傍連結成分は n 個以下」も必要条件として使う。生成は8近傍の塊(`iso:true` は2〜4個、`iso:n` は2〜n個で塊同士は触れない)を置くサンプラと、塊を壊さない move(`isample`/`imove`。`iso:n` は塊ごと動かす手もある)を使う。`iso:n` は爆弾が盤面の約4.5割を超えると生成が極端に遅い(noIsolate の `iso:4` は 7x7 で M=22 まで、24 で失敗)。下限つき cons(lines など)との併用は、サンプラが下限を見ないので当たりが薄くなる可能性がある。
