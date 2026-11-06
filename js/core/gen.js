@@ -17,7 +17,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
  /*[conn]*/const cconn=m=>ccomps(m).length<=1;
  const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp))&&(!P.iso||iok(m))&&(!P.conn||cconn(m));
  const nec=ids.filter(id=>RULES[id].grp||RULES[id].iso||RULES[id].conn||(RULES[id].cons&&RULES[id].cons(R,C).length));
- const LM=!!P.lie;if(LM&&R!=C)throw Error('縦と横が同じ盤面のみ');
+ const LM=!!P.lie,LV=P.lie==2; /* hon[]=特別マス(lie1=正直, lie2=嘘)。LV なら hon 以外が正直 */if(LM&&R!=C)throw Error('縦と横が同じ盤面のみ');
  const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
  /* ---- [liar] 正直な数字: 各行・各列に1つ(安全マスのみ)。ほかの安全マスは±1ズレる(範囲外なら逆向き) ---- */
  const pickHon=m=>{const hon=new Uint8Array(N),used=new Uint8Array(C);let nodes=0;
@@ -25,13 +25,13 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
    for(const c of cs){used[c]=1;hon[r*C+c]=1;if(rec(r+1))return true;used[c]=0;hon[r*C+c]=0}return false};
   return rec(0)?hon:null};
  const mkShown=(m,hon,sg)=>{const sh=new Int8Array(N);for(let i=0;i<N;i++)if(!m[i]){let a=0;for(const j of P.nb[i])a+=m[j];const ln=P.nb[i].length;
-  if(hon[i])sh[i]=a;else{let s=sg[i]?1:-1;if(a+s<0||a+s>ln)s=-s;sh[i]=a+s}}return sh};
+  if(!!hon[i]!==LV)sh[i]=a;else{let s=sg[i]?1:-1;if(a+s<0||a+s>ln)s=-s;sh[i]=a+s}}return sh};
  const lstate=(m,hon0,sg0)=>{const hon=hon0||pickHon(m);if(!hon)return null;const sg=sg0||Uint8Array.from({length:N},()=>rnd()<.5?1:0);return{hon,sg,sh:mkShown(m,hon,sg)}};
  const lmove=(cur,cl,U)=>{const mv=rnd();
   if(mv<.5){const r1=rnd()*R|0,r2=rnd()*R|0;if(r1==r2)return null;let c1=-1,c2=-1;for(let c=0;c<C;c++){if(cl.hon[r1*C+c])c1=c;if(cl.hon[r2*C+c])c2=c}
    if(cur[r1*C+c2]||cur[r2*C+c1])return null;const hon=cl.hon.slice();hon[r1*C+c1]=hon[r2*C+c2]=0;hon[r1*C+c2]=hon[r2*C+c1]=1;
    return{m:cur,L:{hon,sg:cl.sg,sh:mkShown(cur,hon,cl.sg)}}}
-  const cs2=U.filter(i=>!cur[i]&&!cl.hon[i]);if(!cs2.length)return null;const sg=cl.sg.slice(),i=cs2[rnd()*cs2.length|0];sg[i]^=1;
+  const cs2=U.filter(i=>!cur[i]&&!!cl.hon[i]===LV);if(!cs2.length)return null;const sg=cl.sg.slice(),i=cs2[rnd()*cs2.length|0];sg[i]^=1;
   return{m:cur,L:{hon:cl.hon,sg,sh:mkShown(cur,cl.hon,sg)}}};
  /* ---- [grp] グループ配置(gsample)とグループ単位の山登り(gmove) ---- */
  const wpick=(a,w)=>{let t=rnd()*a.reduce((s,c)=>s+w[c],0),p=a[a.length-1];for(const c of a){t-=w[c];if(t<=0){p=c;break}}return p};

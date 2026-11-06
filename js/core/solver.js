@@ -41,10 +41,10 @@ function deduce(P,st,num,M,skip,all){
   for(let i=0;i<N;i++)if(S[i]!=0&&cv[i]!=ts){cfl(i,ts);if(cz>=M)return true}
   return false};
  /*[grp]*/if(GN||IM||CM){S=new Uint8Array(N);vis=new Int32Array(N);for(let i=0;i<N;i++)S[i]=st[i]==1?0:st[i]==2?1:2}
- /*[liar]*/const HM=P.lie&&P.lid!==skip;let rH,cH,rU,cU,rX,cX;
+ /*[liar]*/const HM=P.lie&&P.lid!==skip,LV=P.lie==2; /* LV: 嘘つき2。rH/cH は「特別マス」(lie1=正直, lie2=嘘)の確定数 */let rH,cH,rU,cU,rX,cX;
  /*[liar]*/if(HM){const R0=P.R,C0=P.C;rH=new Int8Array(R0);cH=new Int8Array(C0);rU=new Int8Array(R0);cU=new Int8Array(C0);rX=new Int8Array(R0);cX=new Int8Array(C0);
   for(let i=0;i<N;i++){const r=i/C0|0,c=i%C0;if(st[i]==0){rX[r]=1;cX[c]=1}
-   else if(st[i]==1){if(P.nb[i].some(j=>st[j]==0)){rU[r]++;cU[c]++}else{let m=0;for(const j of P.nb[i])if(st[j]==2)m++;if(m==num[i]){rH[r]++;cH[c]++}}}}}
+   else if(st[i]==1){if(P.nb[i].some(j=>st[j]==0)){rU[r]++;cU[c]++}else{let m=0;for(const j of P.nb[i])if(st[j]==2)m++;if((m==num[i])!=LV){rH[r]++;cH[c]++}}}}}
  /*[wt]*/for(const k of K)for(let q=0;q<k.cells.length;q++){const x=k.w?k.w[q]:1;if(x>k.hi)push(k.cells[q],0,1,k.src);else if(k.sw-x<k.lo)push(k.cells[q],1,1,k.src)}
  if(T<=0)unk.forEach(c=>push(c,0,1,{t:'c'}));else if(T>=unk.length)unk.forEach(c=>push(c,1,1,{t:'c'}));
  /*[grp]*/if(GN){const gs={t:'r',id:P.gid};
@@ -103,7 +103,7 @@ function deduce(P,st,num,M,skip,all){
     /*[iso]*/if(!bad&&IM){S[g[j]]=v;if(!ichk(g[j],v))bad=true}
     /*[conn]*/if(!bad&&CM){S[g[j]]=v;if(!cchk())bad=true}
     const dec=[];
-    /*[liar]*/if(!bad&&HM){const C0=P.C;for(const k of byCell[j])if(k.y>=0&&k.u==0){const r=k.y/C0|0,c=k.y%C0,h=k.a==k.hv;rU[r]--;cU[c]--;if(h){rH[r]++;cH[c]++}dec.push([r,c,h])}
+    /*[liar]*/if(!bad&&HM){const C0=P.C;for(const k of byCell[j])if(k.y>=0&&k.u==0){const r=k.y/C0|0,c=k.y%C0,h=(k.a==k.hv)!=LV;rU[r]--;cU[c]--;if(h){rH[r]++;cH[c]++}dec.push([r,c,h])}
      for(const[r,c]of dec)if(rH[r]>1||cH[c]>1||rH[r]+rU[r]+rX[r]<1||cH[c]+cU[c]+cX[c]<1)bad=true}
     if(!bad){a[j]=v;cnt+=v;rec(j+1);cnt-=v}
     for(const[r,c,h]of dec){rU[r]++;cU[c]++;if(h){rH[r]--;cH[c]--}}
