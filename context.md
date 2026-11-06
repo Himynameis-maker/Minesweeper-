@@ -16,6 +16,7 @@
 - 単一HTML のマインスイーパー・バリアント。「縛り」をランダムに/選んで攻略する。縛りは AI が少しずつ増やす。
 - 最重要: **ノーゲス(運ゲー無し)盤面だけを出す**。開始マスは自動オープンし、推論だけで完走できる配置のみ採用。かつ単調でない(推論の種類>=2、手順3段以上、各縛りを外すと解けなくなる=飾りでない)。
 - フリープレイ: 盤面/爆弾数/縛りを自由指定、ミス=即終了。縛りが今の盤面・爆弾数に合わないとスタートを止める。
+- シード(フリープレイのみ): プレイ画面の小さい「📋 シード」ボタンでシード文字列をコピー(コピーした旨の表示なし)。タイトルのモード「シード」に貼ってスタートすると、生成せずに完全に同じ盤面(縛り・爆弾数・隠れ状態も)で始まる。バージョンアップで盤面が変わることには追従しない。チャレンジにはシードなし。形式の約束は第11節。
 - チャレンジ: X連続クリアが目標、縛りはプールから抽選、ライフ・ヒント回数あり。爆弾数は縛りに合う最寄り値へ自動調整。
 - ヒント: ON/OFF式。ON中に数字・縛り・残り爆弾数をタップすると、その手がかりから確定できるマスがあるかだけ答える(場所は教えない)。
 - 操作: モードは「開ける/旗/マーク」(`fm`=0/1/2)。マークは旗の色違いのメモで、残り爆弾数とヒント推論には影響しない(旗だけが「既知の爆弾」扱い)。同じ印をもう一度立てると外れ、別の印は置き換え。旗/マークの立っているマスは開けない。右クリックは選択中の印を立てる(開けるモード中は旗)。
@@ -37,9 +38,10 @@ js/core/              推論と生成。DOM非依存(node でも動く)
   gen.js              gen(ノーゲス盤面の生成・山登り・品質判定) (11KB)   ★配置様式の主戦場
   selftest.js         selfTest(単体+併用ペア検査), buildReport (2.1KB)
 js/game/              盤面の進行(DOMを読み書きする)
-  state.js            グローバル状態 G/run/SEL..., $ v chk mode msg show (0.7KB)
+  state.js            グローバル状態 G/run/SEL..., $ v chk mode(f/c/s) msg show (0.8KB)
   config.js           設定→cfg: norm, pick, plan, freeCfg, problems (2.9KB)
-  play.js             start(gen呼び出し), flood, act, hscan, ask(ヒント) (3.7KB)
+  play.js             start(gen呼び出し/シード開始), begin(Gを組み立てる唯一の場所), flood, act, hscan, ask(ヒント) (4.3KB)
+  seed.js             シードの符号化 encodeSeed/復号 decodeSeed/コピー copyText (3KB)  ★形式の約束は第11節
 js/ui/                描画と配線
   board.js            draw (1.7KB)
   modal.js            縛りモーダル, tags(縛りのタグ), 例盤面 mini/exHtml, longpress (5.4KB)
@@ -49,11 +51,11 @@ rules/                1ルール=1ファイル(ファイル名=id)。_始まり�
   noTouch cross knight lines liar groupBomb rect noIsolate allConnected colorDouble .js
 tools/
   headless.js         ブラウザ無しで検査: node tools/headless.js [id...] | --combo a,b,c
-  smoke-ui.js         偽DOMでUI一式を動かす: node tools/smoke-ui.js
+  smoke-ui.js         偽DOMでUI一式を動かす(全縛りでシード往復の一致も検査): node tools/smoke-ui.js
 ```
 
 `P`(prep の結果): `{nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp, gid, adj(上下左右), iso, iid, imax(iso の塊サイズ上限。0=上限なし), conn, cnid, adj8(8近傍。iso か conn のときだけ), R, C, lie, lid, w}`。
-`G`(盤面状態, game): `{cfg,P,N,mines,act(実際の数),num(表示数字),st(0未開/1開/2爆発),fl(0なし/1旗/2マーク。真偽値として扱わず fl[i]==1 のように書く),rev,over,done,hint}`。
+`G`(盤面状態, game): `{cfg,P,N,mines,act(実際の数),num(表示数字),st(0未開/1開/2爆発),fl(0なし/1旗/2マーク。真偽値として扱わず fl[i]==1 のように書く),rev,over,done,hint,seed(フリープレイのシード文字列。チャレンジは空)}`。
 
 ## 3. タスク別「渡すファイル」(コスト削減の要)
 
@@ -64,6 +66,7 @@ tools/
 | 併用の矛盾を直す(検査レポートに NG が出た) | `context.md` + 検査レポート + 関係する `rules/<a>.js` `rules/<b>.js` |
 | 生成が遅い/失敗する(特定の縛り) | 上に加えて `js/core/gen.js` |
 | CORE拡張(新しい種類の制約・数字の意味変更。第7節) | `context.md` + `js/core/{prep,solver,gen}.js` + 対象ルール。例盤面の見せ方も変えるなら `js/ui/modal.js` |
+| シードの形式・挙動の変更(原則不要。第11節) | `context.md` + `js/game/seed.js` + `js/game/play.js` + `tools/smoke-ui.js` |
 | UIの見た目・操作の変更 | `context.md` + `index.html` + `css/style.css` + 該当の `js/ui/*.js` `js/game/*.js` |
 | 配布用の単一HTMLが欲しい | プロジェクト全体 → `python3 build.py` の結果 `dist/minesweeper-variants.html` |
 
@@ -114,6 +117,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 - ノーゲスでない盤面は絶対に出さない。`gen` は非同期・キャンセル可。見つからなければ null で失敗(妥協盤面を出さない)。
 - 1ルール=1ファイル=1回の reg。他のルールや CORE に触らない(CORE拡張を頼まれたときを除く)。
 - 推論は単一制約+組合せ(各成分3万ノード上限、超過時は推論せず=安全側)。
+- **盤面を決める情報(隠れ状態を含む)は、必ず gen の返り値 `res`(と `cfg`)に入れる。** `G` を組み立てるのは play.js の `begin(cfg,res)` だけで、`G` は `cfg` と `res` だけから作れること(play.js の start や UI で、gen 時の変数から別途作らない)。これでシード(第11節)は変更不要になる。`res`/`cfg` に入れてよいのは 数値・文字列・真偽・null・配列・プレーンオブジェクト・typed array だけ(Set/Map/関数/NaN/Infinity は不可)。
 
 ## 7. CORE拡張の判定と、触る場所
 
@@ -140,7 +144,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 3. `solver.js` `deduce` — 制約の作り方(`add`)と、全列挙 `rec` 内の枝刈り(必要条件のみ)、必要なら全マス1成分へ併合(liar 方式)、`why` の根拠に rule id を足す(ヒント用)。
 4. `gen.js` — `valid`(全体制約の判定)、`sample`(標準サンプラが作れない配置なら専用サンプラ)、山登りの専用 move(`gmove` 相当)、隠れ状態があれば `L` のように一緒に作って動かす。`nec`(外すと詰む検査の対象)に入れる。
 5. `ui/modal.js` — `tags` にタグを1行、例盤面(`mini`/`exHtml`)で見せ方が要るなら追記。数字の表示が変わるなら `ui/board.js` の `draw`。
-6. `game/play.js` の `start` で、gen の返す隠れ状態(`res.L` 相当)を `G.num` などに反映。
+6. `game/play.js` の `begin` で、gen の返す隠れ状態(`res.L` 相当)を `G.num` などに反映(`G` は `cfg` と `res` だけから作る。第6節・第11節)。
 
 ## 8. 検証(出力前に必ず)
 
@@ -151,6 +155,7 @@ node tools/smoke-ui.js                     # UI一式の通し(ルール登録�
 python3 build.py                           # rules ブロック同期 + dist 生成
 ```
 
+- `smoke-ui.js` は全縛りで「生成した `G` を、そのシードから作り直した `G` と深く比較」する。隠れ状態を `res` に入れ忘れる/入れられない型を使うとここで落ちる。
 - 検査は爆弾数を `mpick`(ok と mstep を満たす最小値)で自動選択する。「未検査(適用外)」は 7x7/9x9 で成り立つ爆弾数が無いという意味。
 - 実行できない環境では、ユーザーがアプリの「検査レポート → ルール検査を実行」を押して出たレポートを貼る。
 - 併用NG(ペアの生成失敗)の直し方: ①本当に論理的に両立しないなら `conflicts` に入れる ②生成が下手なだけなら gen 側を改善する(第9節)。①の安易な乱用は避け、理由を1行コメントで残す。
@@ -170,3 +175,11 @@ python3 build.py                           # rules ブロック同期 + dist 生
 2. `node tools/headless.js <id>` → OK か、併用NGは妥当か確認。`node tools/smoke-ui.js`。
 3. `python3 build.py`(index.html の RULES ブロックが自動更新される)。手でやるなら index.html の `RULES:BEGIN〜END` 内に `<script src="rules/<id>.js"></script>` を1行足す。
 4. `CHANGELOG.md` に1行追記。
+5. 盤面ごとの隠れ状態を持つルールなら、それを gen の返り値 `res` に入れる(第6節)。`node tools/smoke-ui.js` のシード往復が通ることを確認。
+
+## 11. シード(フリープレイ)
+
+- 形式: `'v1.' + base64url(UTF-8 の JSON {c: cfg(dropped 以外すべて), r: gen の返り値 res})`。typed array は `{"$":"b49:..."}`(0/1だけならビット詰め)か `{"$":"Int8Array:..."}`(生バイト)に包む。`cfg`/`res` の項目名は seed.js が決め打ちしない(項目が増えても変更不要)。
+- 復号(`decodeSeed`)は読めなければ null。見るのは「R,C が 3〜24 / 縛り id が今の RULES にある / mines が N 長の0/1で、開始マスは爆弾でなく、爆弾数=M」だけ。解けるかは見ない。
+- 変更が要るのは次の場合だけ: ①`res.mines` の表現(0/1 の配列)や開始マスの持ち方を変えたとき(decodeSeed の検査)、②JSON で運べない型を使いたいとき、③形式を変えざるを得ないとき(先頭を `v2.` にして `v1.` は読めなければ断る)。縛り id の改名・削除は、古いシードが読めなくなるだけで許容(追従しない方針)。
+- 約束を破った場合: encode が例外を出し、begin がそれを握りつぶしてシードボタンを出さず(ゲームは普通に遊べる)、smoke-ui が落ちて気づける。
