@@ -28,14 +28,24 @@ const driver=`
   ok(!$('#go').disabled,id+': スタート可');
   $('#go').onclick();await wait(()=>G&&!G.over&&$('#g').innerHTML.length>0);
   ok(G.cfg.ids.includes(id)&&G.rev>0,id+': 盤面生成と自動オープン');
+  ok(G.seed&&G.seed.startsWith('v1.')&&!$('#sc').hidden,id+': シードが出る');
+  {const sd=decodeSeed(G.seed);ok(sd&&sd.cfg.ids+''==G.cfg.ids+''&&sd.cfg.M==G.cfg.M&&sd.res.start>=0&&sd.res.mines.every((x,i)=>x==G.mines[i])&&(!G.num||!sd.res.L||sd.res.L.sh.every((x,i)=>x==G.num[i])),id+': シード往復(爆弾配置・隠れ状態が一致)')}
   const safe=[...Array(G.N).keys()].find(i=>!G.mines[i]&&!G.st[i]);const r0=G.rev;act(safe,0);ok(G.rev>r0||G.done,id+': 安全マスを開ける');
   const f=[...Array(G.N).keys()].find(i=>!G.st[i]);act(f,1);ok(G.fl[f]==1,id+': 旗');
   $('#hb').onclick();ok(hm==1,id+': ヒントON');ask('c');ask('r',id);$('#hb').onclick();
   $('#rv').onclick();ok($('#ml').innerHTML.includes(id),id+': 盤面の縛り一覧');$('#mx').onclick();
   await showEx([id],'t');ok($('#el').innerHTML.includes('OK例'),id+': 例盤面');
   $('#bk').onclick()}
+ {SEL.clear();SEL.add('cross');$('#mf').onclick();$('#go').onclick();await wait(()=>G&&$('#g').innerHTML.length>0);
+  const s0=G.seed,m0=Array.from(G.mines),n0=Array.from(G.num);ok(!!s0,'シード用: フリープレイで盤面生成');$('#bk').onclick();
+  $('#ms').onclick();ok(mode()=='s'&&!$('#sdc').hidden&&$('#bc').hidden&&$('#rc').hidden,'シードモード: 入力欄が出て盤面・縛り欄が隠れる');
+  $('#sd').value='';upd();ok($('#go').disabled,'シード空ならスタート不可');
+  $('#sd').value='v1.zzz';upd();$('#go').onclick();ok($('#mw').textContent.includes('読み込めません'),'不正なシードは断る');
+  $('#sd').value=' '+s0+'\n';upd();ok(!$('#go').disabled,'シード入力でスタート可');$('#go').onclick();await wait(()=>G&&$('#g').innerHTML.length>0);
+  ok(G.seed==s0&&Array.from(G.mines).every((x,i)=>x==m0[i])&&Array.from(G.num).every((x,i)=>x==n0[i])&&!run,'シードから完全に同じ盤面で始まる(フリープレイ扱い)');
+  $('#bk').onclick();$('#mf').onclick();ok(mode()=='f'&&$('#sdc').hidden&&!$('#bc').hidden,'フリープレイに戻すと元の欄に戻る')}
  SEL.clear();Object.keys(RULES).forEach(i=>SEL.add(i));$('#mc').onclick();$('#go').onclick();await wait(()=>G&&$('#g').innerHTML.length>0);
- ok(run&&G,'チャレンジ開始(縛り '+G.cfg.ids.join('+')+')');
+ ok(run&&G,'チャレンジ開始(縛り '+G.cfg.ids.join('+')+')');ok(G.seed===''&&$('#sc').hidden,'チャレンジにはシードボタンなし');
  return log})()`;
-const ctx=vm.createContext({document,window,performance,setTimeout,console,Date,Uint8Array,Int8Array,Int32Array,innerWidth:400,scrollTo(){},navigator:{},loads});
+const ctx=vm.createContext({document,window,performance,setTimeout,console,Date,Uint8Array,Int8Array,Int32Array,innerWidth:400,scrollTo(){},navigator:{},btoa,atob,TextEncoder,TextDecoder,loads});
 vm.runInContext(code+'\n'+driver,ctx).then(l=>{l.forEach(x=>console.log(x));console.log('SMOKE OK');process.exit(0)},e=>{console.error(e);process.exit(1)});
