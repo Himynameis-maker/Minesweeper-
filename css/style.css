@@ -51,3 +51,19 @@ textarea{width:100%;height:150px;font:11px monospace;box-sizing:border-box;margi
 .hon{outline:2px solid #3b82f6;outline-offset:-2px}
 #hb.on{background:#3b82f6;color:#fff;border-color:#3b82f6}
 .mk{display:inline-block;filter:hue-rotate(200deg) saturate(1.3);pointer-events:none}
+/* チャレンジ: 開始画面の解説・状態バー・終了演出 */
+.cht{font-size:20px;font-weight:800;margin-bottom:6px}
+.chd p{margin:6px 0;font-size:14px;color:var(--fg)}
+.chw{margin-top:12px;padding-top:10px;border-top:1px solid var(--l);font-size:15px}.chw b{font-size:22px}
+#fin{position:fixed;inset:0;background:rgba(10,12,25,.6);display:flex;align-items:center;justify-content:center;z-index:20;padding:20px;animation:fin .3s}
+#finc{width:100%;max-width:360px;text-align:center;margin:0;position:relative;z-index:1;padding:22px 18px;animation:pop .55s cubic-bezier(.2,1.4,.4,1)}
+#fini{font-size:64px;line-height:1.15}#fint{margin:4px 0 2px;font-size:24px}
+#fin.win #fini{animation:bob 1s ease-in-out infinite}
+#fin.lose #finc{animation:pop .45s cubic-bezier(.2,1.4,.4,1),shk .45s .35s}
+#finx{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.pc{position:absolute;top:-40px;animation:fall linear forwards}
+@keyframes fin{from{opacity:0}}@keyframes pop{from{transform:scale(.6);opacity:0}}
+@keyframes bob{50%{transform:translateY(-8px) rotate(-6deg)}}
+@keyframes shk{20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+@media(prefers-reduced-motion:reduce){#finx{display:none}#finc,#fin.win #fini,#fin.lose #finc{animation:none}}
