@@ -20,8 +20,8 @@ window.addEventListener('load',()=>{
  $('#ma').onclick=()=>{vis().forEach(r=>{if(!blockers(r.id).length)SEL.add(r.id)});renderList()};$('#mn').onclick=()=>{vis().forEach(r=>SEL.delete(r.id));renderList()};
  $('#go').onclick=()=>{if(mode()=='k')return startCode();if(problems().length)return upd();show('game');start(1)};$('#bk').onclick=cancelGen;$('#lc').onclick=cancelGen;
  $('#nx').onclick=()=>start(+$('#nx').dataset.nr);$('#rp').onclick=replay;
- $('#cp').onclick=()=>{if(!G)return;const t=makeCode(),b=$('#cp'),ok=()=>{b.textContent='✔ コピーしました';setTimeout(()=>b.textContent='📋 コード',1500)};
-  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(ok,()=>prompt('盤面コード(コピーして使ってください)',t))};
+ $('#cp').onclick=()=>{if(!G)return;const t=makeCode(); /* 成功時は無反応。コピーできない環境のときだけ手動コピー用に表示 */
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).catch(()=>prompt('盤面コード(コピーして使ってください)',t))};
  $('#hb').onclick=()=>{if(!G||G.over||G.done)return;hm=hm?0:1;msg(hm?'ヒントON: 数字のマス・縛り(🧩の中)・残り爆弾数をタップ'+(run?'(1回につきヒント1回消費)':''):'');draw()};
  $('#st').onclick=e=>{if(hm&&e.target.closest('[data-k=c]'))ask('c')};
  $('#ml').addEventListener('click',e=>{if(MODE!='view'||!hm)return;const t=e.target.closest('.ri');if(t)ask('r',t.dataset.rid)});
