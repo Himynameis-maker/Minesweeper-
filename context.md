@@ -50,7 +50,7 @@ rules/                1ルール=1ファイル(ファイル名=id)。_始まり�
   noTouch cross knight lines liar groupBomb rect noIsolate allConnected colorDouble .js
 tools/
   headless.js         ブラウザ無しで検査: node tools/headless.js [id...] | --combo a,b,c
-  smoke-ui.js         偽DOMでUI一式を動かす: node tools/smoke-ui.js
+  smoke-ui.js         偽DOMでUI一式+チャレンジの通し(抽選範囲/ヒント/ミス/達成/ゲームオーバー/引き直し/ウィンストリーク)を動かす: node tools/smoke-ui.js
 ```
 
 `P`(prep の結果): `{nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp, gid, adj(上下左右), iso, iid, imax(iso の塊サイズ上限。0=上限なし), conn, cnid, adj8(8近傍。iso か conn のときだけ), R, C, lie, lid, w}`。
@@ -150,7 +150,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 ```
 node tools/headless.js <新ruleのid>        # 単体 + そのidを含む全ペア。NG(…)/併用NGが出たら直す
 node tools/headless.js --combo a,b,c       # 3縛り以上の同時適用を試す
-node tools/smoke-ui.js                     # UI一式の通し(ルール登録→生成→操作→例盤面)
+node tools/smoke-ui.js                     # UI一式の通し(ルール登録→生成→操作→例盤面)+チャレンジの通し。チャレンジの数値(CHALLENGE)を変えても通るように書いてある
 python3 build.py                           # rules ブロック同期 + dist 生成
 ```
 
