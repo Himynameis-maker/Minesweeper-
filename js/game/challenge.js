@@ -21,12 +21,12 @@ const chSaveStreak=n=>{try{localStorage.setItem(CHALLENGE.storeKey,String(n))}ca
 function chDescHtml(){const c=CHALLENGE,pc=x=>Math.round(x*100),rg=(a,b,u)=>a==b?a+u:a+'〜'+b+u,
  sz=c.square?c.sizeMin+'×'+c.sizeMin+(c.sizeMin==c.sizeMax?'':'〜'+c.sizeMax+'×'+c.sizeMax):'縦横それぞれ'+rg(c.sizeMin,c.sizeMax,'マス');
  return[
-  '縛り・盤面・爆弾数はぜんぶランダム。自分では何も変えられないよ。',
-  '盤面は'+sz+'、爆弾は'+rg(pc(c.bombMin),pc(c.bombMax),'%')+'くらい、縛りは'+rg(c.rulesMin,c.rulesMax,'個')+'。縛りに合わない爆弾数のときは、前後どちらかにずれるよ。',
-  c.wins+'盤面'+(c.missResetsStreak?'を連続でクリアできたら勝ち! ミスすると連続記録はリセットされるから気をつけてね。':'をクリアできたら勝ち!'),
+  '縛り・盤面・爆弾数は全てランダム。',
+  '盤面は'+sz+'、爆弾は'+rg(pc(c.bombMin),pc(c.bombMax),'%')+'くらい、縛りは'+rg(c.rulesMin,c.rulesMax,'個')+'。縛りに合わない爆弾数のときは、前後どちらかにずれる。',
+  c.wins+'盤面'+(c.missResetsStreak?'を連続でクリアできたら勝ち! ミスすると連続記録はリセットされるので注意。':'をクリアできたら勝ち!'),
   'ミスは全部で'+c.lives+'回までOK。ヒントは1盤面ごとに'+c.hints+'回まで使えるよ。',
-  'クリアしてもミスしても次の盤面へ。ミスした盤面は、フリープレイみたいに全部見えちゃう。',
-  '盤面づくりが'+c.regenSec+'秒を超えたら、「引き直す」ボタンが出るよ。'
+  'クリアしてもミスしても次の盤面へ。',
+  '盤面づくりが'+c.regenSec+'秒を超えたら、「引き直す」ボタンが出る。'
  ].map(t=>'<p>'+t+'</p>').join('')}
 function chSetup(){$('#cht').textContent=CHALLENGE.title;$('#chd').innerHTML=chDescHtml();$('#chw').innerHTML='🏆 ウィンストリーク <b>'+chStreak()+'</b>'}
 /* ---- 進行 run={streak,lives,hints,X,stage,total,prev,end} (streak/lives/hints/X は board.js のチップも参照する名前なので変えない) ---- */
