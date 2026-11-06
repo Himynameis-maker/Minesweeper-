@@ -16,7 +16,7 @@
 - 単一HTML のマインスイーパー・バリアント。「縛り」をランダムに/選んで攻略する。縛りは AI が少しずつ増やす。
 - 最重要: **ノーゲス(運ゲー無し)盤面だけを出す**。開始マスは自動オープンし、推論だけで完走できる配置のみ採用。かつ単調でない(推論の種類>=2、手順3段以上、各縛りを外すと解けなくなる=飾りでない)。
 - フリープレイ: 盤面/爆弾数/縛りを自由指定、ミス=即終了。縛りが今の盤面・爆弾数に合わないとスタートを止める。
-- チャレンジ: X連続クリアが目標、縛りはプールから抽選、ライフ・ヒント回数あり。爆弾数は縛りに合う最寄り値へ自動調整。
+- チャレンジ: **設定画面なしの完全ランダム**(プレイヤーは何も変えられない)。盤面・爆弾率・縛りの数を抽選し、縛りは全ルールから抽選。爆弾数が縛りに合わなければ前後どちらか(ランダム)へずらし、合わなくなった縛りは外す。`CHALLENGE.wins`(既定3)盤面クリアで達成(`missResetsStreak` が false なら累計、true なら連続=ミスで0に戻る)。ミスは挑戦全体で `lives` 回まで、ヒントは**1盤面ごと** `hints` 回(次の盤面で回復)。クリアでもミスでも次の盤面へ(ミスした盤面はフリープレイ同様に全開示)。生成が `regenSec` 秒を超えると「引き直す」ボタン(縛り等を再抽選。盤面番号は進まない)。達成/ゲームオーバーで演出(#fin)。ウィンストリーク(チャレンジ達成の連続回数)を localStorage に保存し、開始画面に出す(ゲームオーバーで0)。**数値・文言の調整は `js/game/challenge.js` の `CHALLENGE` だけ**(開始画面の解説文も `chDescHtml` がここの値から作る)。
 - ヒント: ON/OFF式。ON中に数字・縛り・残り爆弾数をタップすると、その手がかりから確定できるマスがあるかだけ答える(場所は教えない)。
 - 操作: モードは「開ける/旗/マーク」(`fm`=0/1/2)。マークは旗の色違いのメモで、残り爆弾数とヒント推論には影響しない(旗だけが「既知の爆弾」扱い)。同じ印をもう一度立てると外れ、別の印は置き換え。旗/マークの立っているマスは開けない。右クリックは選択中の印を立てる(開けるモード中は旗)。
 
@@ -28,7 +28,7 @@
 index.html            画面のHTML骨格 + script読み込み順 (RULES:BEGIN〜END は build.py が自動同期)
 build.py              全部インライン化 → dist/minesweeper-variants.html (python3 build.py)
 context.md            ← これ。CHANGELOG.md = 変更履歴。README.md = 人間向け手順
-css/style.css         見た目のみ (4.8KB)
+css/style.css         見た目のみ (チャレンジの解説・終了演出を含む)
 js/core/              推論と生成。DOM非依存(node でも動く)
   util.js             rnd, D8/D4/KN, offs, gcd (0.5KB)
   registry.js         RULES, reg, conflict, stepOf/mfit/mok/mnear/mpick (2.1KB)
@@ -38,10 +38,11 @@ js/core/              推論と生成。DOM非依存(node でも動く)
   selftest.js         selfTest(単体+併用ペア検査), buildReport (2.1KB)
 js/game/              盤面の進行(DOMを読み書きする)
   state.js            グローバル状態 G/run/SEL..., $ v chk mode msg show (0.7KB)
-  config.js           設定→cfg: norm, pick, plan, freeCfg, problems (2.9KB)
-  play.js             start(gen呼び出し), flood, act, hscan, ask(ヒント) (3.7KB)
+  challenge.js        チャレンジ: CHALLENGE(数値の唯一の置き場), 解説文 chDescHtml, ウィンストリーク保存, run の進行 chNewRun/chNewBoard/chMiss/chClear, 終了演出 chEnd (5.3KB)
+  config.js           設定→cfg: norm, pick, plan, chPlan(チャレンジ抽選), freeCfg, problems (3.1KB)
+  play.js             start(gen呼び出し。nr=新挑戦, again=引き直し), flood, act, hscan, ask(ヒント) (4.5KB)
 js/ui/                描画と配線
-  board.js            draw (1.7KB)
+  board.js            draw (チャレンジ中は ✅クリア X/N・第N盤面・❤・💡 のチップ、「次の盤面」ボタンの出し分けもここ) (2.6KB)
   modal.js            縛りモーダル, tags(縛りのタグ), 例盤面 mini/exHtml, longpress (5.4KB)
   main.js             upd, setMode, 検査レポート欄, 全イベント配線(load) (3.3KB)
 rules/                1ルール=1ファイル(ファイル名=id)。_始まりは読み込まれない
@@ -53,6 +54,7 @@ tools/
 ```
 
 `P`(prep の結果): `{nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp, gid, adj(上下左右), iso, iid, imax(iso の塊サイズ上限。0=上限なし), conn, cnid, adj8(8近傍。iso か conn のときだけ), R, C, lie, lid, w}`。
+`run`(チャレンジ進行。フリープレイは null): `{streak(クリア数。board.js が読む), lives, hints(この盤面の残り), X(目標盤面数), stage(今の盤面番号), total(挑戦中の累計クリア), prev(挑戦開始時のウィンストリーク), end(''|'win'|'lose')}`。
 `G`(盤面状態, game): `{cfg,P,N,mines,act(実際の数),num(表示数字),st(0未開/1開/2爆発),fl(0なし/1旗/2マーク。真偽値として扱わず fl[i]==1 のように書く),rev,over,done,hint}`。
 
 ## 3. タスク別「渡すファイル」(コスト削減の要)
@@ -64,6 +66,7 @@ tools/
 | 併用の矛盾を直す(検査レポートに NG が出た) | `context.md` + 検査レポート + 関係する `rules/<a>.js` `rules/<b>.js` |
 | 生成が遅い/失敗する(特定の縛り) | 上に加えて `js/core/gen.js` |
 | CORE拡張(新しい種類の制約・数字の意味変更。第7節) | `context.md` + `js/core/{prep,solver,gen}.js` + 対象ルール。例盤面の見せ方も変えるなら `js/ui/modal.js` |
+| チャレンジの数値・解説文・演出の調整 | `context.md` + `js/game/challenge.js` だけ(抽選の中身を変えるなら `js/game/config.js` の `chPlan` も) |
 | UIの見た目・操作の変更 | `context.md` + `index.html` + `css/style.css` + 該当の `js/ui/*.js` `js/game/*.js` |
 | 配布用の単一HTMLが欲しい | プロジェクト全体 → `python3 build.py` の結果 `dist/minesweeper-variants.html` |
 
