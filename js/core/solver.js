@@ -56,7 +56,33 @@ function deduce(P,st,num,M,skip,all){
  /*[conn]*/if(CM){const cs2={t:'r',id:P.cnid};
   for(const x of unk){S[x]=1;if(!cchk()){S[x]=2;push(x,0,1,cs2);continue}
    S[x]=0;const ok0=cchk();S[x]=2;if(!ok0)push(x,1,1,cs2)}}
+ const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[]),...(IM?[P.iid]:[]),...(CM?[P.cnid]:[]),...(HM?[P.lid]:[])])]}};
+ /*[probe]*/if(P.probe&&P.pid!==skip&&!out.length&&unk.length){
+  /* 仮定して矛盾を探す推論(failed-literal probing。全列挙より前に試し、見つかれば全列挙を飛ばす=速い): 未確定マスを爆弾/安全と仮定し、全制約(数字・cons・残り爆弾数)の単純な伝播だけで
+     矛盾が出たら逆が確定。伝播は各制約の上限/下限の範囲だけを使うので sound。全列挙が3万ノードを超えて諦めるような広い盤面で効く */
+  const nU=unk.length,idx=new Int32Array(N).fill(-1);unk.forEach((c,j)=>idx[c]=j);
+  const KK=K.map(k=>({c:k.cells.map(c=>idx[c]),w:k.w,lo:k.lo,hi:k.hi,sw:k.sw}));
+  KK.push({c:unk.map((_,j)=>j),w:null,lo:T,hi:T,sw:nU});
+  const nK=KK.length,bc=unk.map(()=>[]);
+  KK.forEach((k,q)=>k.c.forEach((j,p)=>bc[j].push([q,k.w?k.w[p]:1])));
+  const a0=new Float64Array(nK),u0=Float64Array.from(KK,k=>k.sw),v0=new Int8Array(nU).fill(-1);
+  const prop=(v,a,u,j0,b0)=>{const qu=[],inq=new Uint8Array(nK);
+   const asg=(j,b)=>{if(v[j]>=0)return v[j]==b;v[j]=b;for(const[q,x]of bc[j]){u[q]-=x;a[q]+=b*x;const k=KK[q];if(a[q]>k.hi||a[q]+u[q]<k.lo)return false;if(!inq[q]){inq[q]=1;qu.push(q)}}return true};
+   if(j0>=0&&!asg(j0,b0))return false;
+   if(j0<0)for(let q=0;q<nK;q++){inq[q]=1;qu.push(q)}
+   for(let h=0;h<qu.length;h++){const q=qu[h],k=KK[q];inq[q]=0;
+    for(let p=0;p<k.c.length;p++){const j=k.c[p];if(v[j]>=0)continue;const x=k.w?k.w[p]:1;
+     if(a[q]+x>k.hi){if(!asg(j,0))return false}else if(a[q]+u[q]-x<k.lo){if(!asg(j,1))return false}}}
+   return true};
+  const pb=(j,b)=>{const a=a0.slice(),u=u0.slice(),v=v0.slice();return prop(v,a,u,j,b)};
+  const b0=a0.slice(),bu=u0.slice(),bv=v0.slice();
+  if(!prop(bv,b0,bu,-1,0)){/* 矛盾(通常起きない): 何も言わない */}
+  else{for(let j=0;j<nU;j++)if(bv[j]>=0)push(unk[j],bv[j],2,why(unk[j]));
+   if(!out.length)for(let j=0;j<nU;j++){
+    const c1=pb(j,1),c0=pb(j,0);
+    if(!c1&&c0)push(unk[j],0,2,why(unk[j]));else if(!c0&&c1)push(unk[j],1,2,why(unk[j]))}}}
  if(out.length&&!all)return out;
+ /*[probe]*/const NL=(P.probe&&P.pid!==skip)?500:30000; /* probe ルールは全列挙が広がりやすい。見つからなければ早く諦める(諦めても sound) */
  const par={},f=x=>par[x]===x?x:(par[x]=f(par[x]));
  for(const k of K)for(const c of k.cells)if(par[c]===undefined)par[c]=c;
  for(const k of K){const a=f(k.cells[0]);for(const c of k.cells)par[f(c)]=a}
@@ -69,7 +95,7 @@ function deduce(P,st,num,M,skip,all){
   /*[wt]*/const byCell=g.map(()=>[]),byW=g.map(()=>[]);cc.forEach(k=>k.cells.forEach((j,q)=>{byCell[j].push(k);byW[j].push(k.w?k.w[q]:1)}));
   const ks=new Uint8Array(n+1),mk=g.map(()=>new Uint8Array(n+1)),sk=g.map(()=>new Uint8Array(n+1)),a=new Array(n);
   let nodes=0,over=false,cnt=0;
-  const rec=j=>{if(over)return;if(++nodes>30000){over=true;return}
+  const rec=j=>{if(over)return;if(++nodes>NL){over=true;return}
    if(j==n){ks[cnt]=1;for(let x=0;x<n;x++)(a[x]?mk:sk)[x][cnt]=1;return}
    for(const v of[0,1]){const bj=byCell[j],wj=byW[j];for(let q=0;q<bj.length;q++){bj[q].u-=wj[q];bj[q].a+=v*wj[q]}
     let bad=false;for(const k of bj)if(k.a>k.hi||k.a+k.u<k.lo)bad=true;
@@ -91,7 +117,6 @@ function deduce(P,st,num,M,skip,all){
   for(let k=0;k<=fn;k++){mk[k]=k>=1?1:0;sk[k]=k<=fn-1?1:0}
   comps.push({cells:fr,ks,mk:fr.map(()=>mk),sk:fr.map(()=>sk),n:fn,free:1})}
  const conv=(A,B)=>{const r=new Uint8Array(A.length+B.length-1);for(let i=0;i<A.length;i++)if(A[i])for(let j=0;j<B.length;j++)if(B[j])r[i+j]=1;return r};
- const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[]),...(IM?[P.iid]:[]),...(CM?[P.cnid]:[]),...(HM?[P.lid]:[])])]}};
  comps.forEach((cj,j)=>{let O=Uint8Array.of(1);comps.forEach((c,q)=>{if(q!=j)O=conv(O,c.ks)});
   cj.cells.forEach((x,p)=>{let m=0,s=0;
    for(let k=0;k<=cj.n;k++)if(T-k>=0&&T-k<O.length&&O[T-k]){if(cj.mk[p][k])m=1;if(cj.sk[p][k])s=1}
