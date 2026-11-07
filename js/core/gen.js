@@ -7,6 +7,7 @@
    qms秒探索して品質条件を満たさなければ「ノーゲスだが品質未達」を許容、hard秒で打ち切り。
    iso持ちは「8近傍でつながる塊(imax があれば2〜imax個。塊同士は8近傍で触れない)を置く」配置と「塊ごと動かす」山登り。
    下限つき cons(lo>0。例: tidy)は、爆弾を撒いてから違反を min-conflicts で直すサンプラ(lsample)と、valid を保つ swap の山登り(smove)を使う。
+   dragon持ちは「左端から右端まで、1列ごとに直進か上下1行ずれで爆弾を並べる(DFS)」配置(dsample)と、valid を保つ付け替えの山登り(smove)。
    新しい配置様式(例: ヘビ)のルールは、[grp] と同じ位置に「専用の sample と move」を足す(context.md 第6節)。 */
 async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
  const{R,C,M,ids}=cfg,N=R*C,P=prep(cfg),t0=performance.now(),kc=P.cons;
@@ -15,8 +16,8 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
  /*[iso]*/const iok=m=>{if(P.imax)return ccomps(m).every(q=>q.length>=2&&q.length<=P.imax);for(let i=0;i<N;i++)if(m[i]&&!P.adj8[i].some(y=>m[y]))return false;return true};
  /*[conn]*/const ccomps=m=>{const seen=new Uint8Array(N),o=[];for(let i=0;i<N;i++)if(m[i]&&!seen[i]){const q=[i];seen[i]=1;for(let h=0;h<q.length;h++)for(const y of P.adj8[q[h]])if(m[y]&&!seen[y]){seen[y]=1;q.push(y)}o.push(q)}return o};
  /*[conn]*/const cconn=m=>ccomps(m).length<=1;
- const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp))&&(!P.iso||iok(m))&&(!P.conn||cconn(m));
- const nec=ids.filter(id=>RULES[id].grp||RULES[id].iso||RULES[id].conn||(RULES[id].cons&&RULES[id].cons(R,C).length));
+ const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp))&&(!P.iso||iok(m))&&(!P.conn||cconn(m))&&(!P.dragon||dok(P,m));
+ const nec=ids.filter(id=>RULES[id].grp||RULES[id].iso||RULES[id].conn||RULES[id].dragon||(RULES[id].cons&&RULES[id].cons(R,C).length));
  const LM=!!P.lie,LV=P.lie==2; /* hon[]=特別マス(lie1=正直, lie2=嘘)。LV なら hon 以外が正直 */if(LM&&R!=C)throw Error('縦と横が同じ盤面のみ');
  const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
  /* ---- [liar] 正直な数字: 各行・各列に1つ(安全マスのみ)。ほかの安全マスは±1ズレる(範囲外なら逆向き) ---- */
@@ -127,11 +128,25 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
     const y=ys[rnd()*ys.length|0];if(y==null){ok=false;break}m[x]=0;m[y]=1}
    if(ok&&valid(m))return m}
   return null};
- /* ---- 標準の配置サンプラ(密度ムラ)。grp持ちは gsample、iso持ちは isample、conn持ちは csample に切り替わる ---- */
+ /* ---- [dragon] 龍: 左端のランダムな行から右端まで、1列ごとに「直進 or 上下1行ずれ」で爆弾を並べ(DFS。直進とズレは半々)、残りの爆弾は密度ムラで撒く(dsample)。
+        山登りは smove(valid を保つ付け替え。龍が切れる手は棄却)。conn と併用のときは、残りの爆弾を既存の爆弾の8近傍にだけ置く ---- */
+ const dsample=(sz,w)=>{const m=new Uint8Array(N),cnt=kc.map(()=>0);
+  const can=c=>!sz.has(c)&&!m[c]&&byC[c].every(q=>cnt[q]<kc[q].hi);
+  const put=c=>{m[c]=1;byC[c].forEach(q=>cnt[q]++)},del=c=>{m[c]=0;byC[c].forEach(q=>cnt[q]--)};
+  let nodes=0;
+  const dfs=(c,r)=>{if(c==C)return true;if(++nodes>600)return false;
+   const rs=c==0?shuf([...Array(R).keys()]):(rnd()<.5?[r,...shuf([r-1,r+1])]:[...shuf([r-1,r+1]),r]);
+   for(const y of rs){if(y<0||y>=R)continue;const i=y*C+c;if(!can(i))continue;put(i);if(dfs(c+1,y))return true;del(i)}
+   return false};
+  if(M<C||!dfs(0,-1))return null;
+  for(let n=C;n<M;n++){const a=[];for(let c=0;c<N;c++)if(can(c)&&(!P.conn||P.adj8[c].some(y=>m[y])))a.push(c);if(!a.length)return null;put(wpick(a,w))}
+  return valid(m)?m:null};
+ /* ---- 標準の配置サンプラ(密度ムラ)。grp持ちは gsample、iso持ちは isample、dragon持ちは dsample、conn持ちは csample に切り替わる ---- */
  const sample=s=>{const sz=new Set([s,...P.nb[s]]),cx=[0,1,2].map(()=>[rnd()*R,rnd()*C,rnd()]),sg=Math.max(R,C)/3,w=[];
   for(let i=0;i<N;i++){let v=.25;for(const[y,x,a]of cx)v+=a*2*Math.exp(-(((i/C|0)-y)**2+(i%C-x)**2)/(2*sg*sg));w.push(v)}
   if(P.grp)return gsample(sz,w);
   if(P.iso)return isample(sz,w);
+  if(P.dragon)return dsample(sz,w);
   if(P.conn)return csample(sz,w);
   if(LO)return lsample(sz,w);
   const m=new Uint8Array(N),cnt=kc.map(()=>0),cand=[];for(let i=0;i<N;i++)if(!sz.has(i))cand.push(i);
@@ -142,12 +157,13 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
  /* ---- 例盤面用(UIの長押し): 解けるかは見ず、OK例とNG例だけ作る ---- */
  if(o.sampleOnly){let ex=null,bad=null,bc=[];
   for(let k=0;k<20000&&!ex;k++)ex=sample(rnd()*N|0); /* 下限つき cons は当たりが薄い(lines で約0.05%)ので多めに試す */
-  for(let k=0;k<3000&&!bad&&(kc.length||P.grp||P.iso||P.conn);k++){const m=new Uint8Array(N);for(let n=0;n<M;){const c=rnd()*N|0;if(!m[c]){m[c]=1;n++}}
+  for(let k=0;k<3000&&!bad&&(kc.length||P.grp||P.iso||P.conn||P.dragon);k++){const m=new Uint8Array(N);for(let n=0;n<M;){const c=rnd()*N|0;if(!m[c]){m[c]=1;n++}}
    const vi=kc.filter(q=>{let s=0;for(const c of q.cells)s+=m[c];return s<q.lo||s>q.hi});
    const gb=P.grp?gcomps(P,m).filter(q=>q.length!=P.grp).flat():[];
    const ib=P.iso?ccomps(m).filter(q=>q.length<2||(P.imax&&q.length>P.imax)).flat():[];
    const cb=P.conn?(cc=>cc.length>1?cc.sort((p,q)=>q.length-p.length).slice(1).flat():[])(ccomps(m)):[];
-   if(vi.length||gb.length||ib.length||cb.length){bad=m;bc=[...new Set([...vi.flatMap(q=>q.cells),...gb,...ib,...cb])]}}
+   const db=P.dragon?dpath(P,m).cut:[];
+   if(vi.length||gb.length||ib.length||cb.length||db.length){bad=m;bc=[...new Set([...vi.flatMap(q=>q.cells),...gb,...ib,...cb,...db])]}}
   let L=null;if(LM&&ex)for(let k=0;k<50&&!L;k++)L=lstate(ex);
   return{P,mines:ex,bad,bc,L}}
  /* ---- 品質判定と本体ループ ---- */
@@ -165,7 +181,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   if(!a.length||!b.length){cur=null;continue}
   let m2=null,l2=cl;const lm=LM&&rnd()<.6?lmove(cur,cl,U):null;
   if(lm){m2=lm.m;l2=lm.L}
-  else{if(P.grp)m2=gmove(cur,a,new Set(U),cs);else if(P.iso)m2=imove(cur,a,new Set(U),cs);else if(P.conn)m2=cmove(cur,a,new Set(U),cs);else if(LO)m2=smove(cur,a,b);else{m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1}
+  else{if(P.grp)m2=gmove(cur,a,new Set(U),cs);else if(P.iso)m2=imove(cur,a,new Set(U),cs);else if(P.dragon)m2=smove(cur,a,b);else if(P.conn)m2=cmove(cur,a,new Set(U),cs);else if(LO)m2=smove(cur,a,b);else{m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1}
    if(m2&&LM){if(m2.some((x,i)=>x&&cl.hon[i]))m2=null;else l2=lstate(m2,cl.hon,cl.sg)}}
   if(!m2||!valid(m2)){if(++inv>40)cur=null;continue}
   const r2=sim(P,M,m2,cs,undefined,l2);if(r2.bug)throw Error('solver unsound');

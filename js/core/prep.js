@@ -8,9 +8,29 @@ function prep(cfg){const{R,C,ids}=cfg,rs=ids.map(id=>RULES[id]),nr=rs.find(r=>r.
  const gr=rs.find(r=>r.grp),lr=rs.find(r=>r.liar),adj=gr?[...Array(R*C)].map((_,i)=>offs(R,C,i,D4)):null;
  /*[iso]*/const ir=rs.find(r=>r.iso),cr=rs.find(r=>r.conn),adj8=(ir||cr)?[...Array(R*C)].map((_,i)=>offs(R,C,i,D8)):null;
  /*[probe]*/const pr=rs.find(r=>r.probe);
- return{nb,cons,probe:pr?1:0,pid:pr?pr.id:'',grp:gr?gr.grp:0,gid:gr?gr.id:'',adj,R,C,lie:lr?(lr.liar===2?2:1):0,lid:lr?lr.id:'',/*[iso]*/iso:ir?1:0,iid:ir?ir.id:'',imax:ir&&ir.iso!==true?ir.iso:0,/*[conn]*/conn:cr?1:0,cnid:cr?cr.id:'',adj8,w}}
+ /*[dragon]*/const dr=rs.find(r=>r.dragon);
+ return{nb,cons,/*[dragon]*/dragon:dr?1:0,did:dr?dr.id:'',probe:pr?1:0,pid:pr?pr.id:'',grp:gr?gr.grp:0,gid:gr?gr.id:'',adj,R,C,lie:lr?(lr.liar===2?2:1):0,lid:lr?lr.id:'',/*[iso]*/iso:ir?1:0,iid:ir?ir.id:'',imax:ir&&ir.iso!==true?ir.iso:0,/*[conn]*/conn:cr?1:0,cnid:cr?cr.id:'',adj8,w}}
 /* [wt] マスiの数字の真の値 = nbが指すマスの爆弾の重み付き和(wtなしなら普通の個数)。m は 0/1 配列 */
 function ncount(P,m,i){let s=0;for(const j of P.nb[i])s+=m[j]*(P.w?P.w[j]:1);return s}
+/* [dragon] 龍: 左端から右端まで、1列ごとに行が同じか±1の爆弾の列。m は 0/1 配列。dok=あるか / dpath=1本(マス番号の配列)。
+   なければ cut=「龍が途切れる列」のマス(NG例の赤枠用) */
+function dok(P,m){const R=P.R,C=P.C;let f=new Uint8Array(R),g=new Uint8Array(R);
+ for(let r=0;r<R;r++)f[r]=m[r*C]?1:0;
+ for(let c=1;c<C;c++){let a=0;for(let r=0;r<R;r++){const v=m[r*C+c]&&(f[r]||(r>0&&f[r-1])||(r<R-1&&f[r+1]))?1:0;g[r]=v;a|=v}
+  if(!a)return false;const t=f;f=g;g=t}
+ for(let r=0;r<R;r++)if(f[r])return true;return false}
+function dpath(P,m){const R=P.R,C=P.C,pr=[],f=new Int16Array(R).fill(-2);let any=0;
+ for(let r=0;r<R;r++)if(m[r*C]){f[r]=-1;any=1}
+ const col=c=>{const o=[];for(let r=0;r<R;r++)o.push(r*C+c);return o};
+ if(!any)return{ok:false,path:null,cut:col(0)};
+ pr.push(f);
+ for(let c=1;c<C;c++){const g=new Int16Array(R).fill(-2);any=0;
+  for(let r=0;r<R;r++)if(m[r*C+c])for(const q of[r,r-1,r+1])if(q>=0&&q<R&&pr[c-1][q]!=-2){g[r]=q;any=1;break}
+  if(!any)return{ok:false,path:null,cut:col(c)};
+  pr.push(g)}
+ let r=0;while(pr[C-1][r]==-2)r++;
+ const path=[];for(let c=C-1;c>=0;c--){path.push(r*C+c);r=pr[c][r]}
+ return{ok:true,path:path.reverse(),cut:[]}}
 /* [grp] 爆弾の縦横連結成分(配列の配列) */
 function gcomps(P,m){const N=m.length,seen=new Uint8Array(N),o=[];
  for(let i=0;i<N;i++)if(m[i]&&!seen[i]){const q=[i];seen[i]=1;for(let h=0;h<q.length;h++)for(const y of P.adj[q[h]])if(m[y]&&!seen[y]){seen[y]=1;q.push(y)}o.push(q)}

@@ -5,7 +5,9 @@
 /* 確定推論。st:0未知/1開示/2既知爆弾, num:開示マスの数字。返り値[{i,mine,tier,src}] tier1=単一制約, tier3=組合せ(CSP全列挙+残り爆弾数)。常にsound
    all=1 のときは同じマスの全根拠を返し、tier1があってもtier3まで調べる(ヒント用)。
    grp(連結成分サイズ固定)は「必要条件のみ」(楽観側)で使う: S[i]=0安全/1爆弾確定/2未確定。
-   必要条件1: 確定爆弾の連結成分は grp 以下 / 必要条件2: その成分を含む「安全でないマス」の連結領域は grp 以上 */
+   必要条件1: 確定爆弾の連結成分は grp 以下 / 必要条件2: その成分を含む「安全でないマス」の連結領域は grp 以上
+   dragon(龍)は、安全でないマスだけで左端→右端の道があることを必要条件に使う。さらに直接推論として、ある列で龍が通れるマスが1つだけならそこは爆弾、
+   残り爆弾数が龍に必要な未確定爆弾の最小数ちょうどなら、最小の龍が通れない未確定マスは安全(どちらも存在の前提から必ず導けるので sound)。 */
 function deduce(P,st,num,M,skip,all){
  const N=P.nb.length,out=[],K=[],unk=[];let km=0;
  for(let i=0;i<N;i++){if(st[i]==2)km++;if(st[i]==0)unk.push(i)}
@@ -40,7 +42,12 @@ function deduce(P,st,num,M,skip,all){
   const ts=++cst;if(sd>=0){cfl(sd,ts);return cmn==nm&&cz>=M}
   for(let i=0;i<N;i++)if(S[i]!=0&&cv[i]!=ts){cfl(i,ts);if(cz>=M)return true}
   return false};
- /*[grp]*/if(GN||IM||CM){S=new Uint8Array(N);vis=new Int32Array(N);for(let i=0;i<N;i++)S[i]=st[i]==1?0:st[i]==2?1:2}
+ /*[dragon]*/const DM=!!P.dragon&&P.did!==skip,DR=P.R,DC=P.C; /* 龍: 左端から右端まで、1列ごとに行±1以内でつながる爆弾の列が存在する。必要条件: 「安全でないマス」だけで左右がつながる道がある */
+ /*[dragon]*/const df=new Uint8Array(DM?DR:0),dg=new Uint8Array(DM?DR:0);
+ /*[dragon]*/const dchk=()=>{let f=df,g=dg;for(let r=0;r<DR;r++)f[r]=S[r*DC]!=0?1:0;
+  for(let c=1;c<DC;c++){let a=0;for(let r=0;r<DR;r++){const v=S[r*DC+c]!=0&&(f[r]||(r>0&&f[r-1])||(r<DR-1&&f[r+1]))?1:0;g[r]=v;a|=v}if(!a)return false;const t=f;f=g;g=t}
+  for(let r=0;r<DR;r++)if(f[r])return true;return false};
+ /*[grp]*/if(GN||IM||CM||DM){S=new Uint8Array(N);vis=new Int32Array(N);for(let i=0;i<N;i++)S[i]=st[i]==1?0:st[i]==2?1:2}
  /*[liar]*/const HM=P.lie&&P.lid!==skip,LV=P.lie==2; /* LV: 嘘つき2。rH/cH は「特別マス」(lie1=正直, lie2=嘘)の確定数 */let rH,cH,rU,cU,rX,cX;
  /*[liar]*/if(HM){const R0=P.R,C0=P.C;rH=new Int8Array(R0);cH=new Int8Array(C0);rU=new Int8Array(R0);cU=new Int8Array(C0);rX=new Int8Array(R0);cX=new Int8Array(C0);
   for(let i=0;i<N;i++){const r=i/C0|0,c=i%C0;if(st[i]==0){rX[r]=1;cX[c]=1}
@@ -56,7 +63,22 @@ function deduce(P,st,num,M,skip,all){
  /*[conn]*/if(CM){const cs2={t:'r',id:P.cnid};
   for(const x of unk){S[x]=1;if(!cchk()){S[x]=2;push(x,0,1,cs2);continue}
    S[x]=0;const ok0=cchk();S[x]=2;if(!ok0)push(x,1,1,cs2)}}
- const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[]),...(IM?[P.iid]:[]),...(CM?[P.cnid]:[]),...(HM?[P.lid]:[])])]}};
+ /*[dragon]*/if(DM){const ds={t:'r',id:P.did},INF=1e9,Fw=new Int32Array(N),Bw=new Int32Array(N);
+  /* 道の費用 = 未確定マス1個につき1(確定爆弾は0、安全は通れない)。龍が必要とする未確定爆弾の最小数 need と、各マスを通る最小費用 */
+  const dcost=i=>S[i]==0?INF:S[i]==1?0:1;
+  for(let r=0;r<DR;r++)Fw[r*DC]=dcost(r*DC);
+  for(let c=1;c<DC;c++)for(let r=0;r<DR;r++){const i=r*DC+c,k=dcost(i);if(k>=INF){Fw[i]=INF;continue}
+   let b=Fw[i-1];if(r>0&&Fw[i-1-DC]<b)b=Fw[i-1-DC];if(r<DR-1&&Fw[i-1+DC]<b)b=Fw[i-1+DC];Fw[i]=b>=INF?INF:b+k}
+  for(let r=0;r<DR;r++)Bw[r*DC+DC-1]=dcost(r*DC+DC-1);
+  for(let c=DC-2;c>=0;c--)for(let r=0;r<DR;r++){const i=r*DC+c,k=dcost(i);if(k>=INF){Bw[i]=INF;continue}
+   let b=Bw[i+1];if(r>0&&Bw[i+1-DC]<b)b=Bw[i+1-DC];if(r<DR-1&&Bw[i+1+DC]<b)b=Bw[i+1+DC];Bw[i]=b>=INF?INF:b+k}
+  let need=INF;for(let r=0;r<DR;r++)need=Math.min(need,Fw[r*DC+DC-1]);
+  if(need<INF){const tot=i=>{const k=dcost(i);return Fw[i]>=INF||Bw[i]>=INF?INF:Fw[i]+Bw[i]-k};
+   /* ある列で龍が通れるマスが1つだけなら、そこは爆弾(全ての龍が通る) */
+   for(let c=0;c<DC;c++){let n=0,x=-1;for(let r=0;r<DR;r++){const i=r*DC+c;if(tot(i)<INF){n++;x=i}}if(n==1&&S[x]==2)push(x,1,1,ds)}
+   /* 残りの爆弾数が龍に必要な最小数ちょうどなら、最小の龍が通らない未確定マスは安全(爆弾は全部龍の上) */
+   if(T==need)for(const x of unk)if(tot(x)>need)push(x,0,1,ds)}}
+ const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[]),...(IM?[P.iid]:[]),...(CM?[P.cnid]:[]),...(DM?[P.did]:[]),...(HM?[P.lid]:[])])]}};
  /*[probe]*/if(P.probe&&P.pid!==skip&&!out.length&&unk.length){
   /* 仮定して矛盾を探す推論(failed-literal probing。全列挙より前に試し、見つかれば全列挙を飛ばす=速い): 未確定マスを爆弾/安全と仮定し、全制約(数字・cons・残り爆弾数)の単純な伝播だけで
      矛盾が出たら逆が確定。伝播は各制約の上限/下限の範囲だけを使うので sound。全列挙が3万ノードを超えて諦めるような広い盤面で効く */
@@ -102,12 +124,13 @@ function deduce(P,st,num,M,skip,all){
     /*[grp]*/if(!bad&&GN){S[g[j]]=v;if(!gchk(g[j],v))bad=true}
     /*[iso]*/if(!bad&&IM){S[g[j]]=v;if(!ichk(g[j],v))bad=true}
     /*[conn]*/if(!bad&&CM){S[g[j]]=v;if(!cchk())bad=true}
+    /*[dragon]*/if(!bad&&DM){S[g[j]]=v;if(!dchk())bad=true}
     const dec=[];
     /*[liar]*/if(!bad&&HM){const C0=P.C;for(const k of byCell[j])if(k.y>=0&&k.u==0){const r=k.y/C0|0,c=k.y%C0,h=(k.a==k.hv)!=LV;rU[r]--;cU[c]--;if(h){rH[r]++;cH[c]++}dec.push([r,c,h])}
      for(const[r,c]of dec)if(rH[r]>1||cH[c]>1||rH[r]+rU[r]+rX[r]<1||cH[c]+cU[c]+cX[c]<1)bad=true}
     if(!bad){a[j]=v;cnt+=v;rec(j+1);cnt-=v}
     for(const[r,c,h]of dec){rU[r]++;cU[c]++;if(h){rH[r]--;cH[c]--}}
-    /*[grp]*/if(GN||IM||CM)S[g[j]]=2;
+    /*[grp]*/if(GN||IM||CM||DM)S[g[j]]=2;
     for(let q=0;q<bj.length;q++){bj[q].u+=wj[q];bj[q].a-=v*wj[q]}}};
   rec(0);
   if(over||!ks.some(x=>x)){ks.fill(1);comps.push({cells:g,ks,mk:g.map(()=>ks),sk:g.map(()=>ks),n})}

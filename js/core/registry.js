@@ -23,4 +23,5 @@ function reg(d){try{
  if(d.iso!==undefined&&d.iso!==true&&!(Number.isInteger(d.iso)&&d.iso>=3))throw'isoはtrueか3以上の整数';
  if(d.conn!==undefined&&d.conn!==true)throw'connはtrue';
  if(d.liar!==undefined&&d.liar!==true&&d.liar!==2)throw'liarはtrueか2';
+ if(d.dragon!==undefined&&d.dragon!==true)throw'dragonはtrue';
  RULES[d.id]=d}catch(e){RULE_ERR.push((d&&d.id)+': '+e)}}
