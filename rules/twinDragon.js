@@ -6,7 +6,7 @@
             rect(直線のみ・斜め不可。龍は斜めに進む), allConnected(全爆弾が龍になり、龍の外に爆弾が置けない)。 */
 reg({id:'twinDragon',
  name:'双竜', desc:'左端から右端まで、上端から下端まで、爆弾が2体の龍になってつながっている(1つ進むごとに、まっすぐか斜めまで)。龍に隣り合う爆弾(斜め含む)は、必ず龍の一部。',
- dragon:2,
+ dragon:2, // registry.js の dragon 検査を「trueか2」にしてある
  ok:c=>c.M>=c.R+c.C-1&&c.M<=Math.floor(c.R*c.C*.3),
  conflicts:['dragon','groupBomb','noIsolate','noTouch','rect','allConnected']
 });
