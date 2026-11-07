@@ -47,13 +47,13 @@ js/ui/                描画と配線
   main.js             upd, setMode, 検査レポート欄, 全イベント配線(load) (3.3KB)
 rules/                1ルール=1ファイル(ファイル名=id)。_始まりは読み込まれない
   _template.js        ひな形 (reg の全フック一覧つき)
-  noTouch cross crossScan knight lines liar liar2 groupBomb rect noIsolate allConnected colorDouble tidy dragon .js
+  noTouch cross crossScan knight lines liar liar2 groupBomb rect noIsolate allConnected colorDouble tidy dragon twinDragon .js
 tools/
   headless.js         ブラウザ無しで検査: node tools/headless.js [id...] | --combo a,b,c
   smoke-ui.js         偽DOMでUI一式+チャレンジの通し(抽選範囲/ヒント/ミス/達成/ゲームオーバー/引き直し/ウィンストリーク)を動かす: node tools/smoke-ui.js
 ```
 
-`P`(prep の結果): `{nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp, gid, adj(上下左右), iso, iid, imax(iso の塊サイズ上限。0=上限なし), conn, cnid, adj8(8近傍。iso か conn のときだけ), R, C, lie(0=なし/1=各行列に正直1つ/2=各行列に嘘1つ), lid, w, probe/pid(probe推論を使うルールの有無とid), dragon/did(龍の有無とid)}`。
+`P`(prep の結果): `{nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp, gid, adj(上下左右), iso, iid, imax(iso の塊サイズ上限。0=上限なし), conn, cnid, adj8(8近傍。iso か conn のときだけ), R, C, lie(0=なし/1=各行列に正直1つ/2=各行列に嘘1つ), lid, w, probe/pid(probe推論を使うルールの有無とid), dragon/did(龍の有無とid。1=龍, 2=双竜。双竜のときは adj8 も載る)}`。
 `run`(チャレンジ進行。フリープレイは null): `{streak(クリア数。board.js が読む), lives, hints(この盤面の残り), X(目標盤面数), stage(今の盤面番号), total(挑戦中の累計クリア), prev(挑戦開始時のウィンストリーク), end(''|'win'|'lose')}`。
 `G`(盤面状態, game): `{cfg,P,N,mines,act(実際の数),num(表示数字),st(0未開/1開/2爆発),fl(0なし/1旗/2マーク。真偽値として扱わず fl[i]==1 のように書く),rev,over,done,hint}`。
 
@@ -92,6 +92,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
  conn:true,                         // 任意: 全ての爆弾が8近傍でひと続き(手繋ぎ。nb に関係なく常に8近傍)
  probe:true                         // 任意: cons が重なって全列挙が打ち切られるルール(tidy)で、仮定して矛盾を探す推論を solver が使う
  dragon:true                        // 任意: 左端から右端まで、爆弾が1列ごとに同じ行か上下1行ずれでつながる列(龍)が必ずある(同時に1つだけ)
+ dragon:2                           // 任意: dragon の2体版(双竜)。左右の龍H+上下の龍V。龍に8近傍で触れる爆弾は必ず龍の一部。dragon:true と同時に1つだけ(twinDragon.js は conflicts:['dragon'] も書いている)
 });
 ```
 
@@ -143,6 +144,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 | 爆弾全体が8近傍でひと続き | `conn` だけ(実装済み) |
 | 爆弾の連結成分は直線のみ・斜め不可 | `cons` だけ(rect。下限なしなので生成可) |
 | 爆弾が左端から右端までつながる列(龍)がある | `dragon:true` だけ(実装済み。dragon) |
+| 左右+上下の2体の龍があり、龍に触れる爆弾は龍だけ | `dragon:2` だけ(実装済み。twinDragon) |
 | 爆弾全体が1つのヘビ(自己に縦横で触れない) | **CORE拡張**: 新しい全体制約(連結性)。[grp] と同型 |
 | 「各行・各列に正直な数字が1つ」の逆(嘘が各行列に1つ)など、特別マスの意味だけ変える | `liar:2` だけ(実装済み。liar2) |
 | 数字が「色つきマス or 色なしマス」の爆弾数 | **CORE拡張**: 盤面の色分け(静的パターン)+ 数字が2択(選言)の推論。[liar] と同型(盤面ごとの隠れ状態を gen が持つ) |
@@ -185,6 +187,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 - liar / liar2: 全未開マスを1成分として列挙するので、盤面が大きいと推論が打ち切られ(安全側)生成が難航する。tidy との併用は、検査で1回生成失敗・次の検査では失敗なし(2026-11-06)で未確定(`conflicts` には入れていない)。
 - liar2(2026-11-07 追加): 自前ハーネス(5x5/M5, 6x6/M7, 7x7/M10 を各8回。liar2 単体、+十字 nb、+各行2個以下の cons)で生成 全成功・solver unsound なし・各行各列にちょうど1つの嘘を確認。`node tools/headless.js liar2`(全ペア)と `node tools/smoke-ui.js` は**未実行**(tools/ を持っていないため)。併用ペアのNGは、そのレポートを見て `conflicts` か gen 改善を決める。推論の弱点は liar と同じ(全列挙が打ち切られると安全側に諦める)。嘘が1つしかない分、確定できる情報は liar より多いはずだが、その行列制約(嘘を使い切った行の残りは全部正直)は全列挙の中でしか効かない。大盤面で難航するなら、行・列の嘘数が確定したときに残りの数字制約を `[d,d]` に締める伝播を足す(必要条件のみ・sound のまま足せる)。
 - dragon(2026-11-07 追加): 推論は、安全でないマスだけで左→右の道があること(全列挙 `rec` の枝刈りと直接推論)。直接推論は2つ: ある列で龍が通れるマスが1つだけならそこは爆弾 / 残り爆弾数が龍に必要な未確定爆弾の最小数(確定爆弾は費用0、未確定は1の最小費用の道)ちょうどなら、最小の龍が通れない未確定マスは安全。どちらも存在の前提から必ず導けるので sound(tier1、src は dragon)。生成は `dsample`(DFSで龍を置き、残りを密度ムラで撒く。直進の確率 p は盤面ごとにランダム 0.1〜0.9、ずれるときの上下は等確率。左右端の行は自由)と、valid を保つ付け替え `smove`。`dok`/`dpath` は prep.js。検査(自前ハーネス): 5x5・4x6・6x4・3x7 の全配置との照合で確定 約4600件・誤り0件。7x7 は M=7〜22、5x5 は M=5〜11、6x6 は M=6〜16、8x8 は M=10〜25、9x9 は M=9〜32 で各3〜4回中全部成功(品質OKも全部。ただし 7x7 M=22 は4回中1回が品質未達で、そのため上限を4割にした)。併用(7x7、各3回): +liar は M=9/13/17 全て品質OK、+十字nb は M=17 で3回中1回だけ品質OK(成功はする)、+各行3個以下の cons は M=13 で品質OK 2/3。+allConnected は品質未達が多いので conflicts。`node tools/headless.js dragon`(全ペア)と `node tools/smoke-ui.js` は**未実行**(tools/ を持っていないため)。例盤面は龍の一例を橙枠で見せる(`.drg` は modal.js が style を足す)。左→右の向きのみ。上下の龍は未対応。
+- twinDragon(2026-11-07 追加。`dragon:2`): 意味は「爆弾の8近傍連結成分のうち1つ D が、龍H(左→右)と龍V(上→下)の和集合ちょうど。H⊄V かつ V⊄H(斜め一本道を2体と数えるのは不可。同じマスを通るのはOK)」。D 以外の爆弾は D に触れない限り自由で、別の塊が龍になることは起きない(Hと Vに必ず触れるため)。判定は prep の `tok`/`tpath`(Hを全列挙、残りのマスをVが通れるかを行ごとのDP。D は最大 R+C マスなので速い)。推論(solver の [dragon] の TW): ①龍と同じ必要条件と直接推論(層で通れるマスが1つなら爆弾 / 残り爆弾数=必要最小数なら道に乗らないマスは安全)を上下の向きにも ②龍でない(道に乗れない)確定爆弾の8近傍は龍になれない(bn。固定点まで反復) ③確定の龍に触れる確定爆弾も龍 ④確定の龍に触れる未確定マスで、道に乗れないものは安全。全て必要条件のみ。生成は `tsample`(Hを置いてからVを置く。Vは H のマスを通りたがる確率が盤面ごとにランダム。残りは H∪V の8近傍を避けて撒く)と、valid を保つ `smove`。`ok` は M>=max(R,C)+1 かつ M>=R+C-3 かつ M<=盤面の4割。検査(自前ハーネス): 5x5/4x6/6x4/4x4 の全配置(M=6〜10, 有効配置 最大8.6万個)で、solver の確定が「盤面状態と矛盾しない全ての有効配置」で真であることを約17万件照合して違反0(双竜由来の確定を含む)。生成は 7x7 M=8〜30、9x9 M=11〜48、12x12 M=18〜57、16x16 M=28〜100、24x24 M=47〜150 で各4〜5回中ほぼ成功・品質OK(7x7 M=32 は品質未達、M>=34 は失敗。16x16 M=100 は5回中2回、24x24 M=150 は5回中3回成功で遅い=上限4割は大盤面では遅め)。3x3 は品質未達なので ok が空(M範囲が空)になる。併用(7x7 M=13、各5回): +十字nb は品質OK 3/5(2.3秒。龍と同様に難しめ)、+桂馬 / +liar / +liar2 / +各行3個以下 / +colorDouble / +横4連3個以下 は品質OK 4〜5/5。9x9 の liar2 や liar 系との3縛りは、生成が遅く品質未達が多い(龍でも同じ傾向。liar の全列挙打ち切りが原因)。conflicts: dragon / groupBomb / noIsolate / noTouch / rect / allConnected(理由は twinDragon.js 冒頭)。`node tools/headless.js twinDragon`(全ペア)と `node tools/smoke-ui.js` は**未実行**(registry.js / selftest.js / tools/smoke-ui.js が手元になく、自前の最小スタブで検査した)。例盤面は橙枠で2体の龍を見せ、NG例は「龍以外の爆弾を龍に触れるマスへ動かした盤面」(赤枠=動かした爆弾。龍以外の爆弾が無いときは龍が途切れる盤面)。
 - grp の推論は局所的(grp マス以内)な必要条件のみ。
 - conn の推論は「確定爆弾が全て、安全でないマスの同じ連結領域にあり、その領域が M マス以上」という必要条件のみ。生成は鎖っぽく育てるサンプラ(`csample`)と、切れない爆弾を付け替える move(`cmove`)。lines のような下限つき cons と併用すると、品質条件を満たす盤面が出にくく遅い(品質未達の盤面で妥協することがある)。
 - iso の推論は「爆弾にするには8近傍に安全でないマスが要る」という必要条件のみ。`iso:n` ではさらに「確定爆弾の8近傍連結成分は n 個以下」も必要条件として使う。生成は8近傍の塊(`iso:true` は2〜4個、`iso:n` は2〜n個で塊同士は触れない)を置くサンプラと、塊を壊さない move(`isample`/`imove`。`iso:n` は塊ごと動かす手もある)を使う。`iso:n` は爆弾が盤面の約4.5割を超えると生成が極端に遅い(noIsolate の `iso:4` は 7x7 で M=22 まで、24 で失敗)。下限つき cons(lines など)との併用は、サンプラが下限を見ないので当たりが薄くなる可能性がある。
