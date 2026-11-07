@@ -2,6 +2,52 @@
    全体制約系の拡張(grp/liar のような新フック)はここが主戦場。既存の拡張箇所は [grp] [liar] という印(行頭の小さなコメント)で探す。
    不変条件: deduce は sound(確定は必ず真)。必要条件だけで枝刈りし、十分条件を足さない。 */
 
+/* [dd] 隠れ龍(P.dd。dragon.js の dbl:true): 龍の爆弾は数字に2個ぶん。数字 n_i = K_i(8近傍=nbの爆弾数) + D_i(nbに入る龍のマスの数)。
+   本物の龍は隠れている(1列に1マス、隣の列とは行が同じか±1、全部爆弾)。龍の道を列ごとのDPで調べ、今の情報(開いたマス/確定爆弾)と矛盾しない道だけを残す(必要条件のみ・sound):
+   ある開いた数字マス i について、道ごとに D_i が決まり、K_i=n_i-D_i は「確定爆弾数+未確定の龍のマス数 以上、安全でないマス数 以下」でなければならない。
+   残った道すべてでの D_i の最小/最大から、K_i の範囲 lo[i]..hi[i] を返す(ふつうの数字制約の代わりに使う)。残った道がすべて通るマス must[x] は必ず龍=爆弾。
+   geo=false(その縛りを外した検査)や、nb が左右1列を超える(桂馬など)ときは道を見ず、D_i は 0〜min(n_i/2, nbの列数) とだけ考える(弱いが sound)。 */
+function ddprop(P,st,num,geo){
+ const R=P.R,C=P.C,N=R*C,lo=new Int8Array(N),hi=new Int8Array(N);
+ let X=P._dd;
+ if(!X){X=P._dd={rad:0,cols:new Int8Array(N),inb:[]};
+  for(let i=0;i<N;i++){const c0=i%C,cs=new Set(),a=[new Uint8Array(R),new Uint8Array(R),new Uint8Array(R)];
+   for(const j of P.nb[i]){const d=j%C-c0;cs.add(j%C);if(Math.abs(d)>X.rad)X.rad=Math.abs(d);if(d>=-1&&d<=1)a[d+1][j/C|0]=1}
+   X.inb.push(a);X.cols[i]=cs.size}}
+ const weak=()=>{for(let i=0;i<N;i++)if(st[i]==1){const n=num[i],dm=Math.min(n>>1,X.cols[i]);lo[i]=n-dm;hi[i]=n}return{lo,hi,must:null}};
+ if(!geo||X.rad>1)return weak();
+ const ops=[];for(let c=0;c<C;c++)ops.push([]);
+ const kb=new Int8Array(N),ns=new Int8Array(N);
+ for(let i=0;i<N;i++)if(st[i]==1){let a=0,b=0;for(const j of P.nb[i]){if(st[j]==2)a++;if(st[j]!=1)b++}kb[i]=a;ns[i]=b;ops[i%C].push(i)}
+ const av=(c,r)=>st[r*C+c]!=1; /* 龍のマスは開いたマスにはなれない */
+ /* 道が列 c-1,c,c+1 で行 p,q,s のとき(p,s が R なら その列は無い)、列 c の開いた数字マスが全部成り立つか。D=nbに入る龍のマス数, Du=そのうち未確定のマス数 */
+ const dcount=(i,c,p,q,s)=>{const a=X.inb[i];let D=0,Du=0;
+  if(p<R&&a[0][p]){D++;if(st[p*C+c-1]==0)Du++}
+  if(a[1][q]){D++;if(st[q*C+c]==0)Du++}
+  if(s<R&&a[2][s]){D++;if(st[s*C+c+1]==0)Du++}
+  return D*16+Du};
+ const chk=(c,p,q,s)=>{for(const i of ops[c]){const d=dcount(i,c,p,q,s),D=d>>4,Du=d&15,K=num[i]-D;if(K<kb[i]+Du||K>ns[i])return false}return true};
+ const W=R*(R+1),F=[],T3=[],B=[];
+ for(let c=0;c<C;c++){F.push(new Uint8Array(W));T3.push(new Uint8Array(W*3));B.push(new Uint8Array(W))}
+ for(let q=0;q<R;q++)if(av(0,q))F[0][R*R+q]=1;
+ for(let c=0;c<C;c++)for(let p=0;p<=R;p++)for(let q=0;q<R;q++){const nd=p*R+q;if(!F[c][nd])continue;
+  if(c==C-1){if(chk(c,p,q,R))T3[c][nd*3+1]=1;continue}
+  for(let k=0;k<3;k++){const s=q+k-1;if(s<0||s>=R||!av(c+1,s)||!chk(c,p,q,s))continue;T3[c][nd*3+k]=1;F[c+1][q*R+s]=1}}
+ for(let c=C-1;c>=0;c--)for(let nd=0;nd<W;nd++){if(!F[c][nd])continue;const q=nd%R;
+  if(c==C-1){B[c][nd]=T3[c][nd*3+1];continue}
+  for(let k=0;k<3;k++)if(T3[c][nd*3+k]&&B[c+1][q*R+q+k-1]){B[c][nd]=1;break}}
+ let any=0;for(let q=0;q<R;q++)if(B[0][R*R+q])any=1;
+ if(!any)return weak(); /* 今の情報と合う道が1本も無い(矛盾。普通は起きない)ときは何も言わない */
+ const dmin=new Int8Array(N).fill(99),dmax=new Int8Array(N).fill(-1),use=[];
+ for(let c=0;c<C;c++){const u=new Uint8Array(R);use.push(u);
+  for(let p=0;p<=R;p++)for(let q=0;q<R;q++){const nd=p*R+q;if(!F[c][nd]||!B[c][nd])continue;u[q]=1;
+   for(let k=0;k<3;k++){if(!T3[c][nd*3+k])continue;const s=c==C-1?R:q+k-1;if(c<C-1&&!B[c+1][q*R+s])continue;
+    for(const i of ops[c]){const D=dcount(i,c,p,q,s)>>4;if(D<dmin[i])dmin[i]=D;if(D>dmax[i])dmax[i]=D}}}}
+ for(let i=0;i<N;i++)if(st[i]==1){lo[i]=num[i]-dmax[i];hi[i]=num[i]-dmin[i]}
+ const must=new Uint8Array(N);
+ for(let c=0;c<C;c++){let n=0,y=-1;for(let r=0;r<R;r++)if(use[c][r]){n++;y=r}if(n==1)must[y*C+c]=1}
+ return{lo,hi,must}}
+
 /* 確定推論。st:0未知/1開示/2既知爆弾, num:開示マスの数字。返り値[{i,mine,tier,src}] tier1=単一制約, tier3=組合せ(CSP全列挙+残り爆弾数)。常にsound
    all=1 のときは同じマスの全根拠を返し、tier1があってもtier3まで調べる(ヒント用)。
    grp(連結成分サイズ固定)は「必要条件のみ」(楽観側)で使う: S[i]=0安全/1爆弾確定/2未確定。
@@ -13,12 +59,14 @@
    ③sd に触れる未確定マスで、龍の道に乗れないものは安全(爆弾なら龍に触れるので龍でなければならないため)。 */
 function deduce(P,st,num,M,skip,all){
  const N=P.nb.length,out=[],K=[],unk=[];let km=0;
+ /*[dd]*/const DD=P.dd?ddprop(P,st,num,P.did!==skip):null; /* 隠れ龍: 数字は「爆弾数+龍のマス数」。爆弾数の範囲に直して使う */
  for(let i=0;i<N;i++){if(st[i]==2)km++;if(st[i]==0)unk.push(i)}
  /*[wt]*/const add=(cells,lo,hi,src,d,w)=>{const u=[],uw=w?[]:null;let m=0,sw=0;
   for(let q=0;q<cells.length;q++){const c=cells[q],x=w?w[q]:1;if(st[c]==0){u.push(c);if(w)uw.push(x);sw+=x}else if(st[c]==2)m+=x}
   if(u.length)K.push({cells:u,w:uw,sw,lo:Math.max(0,lo-m),hi:Math.min(sw,hi-m),src,hv:(d||0)-m})};
  for(let i=0;i<N;i++)if(st[i]==1){
   /*[liar]*/if(P.lie){const L=P.nb[i].length,d=num[i],un=P.nb[i].some(c=>st[c]!=1);add(P.nb[i],Math.max(d-1,un?1:0),Math.min(L,d+1),{t:'n',i},d)}
+  else if(DD)add(P.nb[i],DD.lo[i],DD.hi[i],{t:'n',i},0)
   else add(P.nb[i],num[i],num[i],{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
  for(const k of P.cons)if(k.src.id!==skip)add(k.cells,k.lo,k.hi,k.src);
  const T=M-km,seen=new Set(),push=(i,mine,tier,src)=>{const key=all?i+src.t+(src.id??src.i??''):i;if(!seen.has(key)){seen.add(key);out.push({i,mine,tier,src})}};
@@ -66,6 +114,7 @@ function deduce(P,st,num,M,skip,all){
  /*[conn]*/if(CM){const cs2={t:'r',id:P.cnid};
   for(const x of unk){S[x]=1;if(!cchk()){S[x]=2;push(x,0,1,cs2);continue}
    S[x]=0;const ok0=cchk();S[x]=2;if(!ok0)push(x,1,1,cs2)}}
+ /*[dd]*/if(DD&&DD.must)for(const x of unk)if(DD.must[x])push(x,1,1,{t:'r',id:P.did}); /* 残った龍の道がすべて通るマス=必ず龍=爆弾 */
  /*[dragon]*/if(DM){const ds={t:'r',id:P.did},INF=1e9,NO=TW?2:1,bn=new Uint8Array(N),FW=[new Int32Array(N),new Int32Array(N)],BW=[new Int32Array(N),new Int32Array(N)],nd=[INF,INF];
   /* 道の費用 = 未確定マス1個につき1(確定爆弾は0、安全は通れない)。龍が必要とする未確定爆弾の最小数 need と、各マスを通る最小費用。
      bn は「龍になれない」マス(双竜: 龍でない確定爆弾の塊に8近傍で触れるマス)。vt=0 左→右, 1 上→下 */

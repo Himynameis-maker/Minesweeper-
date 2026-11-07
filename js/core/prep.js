@@ -1,6 +1,6 @@
 /* [core/prep] cfg(盤面設定) -> P(ソルバ・生成器が共通で使う問題定義)。DOM非依存。
    新しい種類のルールフック(全体制約など)を足すときは、まずここで P に必要な情報を載せる。 */
-/* cfg={R,C,M,ids} -> P={nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp=連結成分サイズ(0=なし), gid=grpルールid, adj=上下左右, iso/iid=孤立禁止(imax=塊サイズの上限。0=上限なし), conn/cnid=手繋ぎ(adj8=8近傍), lie/lid=liar(1=各行列に正直1つ, 2=各行列に嘘1つ), w=マスごとの爆弾の重み(null=全部1), dragon/did=龍(1=龍 dragon:true, 2=双竜 dragon:2。双竜のときは adj8 も載る)} */
+/* cfg={R,C,M,ids} -> P={nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp=連結成分サイズ(0=なし), gid=grpルールid, adj=上下左右, iso/iid=孤立禁止(imax=塊サイズの上限。0=上限なし), conn/cnid=手繋ぎ(adj8=8近傍), lie/lid=liar(1=各行列に正直1つ, 2=各行列に嘘1つ), w=マスごとの爆弾の重み(null=全部1), dragon/did=龍(1=龍 dragon:true, 2=双竜 dragon:2。双竜のときは adj8 も載る), dd=隠れ龍(1=龍の爆弾が数字に2個ぶん。dragon:true で dbl:true のとき。本物の龍は盤面ごとの隠れ状態 L.dr)} */
 function prep(cfg){const{R,C,ids}=cfg,rs=ids.map(id=>RULES[id]),nr=rs.find(r=>r.nb),nb=[];
  for(let i=0;i<R*C;i++)nb.push(nr?nr.nb(R,C,i):offs(R,C,i,D8));
  const cons=[];for(const r of rs)if(r.cons)for(const k of r.cons(R,C))cons.push({cells:k.cells,lo:k.lo,hi:k.hi,src:{t:'r',id:r.id}});
@@ -9,7 +9,7 @@ function prep(cfg){const{R,C,ids}=cfg,rs=ids.map(id=>RULES[id]),nr=rs.find(r=>r.
  /*[dragon]*/const dr=rs.find(r=>r.dragon||r.twin); /* twin:true(双竜)は dragon:2 として扱う。registry が dragon に true しか許さないので別フック */
  /*[iso]*/const ir=rs.find(r=>r.iso),cr=rs.find(r=>r.conn),adj8=(ir||cr||(dr&&(dr.twin||dr.dragon===2)))?[...Array(R*C)].map((_,i)=>offs(R,C,i,D8)):null;
  /*[probe]*/const pr=rs.find(r=>r.probe);
- return{nb,cons,/*[dragon]*/dragon:dr?(dr.twin||dr.dragon===2?2:1):0,did:dr?dr.id:'',probe:pr?1:0,pid:pr?pr.id:'',grp:gr?gr.grp:0,gid:gr?gr.id:'',adj,R,C,lie:lr?(lr.liar===2?2:1):0,lid:lr?lr.id:'',/*[iso]*/iso:ir?1:0,iid:ir?ir.id:'',imax:ir&&ir.iso!==true?ir.iso:0,/*[conn]*/conn:cr?1:0,cnid:cr?cr.id:'',adj8,w}}
+ return{nb,cons,/*[dragon]*/dragon:dr?(dr.twin||dr.dragon===2?2:1):0,did:dr?dr.id:'',/*[dd]*/dd:dr&&dr.dragon===true&&dr.dbl?1:0,probe:pr?1:0,pid:pr?pr.id:'',grp:gr?gr.grp:0,gid:gr?gr.id:'',adj,R,C,lie:lr?(lr.liar===2?2:1):0,lid:lr?lr.id:'',/*[iso]*/iso:ir?1:0,iid:ir?ir.id:'',imax:ir&&ir.iso!==true?ir.iso:0,/*[conn]*/conn:cr?1:0,cnid:cr?cr.id:'',adj8,w}}
 /* [wt] マスiの数字の真の値 = nbが指すマスの爆弾の重み付き和(wtなしなら普通の個数)。m は 0/1 配列 */
 function ncount(P,m,i){let s=0;for(const j of P.nb[i])s+=m[j]*(P.w?P.w[j]:1);return s}
 /* [dragon] 龍: 左端から右端まで、1列ごとに行が同じか±1の爆弾の列。m は 0/1 配列。dok=あるか / dpath=1本(マス番号の配列)。

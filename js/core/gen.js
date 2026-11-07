@@ -7,6 +7,7 @@
    qms秒探索して品質条件を満たさなければ「ノーゲスだが品質未達」を許容、hard秒で打ち切り。
    iso持ちは「8近傍でつながる塊(imax があれば2〜imax個。塊同士は8近傍で触れない)を置く」配置と「塊ごと動かす」山登り。
    下限つき cons(lo>0。例: tidy)は、爆弾を撒いてから違反を min-conflicts で直すサンプラ(lsample)と、valid を保つ swap の山登り(smove)を使う。
+   隠れ龍(P.dd。dragon.js の dbl:true)は「本物の龍1本=L.dr」を盤面と一緒に作り、数字=爆弾数+龍のマス数(L.sh)にする。山登りでは龍が壊れたら引き直す(rpath)。
    双竜(dragon:2)は「龍H(左→右)と龍V(上→下)を置き、その8近傍を避けて残りを撒く」配置(tsample)。
    dragon持ちは「左端から右端まで、1列ごとに直進か上下1行ずれで爆弾を並べる(DFS。直進の確率は盤面ごとにランダム)」配置(dsample)と、valid を保つ付け替えの山登り(smove)。
    新しい配置様式(例: ヘビ)のルールは、[grp] と同じ位置に「専用の sample と move」を足す(context.md 第6節)。 */
@@ -20,6 +21,17 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
  const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp))&&(!P.iso||iok(m))&&(!P.conn||cconn(m))&&(!P.dragon||(P.dragon==2?tok(P,m):dok(P,m)));
  const nec=ids.filter(id=>RULES[id].grp||RULES[id].iso||RULES[id].conn||RULES[id].dragon||(RULES[id].cons&&RULES[id].cons(R,C).length));
  const LM=!!P.lie,LV=P.lie==2; /* hon[]=特別マス(lie1=正直, lie2=嘘)。LV なら hon 以外が正直 */if(LM&&R!=C)throw Error('縦と横が同じ盤面のみ');
+ /* ---- [dd] 隠れ龍: 爆弾の中から龍の道(1列に1マス、隣の列とは行が同じか±1)を1本ランダムに選ぶ(rpath。右端から「そこから右へ行ける」を数えておくので必ず見つかる)。
+        数字 sh[i] = 8近傍の爆弾数 + 8近傍に入る龍のマス数。L={sh,dr(龍のマス番号の配列)} ---- */
+ const DDM=!!P.dd;
+ const rpath=m=>{const g=[];for(let c=C-1;c>=0;c--){g[c]=new Uint8Array(R);for(let r=0;r<R;r++)if(m[r*C+c]&&(c==C-1||g[c+1][r]||(r>0&&g[c+1][r-1])||(r<R-1&&g[c+1][r+1])))g[c][r]=1}
+  const s=[];for(let r=0;r<R;r++)if(g[0][r])s.push(r);if(!s.length)return null;
+  let r=s[rnd()*s.length|0];const o=[r*C];
+  for(let c=1;c<C;c++){const t=[r-1,r,r+1].filter(y=>y>=0&&y<R&&g[c][y]);r=t[rnd()*t.length|0];o.push(r*C+c)}
+  return o};
+ const ddstate=(m,dr)=>{if(!dr)return null;const isD=new Uint8Array(N),sh=new Int8Array(N);for(const c of dr)isD[c]=1;
+  for(let i=0;i<N;i++)if(!m[i]){let a=0;for(const j of P.nb[i])a+=m[j]+isD[j];sh[i]=a}
+  return{sh,dr}};
  const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
  /* ---- [liar] 正直な数字: 各行・各列に1つ(安全マスのみ)。ほかの安全マスは±1ズレる(範囲外なら逆向き) ---- */
  const pickHon=m=>{const hon=new Uint8Array(N),used=new Uint8Array(C);let nodes=0;
@@ -193,6 +205,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
    const db=P.dragon?(P.dragon==2?tpath(P,m).cut:dpath(P,m).cut):[];
    if(vi.length||gb.length||ib.length||cb.length||db.length){bad=m;bc=[...new Set([...vi.flatMap(q=>q.cells),...gb,...ib,...cb,...db])]}}
   let L=null;if(LM&&ex)for(let k=0;k<50&&!L;k++)L=lstate(ex);
+  if(DDM&&ex)L=ddstate(ex,rpath(ex));
   return{P,mines:ex,bad,bc,L}}
  /* ---- 品質判定と本体ループ ---- */
  const qual=(m,s,r,L)=>r.kinds.size>=2&&r.rounds>=3&&r.open0<=.5*r.safe&&nec.every(id=>!sim(P,M,m,s,id,L).ok);
@@ -201,7 +214,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   if(el>hard||cancel())break;
   if(soft&&el>qms)break;
   if(now-last>40){last=now;tick(el,tries);await new Promise(r=>setTimeout(r,0))}
-  if(!cur){cs=rnd()*N|0;cur=sample(cs);inv=it=0;if(!cur)continue;cl=null;if(LM){cl=lstate(cur);if(!cl){cur=null;continue}}tries++;cr=sim(P,M,cur,cs,undefined,cl);if(cr.bug)throw Error('solver unsound')}
+  if(!cur){cs=rnd()*N|0;cur=sample(cs);inv=it=0;if(!cur)continue;cl=null;if(LM){cl=lstate(cur);if(!cl){cur=null;continue}}else if(DDM){cl=ddstate(cur,rpath(cur));if(!cl){cur=null;continue}}tries++;cr=sim(P,M,cur,cs,undefined,cl);if(cr.bug)throw Error('solver unsound')}
   if(cr.ok){if(qual(cur,cs,cr,cl))return{mines:cur,start:cs,gf:1,q:1,L:cl};soft={mines:cur,start:cs,gf:1,q:0,L:cl};cur=null;continue}
   if(++it>400){cur=null;continue}
   const U=[];for(let i=0;i<N;i++)if(!cr.st[i])U.push(i);
@@ -211,6 +224,9 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   if(lm){m2=lm.m;l2=lm.L}
   else{if(P.grp)m2=gmove(cur,a,new Set(U),cs);else if(P.iso)m2=imove(cur,a,new Set(U),cs);else if(P.dragon)m2=smove(cur,a,b);else if(P.conn)m2=cmove(cur,a,new Set(U),cs);else if(LO)m2=smove(cur,a,b);else{m2=cur.slice();m2[a[rnd()*a.length|0]]=0;m2[b[rnd()*b.length|0]]=1}
    if(m2&&LM){if(m2.some((x,i)=>x&&cl.hon[i]))m2=null;else l2=lstate(m2,cl.hon,cl.sg)}}
+  if(DDM){ /* 隠れ龍: 爆弾を動かしたら龍を決め直す(前の龍が残っていれば多くはそのまま)。爆弾を動かさず龍だけ選び直す手もある */
+   if(!m2&&rnd()<.5)m2=cur;
+   if(m2){const keep=m2!==cur&&cl.dr.every(c=>m2[c])&&rnd()<.8;l2=ddstate(m2,keep?cl.dr:rpath(m2));if(!l2)m2=null}}
   if(!m2||!valid(m2)){if(++inv>40)cur=null;continue}
   const r2=sim(P,M,m2,cs,undefined,l2);if(r2.bug)throw Error('solver unsound');
   if(r2.rv>=cr.rv){cur=m2;cl=l2;cr=r2}}
