@@ -8,7 +8,7 @@ function setMode(c){$('#mc').classList.toggle('on',c);$('#mf').classList.toggle(
 window.addEventListener('load',()=>{
  if(RULE_ERR.length)$('#sm').textContent='ルール登録エラー: '+RULE_ERR.join(' / ');
  setMode(false);updSel();
- for(const id of['R','C','M'])$('#'+id).addEventListener('input',upd);
+ for(const id of['S','M'])$('#'+id).addEventListener('input',upd);
  $('#mf').onclick=()=>setMode(false);$('#mc').onclick=()=>setMode(true);
  $('#pk').onclick=()=>openM('pick');$('#rv').onclick=()=>G&&openM('view');
  $('#mx').onclick=$('#mok').onclick=closeM;$('#md').onclick=e=>{if(e.target.id=='md')closeM()};
