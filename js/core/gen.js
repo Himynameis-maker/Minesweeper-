@@ -7,6 +7,7 @@
    qms秒探索して品質条件を満たさなければ「ノーゲスだが品質未達」を許容、hard秒で打ち切り。
    iso持ちは「8近傍でつながる塊(imax があれば2〜imax個。塊同士は8近傍で触れない)を置く」配置と「塊ごと動かす」山登り。
    下限つき cons(lo>0。例: tidy)は、爆弾を撒いてから違反を min-conflicts で直すサンプラ(lsample)と、valid を保つ swap の山登り(smove)を使う。
+   双竜(dragon:2)は「龍H(左→右)と龍V(上→下)を置き、その8近傍を避けて残りを撒く」配置(tsample)。
    dragon持ちは「左端から右端まで、1列ごとに直進か上下1行ずれで爆弾を並べる(DFS。直進の確率は盤面ごとにランダム)」配置(dsample)と、valid を保つ付け替えの山登り(smove)。
    新しい配置様式(例: ヘビ)のルールは、[grp] と同じ位置に「専用の sample と move」を足す(context.md 第6節)。 */
 async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
@@ -16,7 +17,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
  /*[iso]*/const iok=m=>{if(P.imax)return ccomps(m).every(q=>q.length>=2&&q.length<=P.imax);for(let i=0;i<N;i++)if(m[i]&&!P.adj8[i].some(y=>m[y]))return false;return true};
  /*[conn]*/const ccomps=m=>{const seen=new Uint8Array(N),o=[];for(let i=0;i<N;i++)if(m[i]&&!seen[i]){const q=[i];seen[i]=1;for(let h=0;h<q.length;h++)for(const y of P.adj8[q[h]])if(m[y]&&!seen[y]){seen[y]=1;q.push(y)}o.push(q)}return o};
  /*[conn]*/const cconn=m=>ccomps(m).length<=1;
- const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp))&&(!P.iso||iok(m))&&(!P.conn||cconn(m))&&(!P.dragon||dok(P,m));
+ const valid=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi})&&(!P.grp||gcomps(P,m).every(q=>q.length==P.grp))&&(!P.iso||iok(m))&&(!P.conn||cconn(m))&&(!P.dragon||(P.dragon==2?tok(P,m):dok(P,m)));
  const nec=ids.filter(id=>RULES[id].grp||RULES[id].iso||RULES[id].conn||RULES[id].dragon||(RULES[id].cons&&RULES[id].cons(R,C).length));
  const LM=!!P.lie,LV=P.lie==2; /* hon[]=特別マス(lie1=正直, lie2=嘘)。LV なら hon 以外が正直 */if(LM&&R!=C)throw Error('縦と横が同じ盤面のみ');
  const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -141,12 +142,33 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   if(M<C||!dfs(0,-1))return null;
   for(let n=C;n<M;n++){const a=[];for(let c=0;c<N;c++)if(can(c)&&(!P.conn||P.adj8[c].some(y=>m[y])))a.push(c);if(!a.length)return null;put(wpick(a,w))}
   return valid(m)?m:null};
+ /* ---- [dragon:2] 双竜: 龍H(左→右)をDFSで置き、続けて龍V(上→下)をDFSで置く(Hと同じマスを通ってよい。通りたがる確率を盤面ごとにランダムにして、からまり方を変える)。
+        残りの爆弾は、H∪V の8近傍(と H∪V 自身)を避けて密度ムラで撒く(龍に触れる爆弾は龍だけ)。山登りは smove(valid を保つ付け替え。龍の周りに爆弾を置く手や龍が切れる手は棄却) ---- */
+ const tsample=(sz,w)=>{const m=new Uint8Array(N),cnt=kc.map(()=>0);
+  const can=c=>!sz.has(c)&&!m[c]&&byC[c].every(q=>cnt[q]<kc[q].hi);
+  const put=c=>{m[c]=1;byC[c].forEach(q=>cnt[q]++)},del=c=>{m[c]=0;byC[c].forEach(q=>cnt[q]--)};
+  let nodes=0;const p=.1+.8*rnd(),pv=.1+.8*rnd(),sh=rnd()*.7; /* sh=Vが既にあるマス(Hの上)を優先する確率 */
+  const dfs=(c,r)=>{if(c==C)return true;if(++nodes>600)return false;
+   const rs=c==0?shuf([...Array(R).keys()]):(rnd()<p?[r,...shuf([r-1,r+1])]:[...shuf([r-1,r+1]),r]);
+   for(const y of rs){if(y<0||y>=R)continue;const i=y*C+c;if(!can(i))continue;put(i);if(dfs(c+1,y))return true;del(i)}
+   return false};
+  const dfv=(r,c)=>{if(r==R)return true;if(++nodes>1200)return false;
+   let cs=r==0?shuf([...Array(C).keys()]):(rnd()<pv?[c,...shuf([c-1,c+1])]:[...shuf([c-1,c+1]),c]);
+   if(rnd()<sh)cs=[...cs.filter(x=>x>=0&&x<C&&m[r*C+x]),...cs.filter(x=>x>=0&&x<C&&!m[r*C+x])];
+   for(const x of cs){if(x<0||x>=C)continue;const i=r*C+x,had=m[i];if(!had&&!can(i))continue;if(!had)put(i);if(dfv(r+1,x))return true;if(!had)del(i)}
+   return false};
+  if(M<Math.max(R,C)+1||!dfs(0,-1)||(nodes=0,!dfv(0,-1)))return null;
+  let nD=0;const blk=new Uint8Array(N);
+  for(let i=0;i<N;i++)if(m[i]){nD++;blk[i]=1;for(const y of P.adj8[i])blk[y]=1}
+  if(nD>M||nD>R+C)return null;
+  for(let n=nD;n<M;n++){const a=[];for(let c=0;c<N;c++)if(can(c)&&!blk[c])a.push(c);if(!a.length)return null;put(wpick(a,w))}
+  return valid(m)?m:null};
  /* ---- 標準の配置サンプラ(密度ムラ)。grp持ちは gsample、iso持ちは isample、dragon持ちは dsample、conn持ちは csample に切り替わる ---- */
  const sample=s=>{const sz=new Set([s,...P.nb[s]]),cx=[0,1,2].map(()=>[rnd()*R,rnd()*C,rnd()]),sg=Math.max(R,C)/3,w=[];
   for(let i=0;i<N;i++){let v=.25;for(const[y,x,a]of cx)v+=a*2*Math.exp(-(((i/C|0)-y)**2+(i%C-x)**2)/(2*sg*sg));w.push(v)}
   if(P.grp)return gsample(sz,w);
   if(P.iso)return isample(sz,w);
-  if(P.dragon)return dsample(sz,w);
+  if(P.dragon)return P.dragon==2?tsample(sz,w):dsample(sz,w);
   if(P.conn)return csample(sz,w);
   if(LO)return lsample(sz,w);
   const m=new Uint8Array(N),cnt=kc.map(()=>0),cand=[];for(let i=0;i<N;i++)if(!sz.has(i))cand.push(i);
@@ -156,13 +178,19 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   return valid(m)?m:null};
  /* ---- 例盤面用(UIの長押し): 解けるかは見ず、OK例とNG例だけ作る ---- */
  if(o.sampleOnly){let ex=null,bad=null,bc=[];
-  for(let k=0;k<20000&&!ex;k++)ex=sample(rnd()*N|0); /* 下限つき cons は当たりが薄い(lines で約0.05%)ので多めに試す */
+  let s0=0;for(let k=0;k<20000&&!ex;k++){s0=rnd()*N|0;ex=sample(s0)}
+  const sz0=new Set([s0,...P.nb[s0]]); /* ex の開始マスと数字0の領域(NG例で爆弾を置かない)。下限つき cons は当たりが薄い(lines で約0.05%)ので多めに試す */
+  const valid2=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi}); /* NG例が cons の違反でなく龍の違反だけになるように */
+  if(P.dragon==2&&ex){ /* 双竜のNG例: OK例の龍以外の爆弾を1つ、龍に8近傍で触れるマスへ動かす(赤枠=動かした爆弾)。龍以外の爆弾が無ければ下のランダム抽選 */
+   const t=tpath(P,ex),D=new Set(t.cells||[]),ex2=[...Array(N).keys()].filter(i=>ex[i]&&!D.has(i));
+   const nx=[...D].flatMap(i=>P.adj8[i]).filter(i=>!ex[i]&&!sz0.has(i));
+   if(ex2.length&&nx.length){const m=ex.slice();m[ex2[rnd()*ex2.length|0]]=0;const y=nx[rnd()*nx.length|0];m[y]=1;if(!tok(P,m)&&valid2(m)){bad=m;bc=[y]}}}
   for(let k=0;k<3000&&!bad&&(kc.length||P.grp||P.iso||P.conn||P.dragon);k++){const m=new Uint8Array(N);for(let n=0;n<M;){const c=rnd()*N|0;if(!m[c]){m[c]=1;n++}}
    const vi=kc.filter(q=>{let s=0;for(const c of q.cells)s+=m[c];return s<q.lo||s>q.hi});
    const gb=P.grp?gcomps(P,m).filter(q=>q.length!=P.grp).flat():[];
    const ib=P.iso?ccomps(m).filter(q=>q.length<2||(P.imax&&q.length>P.imax)).flat():[];
    const cb=P.conn?(cc=>cc.length>1?cc.sort((p,q)=>q.length-p.length).slice(1).flat():[])(ccomps(m)):[];
-   const db=P.dragon?dpath(P,m).cut:[];
+   const db=P.dragon?(P.dragon==2?tpath(P,m).cut:dpath(P,m).cut):[];
    if(vi.length||gb.length||ib.length||cb.length||db.length){bad=m;bc=[...new Set([...vi.flatMap(q=>q.cells),...gb,...ib,...cb,...db])]}}
   let L=null;if(LM&&ex)for(let k=0;k<50&&!L;k++)L=lstate(ex);
   return{P,mines:ex,bad,bc,L}}
