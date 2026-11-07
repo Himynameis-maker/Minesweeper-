@@ -1,6 +1,6 @@
 /* [ui/modal] 縛りモーダル(pick=検索つき選択 / view=今の盤面の縛り)、併用不可の無効化、長押しで出る7x7の例盤面。
    縛りに付くタグ(tags)は、新しいフックを足したらここに1行足す。例盤面(mini/exHtml)の見せ方もここ。 */
-const tags=r=>(r.nb?'<span class="tag">数字変更</span>':'')+(r.cons?'<span class="tag">制約</span>':'')+(r.grp?'<span class="tag">グループ</span>':'')+(r.liar?'<span class="tag">'+(r.liar===2?'嘘は各行列1つ':'数字が嘘')+'</span>':'')+(r.iso?'<span class="tag">'+(r.iso===true?'孤立禁止':'塊は2〜'+r.iso+'個')+'</span>':'')+(r.conn?'<span class="tag">つながる</span>':'')+(r.dragon?'<span class="tag">'+(r.dragon===2?'双竜(左右+上下)':'龍(左→右)')+'</span>':'')+(r.twin?'<span class="tag">双竜(左右+上下)</span>':'')+(r.wt?'<span class="tag">数え方変更</span>':'')+(r.ok?'<span class="tag">条件付き</span>':'')+(stepOf(r)>1?'<span class="tag">爆弾数は'+stepOf(r)+'の倍数</span>':'');
+const tags=r=>(r.nb?'<span class="tag">数字変更</span>':'')+(r.cons?'<span class="tag">制約</span>':'')+(r.grp?'<span class="tag">グループ</span>':'')+(r.liar?'<span class="tag">'+(r.liar===2?'嘘は各行列1つ':'数字が嘘')+'</span>':'')+(r.iso?'<span class="tag">'+(r.iso===true?'孤立禁止':'塊は2〜'+r.iso+'個')+'</span>':'')+(r.conn?'<span class="tag">つながる</span>':'')+(r.dragon?'<span class="tag">'+(r.dragon===2?'双竜(左右+上下)':'龍(左→右)')+'</span>':'')+(r.twin?'<span class="tag">双竜(左右+上下)</span>':'')+(r.wt||r.dbl?'<span class="tag">数え方変更</span>':'')+(r.ok?'<span class="tag">条件付き</span>':'')+(stepOf(r)>1?'<span class="tag">爆弾数は'+stepOf(r)+'の倍数</span>':'');
 const vis=()=>{const q=$('#mq').value.trim().toLowerCase();return Object.values(RULES).filter(r=>!q||(r.id+r.name+r.desc).toLowerCase().includes(q))};
 function renderList(){const L=$('#ml');
  if(MODE=='pick'){$('#mt').textContent='縛りを選ぶ ('+SEL.size+'/'+Object.keys(RULES).length+')';
@@ -27,8 +27,9 @@ async function exHtml(id){if(exCache[id])return exCache[id];const r=RULES[id];
  if(!cfg){const M=mpick(7,7,8,[id]);if(M)cfg={R:7,C:7,M,ids:[id]}} /* 8/12/16 が ok に合わないルール(tidy は爆弾4〜6割=7x7で20〜29個)は、成り立つ最小の爆弾数にする */
  const e=cfg&&await gen(cfg,{sampleOnly:1});
  if(!e||!e.mines)return h+'<p class="mut">例の盤面を作れませんでした</p>';
- h+='<div class="mut">OK例'+(r.nb?'(数字はこのルールで数えた値)':'')+'</div>'+mini(e.P,e.mines,{sh:e.L&&e.L.sh,hon:e.L&&e.L.hon,dr:r.twin||r.dragon===2?tpath(e.P,e.mines).cells:r.dragon?dpath(e.P,e.mines).path:null});
+ h+='<div class="mut">OK例'+(r.nb?'(数字はこのルールで数えた値)':'')+'</div>'+mini(e.P,e.mines,{sh:e.L&&e.L.sh,hon:e.L&&e.L.hon,dr:r.twin||r.dragon===2?tpath(e.P,e.mines).cells:r.dragon?(r.dbl&&e.L&&e.L.dr)||dpath(e.P,e.mines).path:null});
  if(r.twin||r.dragon===2)h+='<div class="mut">橙枠が2体の龍(左端→右端と上端→下端。1つ進むごとに同じ列/行か1ずれ。同じマスを通ってもよい)。龍に8近傍で触れる爆弾は龍だけ。ほかの爆弾は龍から離れていれば、どこにあってもよい</div>';
+ else if(r.dragon&&r.dbl)h+='<div class="mut">橙枠が本物の龍(左端から右端まで、1列ごとに同じ行か上下1行ずれでつながる爆弾の列。盤面に1本だけ)。龍の爆弾は数字に2個ぶんとして数える(例: 周りに龍の爆弾が1つと、龍でない爆弾が1つなら数字は3)。龍でない爆弾は、たまたま左右につながって見えても1個ぶん。ほかの爆弾はどこにあってもよい</div>';
  else if(r.dragon)h+='<div class="mut">橙枠が龍の一例(左端から右端まで、1列ごとに同じ行か上下1行ずれでつながる爆弾の列)。ほかの爆弾はどこにあってもよい</div>';
  if(r.wt)h+='<div class="mut">橙に塗ったマスが色つき。色つきマスの爆弾は数字に2個ぶんとして数える(爆弾の総数は変わらない)</div>';
  if(r.liar)h+=r.liar===2?'<div class="mut">青枠が嘘の数字(各行・各列に1つ。実際の爆弾数と1ズレている)。ほかの数字は全部正直</div>':'<div class="mut">青枠が正直な数字(各行・各列に1つ)。ほかの数字は実際の爆弾数と1ズレている</div>';
