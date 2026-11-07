@@ -19,12 +19,13 @@ function chPlan(){const c=CHALLENGE,ri=(a,b)=>a+(rnd()*(b-a+1)|0);let cfg;
   cfg.ids=cfg.ids.filter(id=>!RULES[id].ok||RULES[id].ok(cfg));
   if(cfg.ids.length>=c.rulesMin)break}
  return cfg}
+/* フリープレイの盤面サイズは入力1つ(#S=縦と横の長さ)。内部の cfg は R と C を別々に持ち、同じ値を入れる(縦横を分けたくなったら入力欄を戻すだけ) */
 function plan(ch){if(ch)return chPlan();
- const R=Math.max(3,Math.min(24,v('R'))),C=Math.max(3,Math.min(24,v('C'))),N=R*C,M=Math.max(1,Math.min(N-10,v('M'))),
+ const R=Math.max(3,Math.min(24,v('S'))),C=R,N=R*C,M=Math.max(1,Math.min(N-10,v('M'))),
   pool=Object.keys(RULES).filter(id=>SEL.has(id)),cfg={R,C,M,ids:[]};
  cfg.ids=norm(pool,cfg);cfg.dropped=pool.length-cfg.ids.length;return cfg}
 /* フリープレイ: 選んだ縛りが今の盤面・爆弾数に合わないとき、理由を返す(スタートを止める) */
-function freeCfg(){const R=Math.max(3,Math.min(24,v('R')||3)),C=Math.max(3,Math.min(24,v('C')||3)),N=R*C;return{R,C,M:Math.max(1,Math.min(N-10,v('M')||1)),ids:[...SEL]}}
+function freeCfg(){const R=Math.max(3,Math.min(24,v('S')||3)),C=R,N=R*C;return{R,C,M:Math.max(1,Math.min(N-10,v('M')||1)),ids:[...SEL]}}
 function problems(){if(mode()!='f')return[];const cfg=freeCfg(),{R,C,M}=cfg,max=Math.max(1,R*C-10),o=[],fx=[];
  for(const id of SEL){const r=RULES[id];let f=0;for(let m=1;m<=max&&!f;m++)if(mok(R,C,m,[id]))f=1;
   if(f)fx.push(id);else o.push('「'+r.name+'」: '+(r.why||'今の盤面では使えません'))}
