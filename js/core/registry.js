@@ -2,7 +2,7 @@
    [core/registry] ルール登録(reg)・併用不可判定・爆弾数条件(mstep/grp)のヘルパー。DOM非依存。
    ルール定義の仕様は context.md 第4節。ここは通常触らない(新しい任意フィールドを足すときだけ reg と conflict を触る)。 */
 const RULES={},RULE_ERR=[];
-const conflict=(a,b)=>a.id!=b.id&&((a.excl&&a.excl===b.excl)||(a.grp&&b.grp)||(a.liar&&b.liar)||(a.wt&&b.wt)||(a.wt&&b.liar)||(a.liar&&b.wt)||(a.conflicts||[]).includes(b.id)||(b.conflicts||[]).includes(a.id));
+const conflict=(a,b)=>a.id!=b.id&&((a.excl&&a.excl===b.excl)||(a.grp&&b.grp)||(a.liar&&b.liar)||(a.dragon&&b.dragon)||(a.wt&&b.wt)||(a.wt&&b.liar)||(a.liar&&b.wt)||(a.conflicts||[]).includes(b.id)||(b.conflicts||[]).includes(a.id));
 /* 爆弾数の条件: 必要な倍数(mstep か grp) / 倍数に丸める */
 const stepOf=r=>r.mstep||r.grp||1;
 const lcmStep=ids=>ids.reduce((s,id)=>{const t=stepOf(RULES[id]);return s/gcd(s,t)*t},1);
@@ -23,5 +23,5 @@ function reg(d){try{
  if(d.iso!==undefined&&d.iso!==true&&!(Number.isInteger(d.iso)&&d.iso>=3))throw'isoはtrueか3以上の整数';
  if(d.conn!==undefined&&d.conn!==true)throw'connはtrue';
  if(d.liar!==undefined&&d.liar!==true&&d.liar!==2)throw'liarはtrueか2';
- if(d.dragon!==undefined&&d.dragon!==true)throw'dragonはtrue';
+ if(d.dragon!==undefined&&d.dragon!==true&&d.dragon!==2)throw'dragonはtrueか2';
  RULES[d.id]=d}catch(e){RULE_ERR.push((d&&d.id)+': '+e)}}

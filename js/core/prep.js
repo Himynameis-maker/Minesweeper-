@@ -6,10 +6,10 @@ function prep(cfg){const{R,C,ids}=cfg,rs=ids.map(id=>RULES[id]),nr=rs.find(r=>r.
  const cons=[];for(const r of rs)if(r.cons)for(const k of r.cons(R,C))cons.push({cells:k.cells,lo:k.lo,hi:k.hi,src:{t:'r',id:r.id}});
  /*[wt]*/const wr=rs.find(r=>r.wt),w=wr?[...Array(R*C)].map((_,i)=>wr.wt(R,C,i)):null;
  const gr=rs.find(r=>r.grp),lr=rs.find(r=>r.liar),adj=gr?[...Array(R*C)].map((_,i)=>offs(R,C,i,D4)):null;
- /*[dragon]*/const dr=rs.find(r=>r.dragon);
- /*[iso]*/const ir=rs.find(r=>r.iso),cr=rs.find(r=>r.conn),adj8=(ir||cr||(dr&&dr.dragon===2))?[...Array(R*C)].map((_,i)=>offs(R,C,i,D8)):null;
+ /*[dragon]*/const dr=rs.find(r=>r.dragon||r.twin); /* twin:true(双竜)は dragon:2 として扱う。registry が dragon に true しか許さないので別フック */
+ /*[iso]*/const ir=rs.find(r=>r.iso),cr=rs.find(r=>r.conn),adj8=(ir||cr||(dr&&(dr.twin||dr.dragon===2)))?[...Array(R*C)].map((_,i)=>offs(R,C,i,D8)):null;
  /*[probe]*/const pr=rs.find(r=>r.probe);
- return{nb,cons,/*[dragon]*/dragon:dr?(dr.dragon===2?2:1):0,did:dr?dr.id:'',probe:pr?1:0,pid:pr?pr.id:'',grp:gr?gr.grp:0,gid:gr?gr.id:'',adj,R,C,lie:lr?(lr.liar===2?2:1):0,lid:lr?lr.id:'',/*[iso]*/iso:ir?1:0,iid:ir?ir.id:'',imax:ir&&ir.iso!==true?ir.iso:0,/*[conn]*/conn:cr?1:0,cnid:cr?cr.id:'',adj8,w}}
+ return{nb,cons,/*[dragon]*/dragon:dr?(dr.twin||dr.dragon===2?2:1):0,did:dr?dr.id:'',probe:pr?1:0,pid:pr?pr.id:'',grp:gr?gr.grp:0,gid:gr?gr.id:'',adj,R,C,lie:lr?(lr.liar===2?2:1):0,lid:lr?lr.id:'',/*[iso]*/iso:ir?1:0,iid:ir?ir.id:'',imax:ir&&ir.iso!==true?ir.iso:0,/*[conn]*/conn:cr?1:0,cnid:cr?cr.id:'',adj8,w}}
 /* [wt] マスiの数字の真の値 = nbが指すマスの爆弾の重み付き和(wtなしなら普通の個数)。m は 0/1 配列 */
 function ncount(P,m,i){let s=0;for(const j of P.nb[i])s+=m[j]*(P.w?P.w[j]:1);return s}
 /* [dragon] 龍: 左端から右端まで、1列ごとに行が同じか±1の爆弾の列。m は 0/1 配列。dok=あるか / dpath=1本(マス番号の配列)。
