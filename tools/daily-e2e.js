@@ -50,6 +50,8 @@ ok(run('boardDecode')(CODE).ok,'盤面コードの往復');
 let r=await call('/api/daily/status?token=abcdefghijklmnop');let j=await r.json();ok(r.status==200&&j.state=='prep','盤面が無い間は prep');
 r=await call('/api/admin/board',{method:'PUT',headers:adm,body:JSON.stringify({day:today,code:CODE})});ok(r.status==200,'管理APIで登録');
 r=await call('/api/admin/board?day='+today,{headers:adm});ok(r.status==200,'管理API: ある → 200');
+r=await call('/api/admin/board?day=2000-01-01',{headers:adm});j=await r.json();ok(r.status==404&&j.exists===false,'管理API: 無い → 404 と {exists:false}');
+r=await call('/ping');j=await r.json();ok(r.status==200&&j.ok&&j.binding&&j.tables&&j.token,'/ping: binding・tables・token がそろっている');
 r=await call('/api/admin/board?day='+today);ok(r.status==401,'管理API: トークンなし → 401');
 /* ---- 5. 画面: デイリーを開く ---- */
 $('#mdy').onclick();await sleep(100);
