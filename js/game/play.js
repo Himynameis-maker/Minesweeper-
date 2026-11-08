@@ -24,7 +24,7 @@ function act(i,f){if(!G||G.over||G.done||G.st[i])return;G.hint=null;
  if(G.mines[i]){G.st[i]=2;G.over=1;if(run)chMiss();else msg('爆発…')}
  else flood(i);
  if(!G.over&&G.rev==G.N-G.cfg.M){G.done=1;if(run)chClear();else msg('🎉 クリア!')}
- draw()}
+ draw();if(DY&&(G.over||G.done))dyEnd()} /* デイリー: ミスもクリアもここで終わり(ui/daily.js) */
 /* ヒント: ON中に 数字マス/縛り(一覧内)/残り爆弾数 をタップ。その手がかりから分かることがあるかだけ教える(場所は教えない) */
 function hscan(){const{P,N,num,mines,fl,cfg}=G,st=G.st.slice(),out=[],seen=new Set();
  for(let i=0;i<N;i++)if(fl[i]==1&&mines[i]&&!st[i])st[i]=2; /* 正しい旗=既知の爆弾(マークは対象外) */
