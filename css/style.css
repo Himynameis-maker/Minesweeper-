@@ -106,4 +106,7 @@ input[type=text]{font:inherit;font-size:16px;color:var(--fg);background:var(--o)
 #cmd,#crl,#cbd .fld:not(#bcl){transition:opacity .25s ease}
 #setup.fcl #cmd,#setup.fcl #crl,#setup.fcl #cbd .fld:not(#bcl){opacity:.45;pointer-events:none}
 #setup.fcl #BC{border-color:var(--ac)}
-
+/* 盤面コードのコピーボタン(小さく・薄く。幅固定なので「copied」に変わっても周りが動かない) */
+.cpb{width:58px;padding:3px 0;font-size:11px;border:1px solid transparent;background:transparent;border-radius:8px;color:var(--mut);opacity:.6;text-align:center;white-space:nowrap}
+.cpb:active{transform:none}
+#fincpw{margin:10px 0 0}
