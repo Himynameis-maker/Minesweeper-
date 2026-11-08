@@ -33,7 +33,7 @@ async function exHtml(id){if(exCache[id])return exCache[id];const r=RULES[id];
  else if(r.dragon)h+='<div class="mut">橙枠が龍の一例(左端から右端まで、1列ごとに同じ行か上下1行ずれでつながる爆弾の列)。ほかの爆弾はどこにあってもよい</div>';
  if(r.wt)h+='<div class="mut">橙に塗ったマスが色つき。色つきマスの爆弾は数字に2個ぶんとして数える(爆弾の総数は変わらない)</div>';
  if(r.liar)h+=r.liar===2?'<div class="mut">青枠が嘘の数字(各行・各列に1つ。実際の爆弾数と1ズレている)。ほかの数字は全部正直</div>':'<div class="mut">青枠が正直な数字(各行・各列に1つ)。ほかの数字は実際の爆弾数と1ズレている</div>';
- if(r.mir)h+='<div class="mut">数字には、鏡爆弾(上下左右に爆弾が無い爆弾2個。どれかは分からない)の+1が含まれる</div>';
+ if(r.mir)h+='<div class="mut">数字には、鏡爆弾(上下左右に爆弾が無い爆弾1個。どれかは分からない)の+1が含まれる</div>';
  if(r.nb)h+='<div class="mut">数字が数えるマス: 中央「?」の数字は ● のマスの爆弾数</div>'+mini(e.P,null,{pat:1});
  else if(e.bad)h+='<div class="mut">NG例(赤枠がルール違反)</div>'+mini(e.P,e.bad,{bc:e.bc});
  return exCache[id]=h}
