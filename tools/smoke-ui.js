@@ -72,5 +72,5 @@ const driver=`
  $('#finb').onclick();ok($('#fin').hidden&&!$('#setup').hidden&&$('#chw').innerHTML.includes('<b>0</b>'),'チャレンジ: タイトルへ戻る');
  return log})()`;
 const localStorage={getItem:k=>LS[k]??null,setItem:(k,v)=>{LS[k]=String(v)}};
-const ctx=vm.createContext({localStorage,document,window,performance,setTimeout,console,Date,Uint8Array,Int8Array,Int32Array,innerWidth:400,scrollTo(){},navigator:{},loads});
+const ctx=vm.createContext({localStorage,document,window,performance,setTimeout,clearTimeout,setInterval,clearInterval,console,Date,Uint8Array,Int8Array,Int32Array,innerWidth:400,scrollTo(){},navigator:{},loads});
 vm.runInContext(code+'\n'+driver,ctx).then(l=>{console.log('SMOKE OK');process.exit(0)},e=>{console.error(e);process.exit(1)});
