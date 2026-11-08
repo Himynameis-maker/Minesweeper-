@@ -31,6 +31,21 @@ jobs:
           DAY="$DAY_IN"
           [ -n "$DAY" ] || DAY=$(TZ=Asia/Tokyo date -d '+12 hours' +%F)
           echo "day=$DAY" >> "$GITHUB_OUTPUT"
+      - name: サイトの設定を確かめる
+        env:
+          TOKEN: ${{ secrets.DAILY_TOKEN }}
+          SITE: ${{ vars.DAILY_SITE }}
+        run: |
+          [ -n "$SITE" ] || { echo "::error::DAILY_SITE が空です。Settings → Secrets and variables → Actions の「Variables」タブに入れてください(Secrets ではありません)"; exit 1; }
+          [ -n "$TOKEN" ] || { echo "::error::DAILY_TOKEN が空です。「Secrets」タブに入れてください"; exit 1; }
+          case "$SITE" in https://*) ;; *) echo "::error::DAILY_SITE は https:// から始めてください"; exit 1;; esac
+          SITE="${SITE%/}"   # 末尾の / があると //api/... になり、サーバー機能に届かない
+          R=$(curl -sS -m 20 "$SITE/ping" || true)
+          echo "ping: $R" | head -c 300; echo
+          echo "$R" | grep -q '"ok":true' || { echo "::error::$SITE/ping が JSON を返しません。Cloudflare Pages の functions/ が公開されていません(functions/ping.js が無い / ファイル名がおかしい / 別のURL)"; exit 1; }
+          echo "$R" | grep -q '"binding":true' || { echo "::error::D1 の Binding(変数名 DB)が Pages に設定されていません"; exit 1; }
+          echo "$R" | grep -q '"tables":true' || { echo "::error::D1 に schema.sql が実行されていません(boards テーブルが無い)"; exit 1; }
+          echo "$R" | grep -q '"token":true' || { echo "::error::Pages 側の環境変数 DAILY_TOKEN が設定されていません"; exit 1; }
       - name: すでに盤面があるか
         id: ex
         if: ${{ github.event.inputs.force != 'true' }}
@@ -39,8 +54,10 @@ jobs:
           SITE: ${{ vars.DAILY_SITE }}
           DAY: ${{ steps.d.outputs.day }}
         run: |
-          CODE=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$SITE/api/admin/board?day=$DAY")
-          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          SITE="${SITE%/}"
+          # 「"exists":true」という返事が来たときだけ「ある」。404 の代わりに index.html が 200 で返ってきても「ある」と誤判定しない
+          if curl -s -m 20 -H "Authorization: Bearer $TOKEN" "$SITE/api/admin/board?day=$DAY" | grep -q '"exists":true'; then C=200; else C=0; fi
+          echo "code=$C" >> "$GITHUB_OUTPUT"
       - name: 盤面を作る
         if: ${{ steps.ex.outputs.code != '200' }}
         env:
@@ -52,4 +69,7 @@ jobs:
           TOKEN: ${{ secrets.DAILY_TOKEN }}
           SITE: ${{ vars.DAILY_SITE }}
         run: |
-          curl -fsS -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data @payload.json "$SITE/api/admin/board"
+          SITE="${SITE%/}"
+          CODE=$(curl -sS -m 30 -o resp.txt -w '%{http_code}' -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data @payload.json "$SITE/api/admin/board")
+          echo "HTTP $CODE"; head -c 300 resp.txt; echo
+          [ "$CODE" = "200" ] || { echo "::error::盤面を登録できませんでした(HTTP $CODE)。401=トークン不一致 / 400 range=日付が今日の前後2日の外 / 404=サーバー機能が無い"; exit 1; }
