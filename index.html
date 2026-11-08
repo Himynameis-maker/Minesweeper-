@@ -32,7 +32,7 @@
   <textarea id="ctx" readonly></textarea></details>
 </section>
 <section id="game" hidden>
- <div class="row top"><button id="bk">← 設定に戻る</button><button id="rv">🧩 縛り</button></div>
+ <div class="row top"><button id="bk">← 設定に戻る</button><button id="cp" class="cpb" title="盤面コードをコピー" style="visibility:hidden">コード</button><button id="rv">🧩 縛り</button></div>
  <div id="dyt" hidden></div>
  <div class="chips" id="st"></div>
  <div id="ld" class="card" hidden style="text-align:center"><div id="ldt"></div><div class="row" style="justify-content:center;margin-top:8px"><button id="rg" hidden>🔄 縛りを引き直す</button><button id="lc">キャンセルして設定に戻る</button></div></div>
@@ -48,7 +48,7 @@
  <div id="ml"></div>
  <div class="row" id="mfoot"><button id="ma">表示中を全選択</button><button id="mn">表示中を解除</button><button class="pri" id="mok">決定</button></div>
 </div></div>
-<div id="fin" hidden><div id="finx"></div><div class="card" id="finc"><div id="fini"></div><h2 id="fint"></h2><p class="mut" id="find"></p><div class="chips" id="fins" style="justify-content:center"></div><div class="row"><button class="pri grow" id="finr">もう一度挑戦</button><button class="grow" id="finb">タイトルへ</button></div></div></div>
+<div id="fin" hidden><div id="finx"></div><div class="card" id="finc"><div id="fini"></div><h2 id="fint"></h2><p class="mut" id="find"></p><div class="chips" id="fins" style="justify-content:center"></div><div class="row"><button class="pri grow" id="finr">もう一度挑戦</button><button class="grow" id="finb">タイトルへ</button></div><div id="fincpw" hidden><button id="fincp" class="cpb" title="この盤面のコードをコピー">コード</button></div></div></div>
 <div id="cdn" hidden><div id="cdnn"></div></div>
 <div id="rk" hidden><div id="rkb"><div class="row"><b>🏅 デイリーランキング</b><button id="rkx">閉じる</button></div><div class="mut">今日〜6日前のランキング(クリアした人の速い順・上位20位)。盤面コードは明日から見られます</div><div class="seg" id="rkt"></div><div id="rkl"></div></div></div>
 <div id="ex" hidden><div id="eb"><div class="row"><b id="et"></b><button id="ex2">閉じる</button></div><div id="el"></div></div></div>
@@ -90,6 +90,7 @@
 <script src="js/ui/board.js"></script>
 <script src="js/ui/modal.js"></script>
 <script src="js/ui/daily.js"></script>
+<script src="js/ui/copycode.js"></script>
 <script src="js/ui/freecode.js"></script>
 <script src="js/ui/main.js"></script>
 </body></html>
