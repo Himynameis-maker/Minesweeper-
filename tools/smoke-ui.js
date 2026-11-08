@@ -7,7 +7,7 @@ const srcs=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m=>m[1]);
 const rules=fs.readdirSync(path.join(root,'rules')).filter(f=>f.endsWith('.js')&&!f.startsWith('_')).map(f=>'rules/'+f);
 const list=srcs.filter(f=>!f.startsWith('rules/')).flatMap(f=>f=='js/game/state.js'?[...rules,f]:[f]);
 const code=list.map(f=>fs.readFileSync(path.join(root,f),'utf8')).join('\n');
-const defaults={R:7,C:7,M:8},LS={};
+const defaults={S:7,M:8},LS={};
 const els={},loads=[];
 function El(id){this.id=id;this.value=defaults[id]??'';this.checked=false;this.hidden=false;this.innerHTML='';this.textContent='';this.className='';this.dataset={};this.disabled=false;
  const on=new Set(id=='mf'||id=='fo'?['on']:[]);
@@ -24,7 +24,7 @@ const driver=`
  $('#mq').value='十字';$('#mq').oninput();ok($('#ml').innerHTML.includes('cross')&&!$('#ml').innerHTML.includes('knight'),'検索で絞れる');
  $('#mq').value='';$('#mok').onclick();
  for(const id of Object.keys(RULES)){
-  SEL.clear();SEL.add(id);$('#R').value=7;$('#C').value=7;$('#M').value=mpick(7,7,8,[id])||8;updSel();upd(); /* 爆弾数は縛りが成り立つ最小値(tidy のように範囲が決まっているルール用。ほかは8のまま) */
+  SEL.clear();SEL.add(id);$('#S').value=7;$('#M') .value=mpick(7,7,8,[id])||8;updSel();upd(); /* 爆弾数は縛りが成り立つ最小値(tidy のように範囲が決まっているルール用。ほかは8のまま) */
   ok(!$('#go').disabled,id+': スタート可');
   $('#go').onclick();await wait(()=>G&&!G.over&&$('#g').innerHTML.length>0);
   ok(G.cfg.ids.includes(id)&&G.rev>0,id+': 盤面生成と自動オープン');
