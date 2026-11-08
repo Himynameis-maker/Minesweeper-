@@ -4,6 +4,8 @@ export const RETRY_MS=20000; // 開始の応答が届かなかった人のため
 export const KEEP_DAYS=6;    // 過去何日分の盤面・ランキングを残すか
 export const TOP=20;         // ランキングに載る人数
 export const NAME_MAX=12;    // ニックネームの最大文字数
+export const PAST_CACHE_S=600;  // ランキングの過去分をエッジに載せる秒数(日付が変わるまで変わらないので長め)
+export const TODAY_CACHE_S=60;  // ランキングの今日の分をエッジに載せる秒数(他の人のクリアが載るまで最大この秒数遅れる。自分の分は finish がキャッシュを捨てるので遅れない)
 export const json=(o,status=200,h={})=>new Response(JSON.stringify(o),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...h}});
 export const jstDay=ms=>new Date(ms+9*36e5).toISOString().slice(0,10);
 export const addDay=(day,n)=>{const d=new Date(day+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
@@ -17,3 +19,7 @@ export const readJson=async r=>{try{const b=await r.json();return b&&typeof b=='
 /* 管理用(GitHub Actions → 盤面の登録)。Authorization: Bearer <DAILY_TOKEN>。定数時間で比べる */
 export const isAdmin=(r,env)=>{const t=env.DAILY_TOKEN,h=r.headers.get('authorization')||'';if(!t||!h.startsWith('Bearer '))return false;
  const a=h.slice(7);if(a.length!=t.length)return false;let d=0;for(let i=0;i<a.length;i++)d|=a.charCodeAt(i)^t.charCodeAt(i);return d==0};
+/* ランキングのエッジキャッシュ。k='d'=過去分 / k='t'=今日の分。キーに今日の日付を含むので、日付が変われば自然に切り替わる */
+export const rankKey=(request,k,today)=>new Request(new URL('/api/daily/ranking?'+k+'='+today,request.url));
+/* 記録が変わったときにキャッシュを捨てる(ks=['t'] など)。キャッシュが無い環境・失敗は黙って無視(最大 TODAY_CACHE_S 秒で自然に切れる) */
+export const dropRankCache=async(request,today,ks)=>{try{if(typeof caches=='undefined'||!caches.default)return;await Promise.all(ks.map(k=>caches.default.delete(rankKey(request,k,today))))}catch(e){}};
