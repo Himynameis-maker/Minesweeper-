@@ -5,6 +5,7 @@ on:
   schedule:
     - cron: '0 9 * * *'
     - cron: '5 13 * * *'
+    - cron: '*/10 * * * *'   # 【テスト用】自動実行が動くか確認するための行。schedule の実行が出たら、この1行を消す
   workflow_dispatch:
     inputs:
       day:
