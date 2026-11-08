@@ -226,12 +226,12 @@ python3 build.py                           # rules ブロック同期 + dist 生
 
 **日付は全部サーバーの JST**(端末の時計は使わない)。盤面は 0:00 JST に切り替わる。
 
-**API**(すべて JSON・`cache-control: no-store`。ranking だけエッジに600秒):
+**API**(すべて JSON・`cache-control: no-store`。ranking だけエッジにキャッシュ: 過去分600秒・今日の分60秒):
 - `GET /api/daily/status?token=` → `{day,ver,state}`。state = prep(今日の盤面なし)/new/playing/done。ver = 盤面コードのルールセット番号
 - `POST /api/daily/start {token}` → `{day,code,startedAt}`。盤面を渡す唯一の場所。1日1回(409=played)。応答が届かなかった人は20秒以内なら同じ盤面を再取得できる(RETRY_MS)。503=prep
 - `POST /api/daily/finish {token,day,clear,name}` → `{ok,ms,rank}`。タイムはサーバーが「今−開始−CD_MS」で測る。ランキングに残るのは クリア かつ 上位20位 だけ
 - `GET /api/daily/code?token=` → 今日の盤面コード。**終わった(done)端末にだけ**渡す
-- `GET /api/daily/ranking` → `{today, days}`。先頭が「今日」(`today:true`・順位は今の分が見える・**`code` は常に null=今日の盤面コードは出さない**)、続けて1〜6日前(盤面コードと順位)。過去分だけエッジに600秒キャッシュ、今日の分は毎回 D1 から読む(最大20件)
+- `GET /api/daily/ranking` → `{today, days}`。先頭が「今日」(`today:true`・順位は今の分が見える・**`code` は常に null=今日の盤面コードは出さない**)、続けて1〜6日前(盤面コードと順位)。過去分は別キー(`?d=日付`)でエッジに600秒、今日の分も別キー(`?t=日付`)で60秒キャッシュ(TODAY_CACHE_S・PAST_CACHE_S は `_lib.js`)。他の人のクリアは今日の順位に最大60秒遅れて載る。ただし `finish` が記録を入れたとき(と admin PUT のとき)は `dropRankCache` でキャッシュを捨てるので、クリアした本人は自分の記録がすぐ見える。Cache API が無い環境では毎回 D1 から読む(従来どおり)
 - `GET/PUT /api/admin/board`(`Authorization: Bearer DAILY_TOKEN`)。GET は `{exists:true}`(200)/`{exists:false}`(404)。PUT は `{day,code}` で登録。すでにあれば置き換え、その日の plays/ranks を消す(=みんなやり直せる)。日付は今日の −1〜+2 日だけ受け付ける
 - `GET /ping` → `{ok,binding,tables,token}`(D1 の DB 結合・テーブル有無・DAILY_TOKEN の有無。値は返さない)。動作確認用
 
