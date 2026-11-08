@@ -1,9 +1,9 @@
 name: daily-board
-# 毎日 23:50 JST(=14:50 UTC)に翌日分を作る。GitHub の cron は混むと遅れる/落ちることがあるので、00:10 JST(=15:10 UTC)にも走らせ、
-# 「その日の盤面がまだ無いときだけ」作る安全網にする。対象の日付は「今から15分後の JST の日付」(23:50台→翌日 / 00:10台→今日)。
+# 毎日 18:00 JST(=09:00 UTC)に翌日分を作る。GitHub の cron は混むと遅れる/落ちることがあるので、00:10 JST(=15:10 UTC)にも走らせ、
+# 「その日の盤面がまだ無いときだけ」作る安全網にする。対象の日付は「今から12時間後の JST の日付」(18:00台→翌日 / 00:10台→今日)。
 on:
   schedule:
-    - cron: '50 14 * * *'
+    - cron: '0 9 * * *'
     - cron: '10 15 * * *'
   workflow_dispatch:
     inputs:
@@ -26,7 +26,7 @@ jobs:
         id: d
         env: { DAY_IN: '${{ github.event.inputs.day }}' }
         run: |
-          DAY="$DAY_IN"; [ -n "$DAY" ] || DAY=$(TZ=Asia/Tokyo date -d '+15 minutes' +%F)
+          DAY="$DAY_IN"; [ -n "$DAY" ] || DAY=$(TZ=Asia/Tokyo date -d '+12 hours' +%F)
           echo "day=$DAY" >> "$GITHUB_OUTPUT"
       - name: すでに盤面があるか
         id: ex
