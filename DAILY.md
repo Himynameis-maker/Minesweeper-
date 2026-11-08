@@ -1,4 +1,4 @@
-# デイリー管理ガイド(AIは読むな。コードがわからなくても使えます)
+# デイリー管理ガイド(コードがわからなくても使えます)
 
 ## しくみ(これだけ分かればOK)
 
@@ -63,6 +63,11 @@
 | Cloudflare Pages → Settings → Variables and Secrets | `DAILY_TOKEN` | GitHub の Secrets と **同じ値** |
 | Cloudflare Pages → Settings → Bindings | D1 / 変数名 `DB` | 作成した D1 データベース |
 | Cloudflare D1 → Console | (1回だけ) | `schema.sql` の中身を貼って実行 |
+
+## ランキング
+
+- ランキング画面の最初のタブは「今日」です。今日クリアした人の順位(名前とタイム)が、その場で見られます。
+- 今日の盤面コードは出ません(「明日から見られます」)。昨日以前のタブには、盤面コードも出ます。
 
 ## ルールを変えたあとの「古い盤面コード」
 

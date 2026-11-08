@@ -109,8 +109,8 @@ function dyShow(){const win=DYS.clear,sent=DYS.sent,r=DYS.res,ms=r?r.ms:DYS.loca
  let ic,tt,ds;
  if(bad){ic='📡';tt='通信エラー';ds='結果を送れませんでした。電波のいい場所で「もう一度送る」を押してね。このまま戻ると、今日の記録は残りません。'}
  else if(!win){ic='💥';tt='ミス…';ds='今日の挑戦は終了です。また明日!(盤面入手で今日の盤面コードをコピーできます)'}
- else if(sent=='ok'){ic='🏆';tt='クリア!';ds=r.rank?r.rank+'位にランクイン! 順位は明日以降、ランキングで見られるよ。':'クリア! 惜しくもランキング圏外(上位20位まで)でした。'}
- else{ic='🏆';tt='クリア!';ds=sent=='unk'?'結果が届いたか確認できませんでした。ランキングは明日以降に見られます。':'今日の記録は登録できませんでした('+DYS.err+')。'}
+ else if(sent=='ok'){ic='🏆';tt='クリア!';ds=r.rank?r.rank+'位にランクイン! 今のランキングは設定画面の「ランキング」で見られるよ。':'クリア! 惜しくもランキング圏外(上位20位まで)でした。'}
+ else{ic='🏆';tt='クリア!';ds=sent=='unk'?'結果が届いたか確認できませんでした。ランキングで確かめてね。':'今日の記録は登録できませんでした('+DYS.err+')。'}
  $('#fin').className=win&&!bad?'win':'lose';$('#fini').textContent=ic;$('#fint').textContent=tt;$('#find').textContent=ds;
  $('#fins').innerHTML='<span class="chip">⏱ <b>'+dyFmt(ms,2)+'</b></span>'+(win&&sent=='ok'&&r&&r.rank?'<span class="chip">🏅 '+r.rank+'位</span>':'');
  $('#finr').hidden=!bad;$('#finr').textContent='📡 もう一度送る';$('#finb').textContent='デイリーに戻る';
@@ -120,15 +120,16 @@ function dyLeave(){$('#fin').hidden=true;clearInterval(DYS.tick);DY=0;DYS.busy=0
  $('#hb').hidden=$('#bk').hidden=false;$('#dyt').hidden=true;$('#finr').hidden=false;$('#finr').textContent='もう一度挑戦';$('#finb').textContent='タイトルへ';
  DYS.state='';show('setup');dyRender();dyRefresh()}
 
-/* ---- ランキング(1〜6日前)。盤面コードは地味に小さく置く。コピーしても反応は出さない ---- */
+/* ---- ランキング(今日〜6日前)。今日の分は順位だけで、盤面コードは出さない(明日から)。盤面コードは地味に小さく置く。コピーしても反応は出さない ---- */
 async function dyRank(){$('#rk').hidden=false;$('#rkt').innerHTML='';$('#rkl').innerHTML='<p class="mut">読み込み中…</p>';
  const r=await dyApi('/api/daily/ranking');
  if(!r.ok||!r.j.days){$('#rkl').innerHTML='<p class="mut">読み込めませんでした。あとでもう一度開いてね。</p>';return}
  DYS.rk=r.j.days;DYS.rkSel=0;dyRankDraw()}
 function dyRankDraw(){const ds=DYS.rk||[],d=ds[DYS.rkSel];if(!d)return;
- $('#rkt').innerHTML=ds.map((x,i)=>'<button data-n="'+i+'"'+(i==DYS.rkSel?' class="on"':'')+'>'+x.day.slice(5).replace('-','/')+'</button>').join('');
- $('#rkl').innerHTML=(d.ranks.length?d.ranks.map((x,i)=>'<div class="rkr"><span class="rkn">'+(i+1)+'</span><span class="rkm">'+dyEsc(x.name)+'</span><b>'+dyFmt(x.ms,2)+'</b></div>').join(''):'<p class="mut">'+(d.code?'この日のクリア記録はありません':'この日の盤面はありません')+'</p>')
-  +(d.code?(bcOld(d.code)?'<div class="bcode old"><div>盤面コード</div>🔒 バージョンアップのため、この盤面は利用できません</div>' /* 古い番号: コードは出さない=コピーできない */
+ $('#rkt').innerHTML=ds.map((x,i)=>'<button data-n="'+i+'"'+(i==DYS.rkSel?' class="on"':'')+'>'+(x.today?'今日':x.day.slice(5).replace('-','/'))+'</button>').join('');
+ $('#rkl').innerHTML=(d.ranks.length?d.ranks.map((x,i)=>'<div class="rkr"><span class="rkn">'+(i+1)+'</span><span class="rkm">'+dyEsc(x.name)+'</span><b>'+dyFmt(x.ms,2)+'</b></div>').join(''):'<p class="mut">'+(d.today?'まだクリア記録はありません':d.code?'この日のクリア記録はありません':'この日の盤面はありません')+'</p>')
+  +(d.today?'<div class="bcode old"><div>盤面コード</div>🔒 今日の盤面コードは、明日から見られます</div>' /* 今日の分: コードは出さない */
+  :d.code?(bcOld(d.code)?'<div class="bcode old"><div>盤面コード</div>🔒 バージョンアップのため、この盤面は利用できません</div>' /* 古い番号: コードは出さない=コピーできない */
   :'<div class="bcode" data-c="1"><div>盤面コード</div>'+dyEsc(d.code)+'</div>'):'')}
 
 window.addEventListener('load',()=>{

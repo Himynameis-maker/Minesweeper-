@@ -229,9 +229,11 @@ python3 build.py                           # rules ブロック同期 + dist 生
 - `POST /api/daily/start {token}` → `{day,code,startedAt}`。盤面を渡す唯一の場所。1日1回(409=played)。応答が届かなかった人は20秒以内なら同じ盤面を再取得できる(RETRY_MS)。503=prep
 - `POST /api/daily/finish {token,day,clear,name}` → `{ok,ms,rank}`。タイムはサーバーが「今−開始−CD_MS」で測る。ランキングに残るのは クリア かつ 上位20位 だけ
 - `GET /api/daily/code?token=` → 今日の盤面コード。**終わった(done)端末にだけ**渡す
-- `GET /api/daily/ranking` → 1〜6日前の盤面コードとランキング(今日の分は出さない)
+- `GET /api/daily/ranking` → `{today, days}`。先頭が「今日」(`today:true`・順位は今の分が見える・**`code` は常に null=今日の盤面コードは出さない**)、続けて1〜6日前(盤面コードと順位)。過去分だけエッジに600秒キャッシュ、今日の分は毎回 D1 から読む(最大20件)
 - `GET/PUT /api/admin/board`(`Authorization: Bearer DAILY_TOKEN`)。GET は `{exists:true}`(200)/`{exists:false}`(404)。PUT は `{day,code}` で登録。すでにあれば置き換え、その日の plays/ranks を消す(=みんなやり直せる)。日付は今日の −1〜+2 日だけ受け付ける
 - `GET /ping` → `{ok,binding,tables,token}`(D1 の DB 結合・テーブル有無・DAILY_TOKEN の有無。値は返さない)。動作確認用
+
+**今日のランキング**: ランキング画面の最初のタブは「今日」。順位(名前とタイム)は見えるが、盤面コードは「明日から見られます」と出し、コードは API の応答にも含めない。
 
 **古いルールセット番号の盤面コード**: ランキング画面と「盤面入手」は、コードの番号 < BOARD_VER(`bcOld`)なら、コードを出さず(=コピーできず)「🔒 バージョンアップのため利用できません」と表示する。フリープレイの貼り付け欄(`js/ui/freecode.js`)も同じ理由で断る。
 

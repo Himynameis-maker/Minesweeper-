@@ -101,13 +101,21 @@ ok(run('DYS.state')=='done'&&run('DYS.forfeit')==1,'戻ってきたらミス扱�
 const yday=run(`(()=>{const d=new Date(today+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10)})()`.replace('today',"'"+today+"'"));
 sql.prepare('INSERT INTO boards(day,code) VALUES(?,?)').run(yday,CODE);
 sql.prepare('INSERT INTO ranks(day,name,ms,at) VALUES(?,?,?,?)').run(yday,'<b>先頭</b>',12345,1);sql.prepare('INSERT INTO ranks(day,name,ms,at) VALUES(?,?,?,?)').run(yday,'二番',23456,2);
+r=await call('/api/daily/ranking');j=await r.json();
+ok(r.status==200&&j.days.length==7&&j.days[0].today===true&&j.days[0].day==today&&j.days[0].code===null,'ランキングAPI: 先頭は今日・盤面コードは null');
+ok(j.days[0].ranks.length==1&&j.days[0].ranks[0].name=='テスト太郎'&&!JSON.stringify(j.days[0]).includes('MS1.'),'ランキングAPI: 今日の順位は見える(コードは含まれない)');
+ok(j.days[1].day==yday&&j.days[1].code===CODE,'ランキングAPI: 昨日以前はコードも付く');
+const selTab=n=>$('#rkt').onclick({target:{closest:()=>({dataset:{n:String(n)}})}});
 $('#dyr').onclick();await sleep(300);
+ok($('#rkt').innerHTML.includes('>今日<')&&$('#rkl').innerHTML.includes('テスト太郎'),'ランキング画面: 最初は「今日」のタブで今日の順位が出る');
+ok($('#rkl').innerHTML.includes('明日から見られます')&&!$('#rkl').innerHTML.includes('MS1.')&&!$('#rkl').innerHTML.includes('data-c'),'ランキング画面: 今日は「盤面コードは明日から」でコードもコピーも無し');
+selTab(1);
 ok(!$('#rk').hidden&&$('#rkl').innerHTML.includes('0:12.35')||$('#rkl').innerHTML.includes('0:12.34'),'ランキングにタイム表示');
 ok($('#rkl').innerHTML.includes('&lt;b&gt;')&&!$('#rkl').innerHTML.includes('<b>先頭'),'名前はHTMLエスケープされる');
 ok($('#rkl').innerHTML.includes('bcode')&&$('#rkl').innerHTML.includes(CODE),'盤面コードが小さく載る');
-ok($('#rkt').innerHTML.split('<button').length-1==6,'1〜6日前のタブが6つ');
+ok($('#rkt').innerHTML.split('<button').length-1==7,'今日+1〜6日前のタブが7つ');
 if(run('BOARD_VER')>0){const oldC=CODE.replace(/^MS1\.\d+\./,'MS1.0.');sql.prepare('UPDATE boards SET code=? WHERE day=?').run(oldC,yday);
- $('#dyr').onclick();await sleep(300);const h=$('#rkl').innerHTML;
+ $('#dyr').onclick();await sleep(300);selTab(1);const h=$('#rkl').innerHTML;
  ok(h.includes('バージョンアップ')&&!h.includes(oldC)&&!h.includes('data-c'),'ランキング: 古い番号の盤面コードは出さず「バージョンアップのため利用不可」(コピーもできない)');
  ctx.__clip=null;$('#rkl').onclick({target:{closest:s=>s=='.bcode[data-c]'?null:null}});ok(ctx.__clip==null,'ランキング: 古い盤面コードをタップしてもコピーされない');
  sql.prepare('UPDATE boards SET code=? WHERE day=?').run(CODE,yday)}
