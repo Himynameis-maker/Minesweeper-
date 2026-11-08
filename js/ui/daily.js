@@ -39,7 +39,7 @@ function dyClockTick(){const left=864e5-((Date.now()+9*36e5)%864e5),s=Math.floor
  if(left>86396e3&&DYS.state!=''&&Date.now()-DYS.last>5000)dyRefresh()} /* 0:00 を過ぎた直後は状態を取り直す */
 async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll);DYS.last=Date.now();
  const r=await dyApi('/api/daily/status?token='+dyTok());if(DYS.busy)return;
- if(!r.ok||!r.j.state){DYS.state='err';DYS.err=r.status}
+ if(!r.ok||!r.j.state){DYS.state='err';DYS.err=r.ok?404:r.status} /* 200 なのに JSON でない=index.html が返っている=サーバー機能(functions/)が公開されていない。404 と同じ案内にする */
  else{DYS.day=r.j.day;DYS.ver=r.j.ver==null?null:+r.j.ver; /* null=サーバーが番号を返さない(古い status.js)→ 判定しない */DYS.state=r.j.state;
   if(DYS.state=='new'&&DYS.ver!=null&&DYS.ver<BOARD_VER)DYS.state='prep'; /* ルール更新後で、盤面がまだ古い番号のまま(作り直し待ち) */
   if(DYS.state=='playing'){ /* 途中で離れた=ミス扱いで終了 */
