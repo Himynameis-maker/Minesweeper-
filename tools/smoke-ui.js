@@ -34,6 +34,24 @@ const driver=`
   $('#rv').onclick();ok($('#ml').innerHTML.includes(id),id+': 盤面の縛り一覧');$('#mx').onclick();
   await showEx([id],'t');ok($('#el').innerHTML.includes('OK例'),id+': 例盤面');
   $('#bk').onclick()}
+ /* ---- フリープレイ: 盤面コード(貼り付け専用) ---- */
+ console.log('--- 盤面コード(貼り付け) ---');
+ {const mines=new Uint8Array(36);[1,8,14,20,27,33].forEach(i=>mines[i]=1);
+  const CODE=boardEncode({R:6,C:6,M:6,ids:[]},{mines,start:35}),p=CODE.split('.');p[1]='0';const b0=p.slice(0,7).join('.'),OLD=b0+'.'+bcSum(b0); /* 番号0・検査字は正しい=「古い」だけで断られるコード */
+  SEL.clear();SEL.add('cross');$('#S').value=7;$('#M').value=8;updSel();upd();
+  fcApply('でたらめ');ok(!FC&&$('#bcm').className.includes('ng'),'盤面コード: でたらめは断る');
+  fcApply(CODE.slice(0,-1)+(CODE.endsWith('a')?'b':'a'));ok(!FC&&$('#bcm').textContent.includes('写し間違い'),'盤面コード: 写し間違いは断る');
+  ok(bcOld(OLD)&&!bcOld(CODE)&&bcVer(CODE)==BOARD_VER,'盤面コード: bcOld / bcVer');
+  fcApply(OLD);ok(!FC&&$('#bcm').textContent.includes('バージョンアップ')&&$('#BC').value=='','盤面コード: 古い番号は「バージョンアップのため使えません」');
+  ok(!$('#S').disabled&&!$('#mf').disabled,'盤面コード: 断られたら設定はそのまま触れる');
+  fcApply(CODE);ok(FC&&FC.cfg.M==6&&$('#S').value==6&&$('#M').value==6,'盤面コード: 貼ると盤面サイズ・爆弾数が入る');
+  ok($('#S').disabled&&$('#M').disabled&&$('#pk').disabled&&$('#mf').disabled&&$('#mc').disabled&&$('#mdy').disabled&&$('#BC').readOnly,'盤面コード: ほかの入力は触れなくなる');
+  ok(!$('#bcc').disabled&&!$('#go').disabled&&$('#setup').classList.contains('fcl'),'盤面コード: キャンセルとスタートだけ押せる');
+  $('#go').onclick();ok(G&&G.N==36&&G.cfg.M==6&&G.mines[1]==1&&!$('#game').hidden&&G.rev>0,'盤面コード: スタートでその盤面が始まる');
+  act(1,0);ok(G.over==1,'盤面コード: 爆弾を踏むと終了(フリープレイと同じ)');
+  $('#bk').onclick();ok(!$('#setup').hidden&&FC,'盤面コード: 設定に戻っても「キャンセル/スタート」のまま');
+  $('#bcc').onclick();ok(!FC&&$('#S').value==7&&$('#M').value==8&&SEL.has('cross')&&SEL.size==1&&!$('#S').disabled&&!$('#mf').disabled&&$('#bcc').disabled&&$('#BC').value=='','盤面コード: キャンセルで貼る前の設定に戻る');
+  ok(!$('#setup').classList.contains('fcl'),'盤面コード: キャンセルで通常表示')}
  SEL.clear();Object.keys(RULES).forEach(i=>SEL.add(i));$('#mc').onclick();$('#go').onclick();await wait(()=>G&&$('#g').innerHTML.length>0);
  ok(run&&G,'チャレンジ開始(縛り '+G.cfg.ids.join('+')+')');
  /* ---- チャレンジの通し ---- */

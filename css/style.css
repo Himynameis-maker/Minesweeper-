@@ -94,3 +94,16 @@ input[type=text]{font:inherit;font-size:16px;color:var(--fg);background:var(--o)
 .rkr:nth-child(-n+3) .rkn{color:#d99a00}
 .bcode{margin-top:22px;font:10px/1.4 ui-monospace,Menlo,monospace;color:var(--mut);opacity:.5;word-break:break-all;cursor:default}
 .bcode div{font:10px system-ui,sans-serif;margin-bottom:2px}
+/* 盤面コード(ranking の古い番号) */
+.bcode.old{opacity:.75;font:12px system-ui,sans-serif;user-select:none;-webkit-user-select:none}
+/* フリープレイの盤面コード欄: 貼ると「キャンセル/スタート」だけになる。並びは動かさず、薄くして触れなくするだけ */
+#bcl{flex:1 1 96px;min-width:0}#bcl input{width:100%;box-sizing:border-box}
+#bcm{min-height:1.5em}#bcm.ng{color:#d33}
+.gor{display:flex}.gor #go{flex:1;width:auto}
+#bcc{width:auto;max-width:0;padding:15px 0;margin-left:0;border-width:0;opacity:0;overflow:hidden;white-space:nowrap;transition:max-width .25s ease,padding .25s ease,margin-left .25s ease,opacity .25s ease}
+#setup.fcl #bcc{max-width:160px;padding:15px 20px;margin-left:10px;border-width:1px;opacity:1}
+#bcc:disabled{opacity:0}
+#cmd,#crl,#cbd .fld:not(#bcl){transition:opacity .25s ease}
+#setup.fcl #cmd,#setup.fcl #crl,#setup.fcl #cbd .fld:not(#bcl){opacity:.45;pointer-events:none}
+#setup.fcl #BC{border-color:var(--ac)}
+

@@ -106,6 +106,11 @@ ok(!$('#rk').hidden&&$('#rkl').innerHTML.includes('0:12.35')||$('#rkl').innerHTM
 ok($('#rkl').innerHTML.includes('&lt;b&gt;')&&!$('#rkl').innerHTML.includes('<b>先頭'),'名前はHTMLエスケープされる');
 ok($('#rkl').innerHTML.includes('bcode')&&$('#rkl').innerHTML.includes(CODE),'盤面コードが小さく載る');
 ok($('#rkt').innerHTML.split('<button').length-1==6,'1〜6日前のタブが6つ');
+if(run('BOARD_VER')>0){const oldC=CODE.replace(/^MS1\.\d+\./,'MS1.0.');sql.prepare('UPDATE boards SET code=? WHERE day=?').run(oldC,yday);
+ $('#dyr').onclick();await sleep(300);const h=$('#rkl').innerHTML;
+ ok(h.includes('バージョンアップ')&&!h.includes(oldC)&&!h.includes('data-c'),'ランキング: 古い番号の盤面コードは出さず「バージョンアップのため利用不可」(コピーもできない)');
+ ctx.__clip=null;$('#rkl').onclick({target:{closest:s=>s=='.bcode[data-c]'?null:null}});ok(ctx.__clip==null,'ランキング: 古い盤面コードをタップしてもコピーされない');
+ sql.prepare('UPDATE boards SET code=? WHERE day=?').run(CODE,yday)}
 /* ---- 10. 古い番号の盤面は準備中扱い ---- */
 const old=CODE.replace(/^MS1\.\d+\./,'MS1.0.');sql.prepare('UPDATE boards SET code=? WHERE day=?').run(old.replace(/^(MS1\.0\.)/,'MS1.0.'),today);
 run('BOARD_VER_TEST=0');

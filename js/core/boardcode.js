@@ -12,6 +12,9 @@ function boardEncode(cfg,res){const{R,C,ids}=cfg,N=R*C,mb=new Uint8Array(N+7>>3)
  for(let i=0;i<N;i++)if(res.mines[i])mb[i>>3]|=1<<(i&7);
  const sh=res.L&&res.L.sh?bcB64(Uint8Array.from(res.L.sh,x=>x&255)):'';
  const body=[BC_HEAD,BOARD_VER,R+'x'+C,res.start,ids.join(','),bcB64(mb),sh].join('.');return body+'.'+bcSum(body)}
+/* コードのルールセット番号だけを読む(形が違えば null)。bcOld=今のルールセット番号より古い(=コピー・利用不可)。 */
+const bcVer=code=>{const f=String(code||'').trim().split('.');return f[0]==BC_HEAD&&/^\d+$/.test(f[1]||'')?+f[1]:null};
+const bcOld=code=>{const v=bcVer(code);return v!=null&&v<BOARD_VER};
 /* 盤面コード → {ok:true,cfg,res,ver}(res は gen の返り値と同じ形。play の setBoard にそのまま渡せる) / {ok:false,err,id?}
    err: format(形が違う) sum(写し間違い) old(ルールセット番号が古い) size rule(id=未登録の縛り) board(中身が不正) */
 function boardDecode(code){const f=String(code||'').trim().split('.'),bad=(err,id)=>({ok:false,err,id});

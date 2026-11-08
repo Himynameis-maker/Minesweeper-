@@ -61,8 +61,8 @@ async function dyGo(){const s=DYS.state;
  if(s=='new')return dyStart()}
 async function dyCode(){const b=$('#dyk');if(b.disabled)return;b.disabled=true;
  const r=await dyApi('/api/daily/code?token='+dyTok());
- b.textContent=r.ok&&r.j.code?(await dyCopy(r.j.code)?'✅ コピーしました':'コピーできませんでした'):'取得できませんでした';
- setTimeout(()=>{b.textContent='📋 盤面入手';b.disabled=false},1600)}
+ b.textContent=r.ok&&r.j.code?(bcOld(r.j.code)?'🔒 バージョンアップのため使えません':await dyCopy(r.j.code)?'✅ コピーしました':'コピーできませんでした'):'取得できませんでした';
+ setTimeout(()=>{b.textContent='📋 盤面入手';b.disabled=false},2200)}
 
 /* ---- 開始 → 3,2,1 → プレイ ---- */
 async function dyStart(){if(DYS.busy||DYS.state!='new')return;const name=dyName();if(!name)return dyRender();
@@ -128,14 +128,15 @@ async function dyRank(){$('#rk').hidden=false;$('#rkt').innerHTML='';$('#rkl').i
 function dyRankDraw(){const ds=DYS.rk||[],d=ds[DYS.rkSel];if(!d)return;
  $('#rkt').innerHTML=ds.map((x,i)=>'<button data-n="'+i+'"'+(i==DYS.rkSel?' class="on"':'')+'>'+x.day.slice(5).replace('-','/')+'</button>').join('');
  $('#rkl').innerHTML=(d.ranks.length?d.ranks.map((x,i)=>'<div class="rkr"><span class="rkn">'+(i+1)+'</span><span class="rkm">'+dyEsc(x.name)+'</span><b>'+dyFmt(x.ms,2)+'</b></div>').join(''):'<p class="mut">'+(d.code?'この日のクリア記録はありません':'この日の盤面はありません')+'</p>')
-  +(d.code?'<div class="bcode" data-c="1"><div>盤面コード</div>'+dyEsc(d.code)+'</div>':'')}
+  +(d.code?(bcOld(d.code)?'<div class="bcode old"><div>盤面コード</div>🔒 バージョンアップのため、この盤面は利用できません</div>' /* 古い番号: コードは出さない=コピーできない */
+  :'<div class="bcode" data-c="1"><div>盤面コード</div>'+dyEsc(d.code)+'</div>'):'')}
 
 window.addEventListener('load',()=>{
  $('#dyg').onclick=dyGo;$('#dyk').onclick=dyCode;$('#dyr').onclick=dyRank;
  $('#dyn').oninput=()=>{if(DYS.state=='new')dyRender()};
  $('#rkx').onclick=()=>$('#rk').hidden=true;$('#rk').onclick=e=>{if(e.target.id=='rk')$('#rk').hidden=true};
  $('#rkt').onclick=e=>{const b=e.target.closest&&e.target.closest('button');if(b){DYS.rkSel=+b.dataset.n;dyRankDraw()}};
- $('#rkl').onclick=e=>{if(e.target.closest&&e.target.closest('.bcode')){const d=(DYS.rk||[])[DYS.rkSel];if(d&&d.code)dyCopy(d.code)}}; /* 反応なしでコピー */
+ $('#rkl').onclick=e=>{if(e.target.closest&&e.target.closest('.bcode[data-c]')){const d=(DYS.rk||[])[DYS.rkSel];if(d&&d.code&&!bcOld(d.code))dyCopy(d.code)}}; /* 反応なしでコピー */
  /* アプリに戻ってきたとき(別アプリ・別タブから)。遊んでいる最中は触らない */
  const back=()=>{if(mode()=='d'&&!DYS.busy&&!$('#setup').hidden&&Date.now()-DYS.last>5000)dyRefresh()};
  window.addEventListener('focus',back);window.addEventListener('pageshow',back)});

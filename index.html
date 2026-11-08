@@ -7,7 +7,7 @@
 <section id="setup">
  <h1>Minesweeper <span>Plus</span></h1>
  <p class="sub">運ゲー盤面なし 特殊ルールで遊ぼう</p>
- <div class="card"><h3>モード</h3><div class="seg"><button id="mf" class="on">フリープレイ</button><button id="mc">チャレンジ</button><button id="mdy">デイリー</button></div></div>
+ <div class="card" id="cmd"><h3>モード</h3><div class="seg"><button id="mf" class="on">フリープレイ</button><button id="mc">チャレンジ</button><button id="mdy">デイリー</button></div></div>
  <div class="card" id="chi" hidden><div class="cht" id="cht"></div><div class="chd" id="chd"></div><div class="chw" id="chw"></div></div>
    <div class="card" id="dyc" hidden><div class="cht">📅 デイリー</div>
   <div class="chd"><p>毎日 0:00(日本時間)に、みんな共通の盤面が1つ出るよ。</p><p>ヒントなし・ミスしたらその場で終了。挑戦は<b>1日1回だけ</b>(クリアしてもミスしても)。</p><p>クリアした人のうち、タイムが速い上位20人だけがランキングに載るよ。</p></div>
@@ -19,12 +19,14 @@
   <div class="chw" id="dyx"></div></div>
   <div class="card" id="cbd"><h3>盤面</h3><div class="row">
   <label class="fld">盤面の縦と横の長さ<input id="S" type="number" value="7" min="3" max="24"></label>
-  <label class="fld">爆弾数<input id="M" type="number" value="8" min="1"></label></div></div>
+  <label class="fld">爆弾数<input id="M" type="number" value="8" min="1"></label>
+  <label class="fld" id="bcl">盤面コード(貼り付け専用)<input id="BC" type="text" inputmode="none" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="貼り付け"></label></div>
+  <p class="mut" id="bcm"></p></div>
  <div class="card" id="crl"><h3>縛り</h3><button id="pk" style="width:100%">🧩 縛りを選ぶ</button><p class="mut" id="sel"></p><p class="mut" id="rcap"></p></div>
  <p class="warn" id="mw"></p>
- <button class="pri big" id="go">スタート</button>
+ <div class="gor" id="gor"><button class="pri big" id="go">スタート</button><button class="big" id="bcc" disabled>キャンセル</button></div>
  <p class="mut" id="sm"></p>
- <details class="card" style="margin-top:14px"><summary>検査レポート(AIに渡す用)</summary>
+ <details class="card" id="rpt" style="margin-top:14px" hidden><summary>検査レポート(AIに渡す用)</summary>
   <p class="mut">ルールを足した/直したら「ルール検査を実行」→ 結果をAIに渡すと、併用の矛盾を直してもらえます。</p>
   <div class="row" style="margin-top:8px"><button id="ct">ルール検査を実行</button><button id="cg">コピー</button><button id="cd">DL</button></div>
   <textarea id="ctx" readonly></textarea></details>
@@ -88,5 +90,6 @@
 <script src="js/ui/board.js"></script>
 <script src="js/ui/modal.js"></script>
 <script src="js/ui/daily.js"></script>
+<script src="js/ui/freecode.js"></script>
 <script src="js/ui/main.js"></script>
 </body></html>
