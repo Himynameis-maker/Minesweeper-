@@ -18,5 +18,5 @@ function draw(){if(!G)return;const{cfg,st,fl,num,mines,over,hint:h}=G,{R,C}=cfg,
  $('#rv').textContent='🧩 縛り ('+cfg.ids.length+')';$('#rv').className=hr.length?'hl':'';
  const fin=G.over||G.done,out=run&&run.hints<=0;if(fin||out)hm=0;$('#hb').disabled=fin||out;$('#hb').classList.toggle('on',!!hm);$('#hb').textContent='💡 ヒント '+(hm?'ON':'OFF')+(run?' (残り'+run.hints+')':'');
  /* 次へボタン: フリープレイ=いつでも「新しい盤面」。チャレンジ=クリアでもミスでも「次の盤面」(挑戦が終わったら出さない。終了演出のボタンを使う) */
- let lab=null;if(!run)lab='新しい盤面';else if(!run.end&&fin)lab='次の盤面';
+ let lab=null;if(DY){}else if(!run)lab='新しい盤面';else if(!run.end&&fin)lab='次の盤面';
  const nx=$('#nx');nx.hidden=!lab;nx.textContent=lab||'';nx.dataset.nr=0}

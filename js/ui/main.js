@@ -2,14 +2,16 @@
 const rep=()=>{const t=buildReport();$('#ctx').value=t;return t};
 function upd(){const p=problems();$('#mw').innerHTML=p.map(x=>'⚠ '+x).join('<br>');$('#go').disabled=p.length>0}
 function cancelGen(){TK++;$('#ld').hidden=true;$('#rg').hidden=true;chSetup();show('setup')}
-function setMode(c){$('#mc').classList.toggle('on',c);$('#mf').classList.toggle('on',!c);
- $('#chi').hidden=!c;$('#cbd').hidden=$('#crl').hidden=c;$('#go').textContent=c?'🔥 チャレンジ開始':'スタート';
- $('#rcap').textContent='フリープレイ: 選んだ縛りを全部適用します(爆弾数などが縛りに合わないときはスタートできません)';if(c)chSetup();upd()}
+/* m: 'f'=フリープレイ 'c'=チャレンジ 'd'=デイリー(true/false は旧呼び出し用。true=チャレンジ, false=フリープレイ) */
+function setMode(m){if(m===true)m='c';else if(!m)m='f';const c=m=='c',d=m=='d';
+ $('#mf').classList.toggle('on',m=='f');$('#mc').classList.toggle('on',c);$('#mdy').classList.toggle('on',d);
+ $('#chi').hidden=!c;$('#cbd').hidden=$('#crl').hidden=c||d;$('#go').hidden=d;$('#dyc').hidden=!d;$('#go').textContent=c?'🔥 チャレンジ開始':'スタート';
+ $('#rcap').textContent='フリープレイ: 選んだ縛りを全部適用します(爆弾数などが縛りに合わないときはスタートできません)';if(c)chSetup();if(d)dyOpen();else dyClose();upd()}
 window.addEventListener('load',()=>{
  if(RULE_ERR.length)$('#sm').textContent='ルール登録エラー: '+RULE_ERR.join(' / ');
  setMode(false);updSel();
  for(const id of['S','M'])$('#'+id).addEventListener('input',upd);
- $('#mf').onclick=()=>setMode(false);$('#mc').onclick=()=>setMode(true);
+ $('#mf').onclick=()=>setMode('f');$('#mc').onclick=()=>setMode('c');$('#mdy').onclick=()=>setMode('d');
  $('#pk').onclick=()=>openM('pick');$('#rv').onclick=()=>G&&openM('view');
  $('#mx').onclick=$('#mok').onclick=closeM;$('#md').onclick=e=>{if(e.target.id=='md')closeM()};
  $('#mq').oninput=renderList;
@@ -19,7 +21,7 @@ window.addEventListener('load',()=>{
  $('#ma').onclick=()=>{vis().forEach(r=>{if(!blockers(r.id).length)SEL.add(r.id)});renderList()};$('#mn').onclick=()=>{vis().forEach(r=>SEL.delete(r.id));renderList()};
  $('#go').onclick=()=>{if(problems().length)return upd();show('game');start(1)};$('#bk').onclick=cancelGen;$('#lc').onclick=cancelGen;
  $('#nx').onclick=()=>start(+$('#nx').dataset.nr);
- $('#rg').onclick=()=>start(0,1);$('#finr').onclick=()=>start(1);$('#finb').onclick=chLeave;
+ $('#rg').onclick=()=>start(0,1);$('#finr').onclick=()=>DY?dyRetry():start(1);$('#finb').onclick=()=>DY?dyLeave():chLeave();
  $('#hb').onclick=()=>{if(!G||G.over||G.done)return;hm=hm?0:1;msg(hm?'ヒントON: 数字のマス・縛り(🧩の中)・残り爆弾数をタップ'+(run?'(1回タップでヒント1回消費・この盤面あと'+run.hints+'回)':''):'');draw()};
  $('#st').onclick=e=>{if(hm&&e.target.closest('[data-k=c]'))ask('c')};
  $('#ml').addEventListener('click',e=>{if(MODE!='view'||!hm)return;const t=e.target.closest('.ri');if(t)ask('r',t.dataset.rid)});
