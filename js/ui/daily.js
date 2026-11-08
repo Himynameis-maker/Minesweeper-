@@ -6,7 +6,7 @@
 const DAILY_UI={
  cdMs:3000,          // 3,2,1 の長さ。functions/_lib.js の CD_MS と同じ値にすること(サーバーは「開始〜終了」からこれを引いてタイムにする)
  endDelayMs:1100,    // クリア/ミスの盤面を見せてから結果カードを出すまでの時間
- pollMs:30000,       // 「準備中」のとき、何ミリ秒ごとに確かめ直すか
+ pollMs:60000,       // 「準備中」「エラー」のとき、何ミリ秒ごとに確かめ直すか(タブが見えていないときは確かめない。見える状態に戻ったときに取り直す)
  tokenKey:'msv.dailyToken',nameKey:'msv.dailyName',nameMax:12
 };
 const DYS={state:'',day:'',ver:null,tok:'',name:'',busy:0,fin:0,clear:false,t0:0,res:null,sent:'',err:0,forfeit:0,tick:0,clock:0,poll:0,last:0,rk:null,rkSel:0};
@@ -36,7 +36,7 @@ function dyOpen(){try{const n=localStorage.getItem(DAILY_UI.nameKey);if(n&&!$('#
 function dyClose(){clearInterval(DYS.clock);clearTimeout(DYS.poll)}
 function dyClockTick(){const left=864e5-((Date.now()+9*36e5)%864e5),s=Math.floor(left/1000),p=n=>String(n).padStart(2,'0');
  $('#dyx').textContent='⏰ 次の盤面まで '+p(s/3600|0)+':'+p(s%3600/60|0)+':'+p(s%60);
- if(left>86396e3&&DYS.state!=''&&Date.now()-DYS.last>5000)dyRefresh()} /* 0:00 を過ぎた直後は状態を取り直す */
+ if(left>86396e3&&DYS.state!=''&&!document.hidden&&Date.now()-DYS.last>5000)dyRefresh()} /* 0:00 を過ぎた直後は状態を取り直す(見えていないタブは、見えるようになったときに取り直す) */
 async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll);DYS.last=Date.now();
  const r=await dyApi('/api/daily/status?token='+dyTok());if(DYS.busy)return;
  if(!r.ok||!r.j.state){DYS.state='err';DYS.err=r.ok?404:r.status} /* 200 なのに JSON でない=index.html が返っている=サーバー機能(functions/)が公開されていない。404 と同じ案内にする */
@@ -45,7 +45,9 @@ async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll
   if(DYS.state=='playing'){ /* 途中で離れた=ミス扱いで終了 */
    const f=await dyApi('/api/daily/finish',{token:dyTok(),day:DYS.day,clear:false});
    DYS.state=f.ok||f.status==409?'done':'err';DYS.err=f.status;DYS.forfeit=DYS.state=='done'}}
- dyRender();if(DYS.state=='prep'||DYS.state=='err')DYS.poll=setTimeout(dyRefresh,DAILY_UI.pollMs)}
+ dyRender();if(DYS.state=='prep'||DYS.state=='err')DYS.poll=setTimeout(dyPoll,DAILY_UI.pollMs)}
+/* 定期の確かめ直し。タブが見えていないなら通信せず、ここで止める(見えるようになったら visibilitychange が取り直して、また続く) */
+function dyPoll(){if(document.hidden)return;dyRefresh()}
 function dyRender(){const s=DYS.state,g=$('#dyg'),done=s=='done',nameOk=!!dyName();
  $('#dyl').hidden=done;$('#dyg').hidden=done;$('#dyk').hidden=!done;
  g.disabled=s==''||(s=='new'&&!nameOk);
@@ -113,7 +115,7 @@ function dyShow(){const win=DYS.clear,sent=DYS.sent,r=DYS.res,ms=r?r.ms:DYS.loca
  else{ic='🏆';tt='クリア!';ds=sent=='unk'?'結果が届いたか確認できませんでした。ランキングで確かめてね。':'今日の記録は登録できませんでした('+DYS.err+')。'}
  $('#fin').className=win&&!bad?'win':'lose';$('#fini').textContent=ic;$('#fint').textContent=tt;$('#find').textContent=ds;
  $('#fins').innerHTML='<span class="chip">⏱ <b>'+dyFmt(ms,2)+'</b></span>'+(win&&sent=='ok'&&r&&r.rank?'<span class="chip">🏅 '+r.rank+'位</span>':'');
- $('#finr').hidden=!bad;$('#finr').textContent='📡 もう一度送る';$('#finb').textContent='デイリーに戻る';
+ $('#finr').hidden=!bad;$('#finr').textContent='📡 もう一度送る';$('#finb').textContent='デイリーに戻る';cpFin(0);
  chFx(win&&!bad);$('#fin').hidden=false}
 async function dyRetry(){if(DYS.sent=='sending')return;$('#finr').disabled=true;$('#finr').textContent='送信中…';await dySend();$('#finr').disabled=false;dyShow()}
 function dyLeave(){$('#fin').hidden=true;clearInterval(DYS.tick);DY=0;DYS.busy=0;G=null;$('#g').innerHTML='';$('#g').style.visibility='';$('#st').innerHTML='';
@@ -140,4 +142,5 @@ window.addEventListener('load',()=>{
  $('#rkl').onclick=e=>{if(e.target.closest&&e.target.closest('.bcode[data-c]')){const d=(DYS.rk||[])[DYS.rkSel];if(d&&d.code&&!bcOld(d.code))dyCopy(d.code)}}; /* 反応なしでコピー */
  /* アプリに戻ってきたとき(別アプリ・別タブから)。遊んでいる最中は触らない */
  const back=()=>{if(mode()=='d'&&!DYS.busy&&!$('#setup').hidden&&Date.now()-DYS.last>5000)dyRefresh()};
- window.addEventListener('focus',back);window.addEventListener('pageshow',back)});
+ window.addEventListener('focus',back);window.addEventListener('pageshow',back);
+ window.addEventListener('visibilitychange',()=>{if(!document.hidden)back()}) /* タブが見えるようになったとき(visibilitychange は window まで届く) */});
