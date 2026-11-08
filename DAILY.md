@@ -1,0 +1,74 @@
+# デイリー管理ガイド(コードがわからなくても使えます)
+
+## しくみ(これだけ分かればOK)
+
+- 毎日 **18:00(日本時間)** に、GitHub が自動で「明日の盤面」を作って、サイト(Cloudflare)に登録します。
+- 18:00 の実行が遅れたり落ちたりしたときのために、**00:10** にもう一度走ります(その日の盤面がまだ無いときだけ作る)。
+- 盤面は **0:00(日本時間)** に切り替わります。ゲームのデイリーは、その日の盤面で1人1回だけ遊べます。
+- 過去6日分の盤面とランキングだけ残ります(ランキングは上位20人)。
+- ふだん、あなたがやることは **ありません**。気になったときだけ下の「確認」をしてください。
+
+## 確認(30秒)
+
+1. ゲームを開いて、デイリーに **「スタート」** が出れば正常です。
+2. GitHub の **Actions** タブで、`daily-board` の一番上に緑のチェック ✅ が付いていれば正常です。
+3. 赤い ❌ のときは、GitHub から失敗メールが届きます。下の「困ったとき」を見てください。
+
+サイトの健康診断: ブラウザで `https://minesweeperplus-6o4.pages.dev/ping` を開き、
+`{"ok":true,"binding":true,"tables":true,"token":true}` と出れば正常です。
+
+## よくある操作(すべて GitHub の画面で)
+
+### A. 盤面を手動で作る / 作り直す
+1. GitHub のリポジトリ → **Actions** → 左の **daily-board** → 右の **Run workflow**
+2. 入力欄:
+   - **day**: 作りたい日(例 `2026-11-09`)。**空欄だと自動**で決まります(日本時間の 12:00〜23:59 に押すと「明日」、0:00〜11:59 だと「今日」)
+   - **force**: チェックすると、盤面がすでにあっても **作り直します**。
+3. 緑のチェックが付けば完了です(30秒〜数分)。
+
+⚠️ force で作り直すと、**その日のプレイ記録とランキングが消えます**(みんなもう一度遊べます)。遊んでいる人がいる時間帯は避けてください。
+日付は「今日の前後2日以内」しか受け付けません。
+
+### B. ルールを足した/ルールの動きを変えたあと
+- ルールを **足しただけ** なら、何もしなくてOKです(次の盤面から自然に入ります)。
+- ルールの **意味や判定を変えた** とき(AI にそう言われたとき)は、`js/core/boardver.js` の数字を **+1** します(GitHub でファイルを開く → 鉛筆 → `const BOARD_VER=1;` の数字を 2 に → Commit)。
+  そのあと **A の force** で、今日と明日の盤面を作り直してください。古い番号の盤面は、ゲーム側が「準備中」として扱います。
+- 迷ったら、変更内容を AI に伝えて「BOARD_VER を上げる必要ある?」と聞いてください。
+
+### C. 盤面の大きさ・爆弾の数を変えたい
+`tools/daily-plan.js` の最初の `DAILY` の数字です(`sizeMin`/`sizeMax`=盤面の一辺、`bombMin`/`bombMax`=爆弾の割合)。自分で触らず、AI に「デイリーを◯◯にして」と頼むのが安全です。
+
+## 困ったとき
+
+| 症状 | 見る場所 / 直し方 |
+|---|---|
+| ゲームに「サーバー機能が見つかりません」 | ゲームを開いているアドレスが `https://minesweeperplus-6o4.pages.dev/` ぴったりか確認(英数字が前に付いたアドレスや、保存したHTMLだとダメ)。タブを閉じて開き直す |
+| ゲームが「準備中」のまま | Actions で今日の `daily-board` が緑か確認。無ければ **A** で day を今日の日付にして実行 |
+| `/ping` に `"binding":false` | Cloudflare の Pages → Settings → Bindings で、D1 データベースの変数名が **DB** になっているか |
+| `/ping` に `"tables":false` | Cloudflare の D1 → Console に `schema.sql` の中身を貼って実行 |
+| `/ping` に `"token":false` | Cloudflare Pages の環境変数 `DAILY_TOKEN` を設定(GitHub の Secrets と同じ値) |
+| Actions が赤:「サイトの設定を確かめる」 | 表示されたメッセージの通りに直す(`DAILY_SITE` は **Variables** タブ・末尾に `/` を付けない・`https://` から) |
+| Actions が赤:「サイトへ送る」`HTTP 401` | GitHub の Secrets の `DAILY_TOKEN` と Cloudflare の `DAILY_TOKEN` が違う(前後の空白・改行に注意) |
+| 〃 `HTTP 400` と `range` | 日付が今日の前後2日の外 |
+| 〃 `HTTP 404` | `DAILY_SITE` のアドレスが違う |
+| Actions が赤:「盤面を作る」 | 縛りが合わず生成に失敗(まれ)。もう一度 **Run workflow**。続くなら AI にログを貼る |
+| 黄色い警告「Node.js 20 is deprecated」 | 動作には影響なし。無視してOK |
+
+## 設定の一覧(どこに何が入っているか)
+
+| 場所 | 名前 | 入れるもの |
+|---|---|---|
+| GitHub → Settings → Secrets and variables → Actions → **Secrets** | `DAILY_TOKEN` | 長いランダムな合言葉 |
+| 同 → **Variables** | `DAILY_SITE` | `https://minesweeperplus-6o4.pages.dev`(末尾に `/` なし) |
+| Cloudflare Pages → Settings → Variables and Secrets | `DAILY_TOKEN` | GitHub の Secrets と **同じ値** |
+| Cloudflare Pages → Settings → Bindings | D1 / 変数名 `DB` | 作成した D1 データベース |
+| Cloudflare D1 → Console | (1回だけ) | `schema.sql` の中身を貼って実行 |
+
+## 触らないこと
+
+- `functions/` の中のファイル名を変えない・増やさない(**ファイル名がそのままURLになる**ため、`status (1).js` のように空白や `(1)` が付くと動きません。ダウンロードしたファイルを置くときに付きがちです)。
+- 翌日の盤面コードは公開しない(Actions のログには出ない作りです。コードを貼るのは当日の盤面入手ボタンから)。
+
+## AI に頼むとき
+
+`context.md`(第11節がデイリーの説明です)と、**症状をそのまま** 渡してください(画面のメッセージ、Actions の赤い行、`/ping` の表示)。

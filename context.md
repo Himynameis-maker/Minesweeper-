@@ -5,7 +5,7 @@
 ## 0. あなたの役割と出力ルール
 
 - 役割: マインスイーパーの「縛り(ルール)」の追加・修正・併用矛盾の解消担当。必要なら CORE(推論/生成)も拡張する。
-- ユーザーは日本語話者。簡潔に。案が複数あるなら短く列挙して選んでもらう。
+- ユーザーは日本語話者で、**コードは書けない/読めない**。専門用語・コマンドは避け、手順は「GitHub の画面でこのファイルを開く→鉛筆→ここを直す→Commit」のように1手ずつ。ファイルを渡すときは変更ファイルを丸ごと(置換位置の指示だけにしない)。簡潔に。案が複数あるなら短く列挙して選んでもらう。
 - **渡されていないファイルは推測で書かない。** 必要なら「◯◯を渡してください」と先に言う。
 - 出力は「変更・新規ファイルの全文」+「CHANGELOG.md に足す1行」+「併用NGを conflicts に入れた旨」。大きいファイル(solver.js / gen.js)だけは「置換前→置換後」の差分でもよい。
 - 新ルールが **CORE拡張を要する** なら、作る前にユーザーに確認する(判定は第7節の表)。
@@ -51,6 +51,15 @@ rules/                1ルール=1ファイル(ファイル名=id)。_始まり�
 tools/
   headless.js         ブラウザ無しで検査: node tools/headless.js [id...] | --combo a,b,c
   smoke-ui.js         偽DOMでUI一式+チャレンジの通し(抽選範囲/ヒント/ミス/達成/ゲームオーバー/引き直し/ウィンストリーク)を動かす: node tools/smoke-ui.js
+  daily-plan.js       デイリー盤面の抽選と生成。数値の調整は先頭の DAILY だけ(盤面サイズ・爆弾率・生成の制限時間)
+  daily-gen.js        daily-plan を core+rules と読み込み、盤面コードを JSON に書く: node tools/daily-gen.js payload.json YYYY-MM-DD (workflow が使う)
+  daily-e2e.js        デイリーの通しテスト(偽D1+偽DOM。functions/ の本物を動かす): node tools/daily-e2e.js (Node 22.5+)
+js/ui/daily.js        デイリー画面(スタート/3,2,1/タイマー/結果/ランキング/盤面入手)。サーバーとの通信もここ
+js/core/boardcode.js  盤面コードの符号化(boardEncode/boardDecode)。js/core/boardver.js = ルールセット番号 BOARD_VER
+functions/            Cloudflare Pages Functions(デイリーのサーバー側)。★ファイル名がそのままURLになる。_lib.js=共通, ping.js=動作確認, api/daily/{status,start,finish,code,ranking}.js, api/admin/board.js
+schema.sql            D1(SQLite)のテーブル定義。Cloudflare の D1 → Console に貼って1回実行
+.github/workflows/daily.yml   毎日の盤面作りの自動実行(GitHub Actions)
+DAILY.md              ★ユーザー向けのデイリー管理ガイド(非エンジニア向け)。仕様を変えたらここも直す
 ```
 
 `P`(prep の結果): `{nb[i]=数字が数えるマス, cons=[{cells,lo,hi,src}], grp, gid, adj(上下左右), iso, iid, imax(iso の塊サイズ上限。0=上限なし), conn, cnid, adj8(8近傍。iso か conn のときだけ), R, C, lie(0=なし/1=各行列に正直1つ/2=各行列に嘘1つ), lid, w, probe/pid(probe推論を使うルールの有無とid), dragon/did(龍の有無とid。1=龍, 2=双竜。双竜のときは adj8 も載る)}`。
@@ -68,6 +77,8 @@ tools/
 | CORE拡張(新しい種類の制約・数字の意味変更。第7節) | `context.md` + `js/core/{prep,solver,gen}.js` + 対象ルール。例盤面の見せ方も変えるなら `js/ui/modal.js` |
 | チャレンジの数値・解説文・演出の調整 | `context.md` + `js/game/challenge.js` だけ(抽選の中身を変えるなら `js/game/config.js` の `chPlan` も) |
 | UIの見た目・操作の変更 | `context.md` + `index.html` + `css/style.css` + 該当の `js/ui/*.js` `js/game/*.js` |
+| デイリーの不具合(サーバー機能・登録・準備中など) | `context.md` + 症状(画面のメッセージ / `/ping` の表示 / Actions の赤い行)。コードは `functions/` `.github/workflows/daily.yml` `js/ui/daily.js` |
+| デイリーの盤面(大きさ・爆弾率・生成) | `context.md` + `tools/daily-plan.js` |
 | 配布用の単一HTMLが欲しい | プロジェクト全体 → `python3 build.py` の結果 `dist/minesweeper-variants.html` |
 
 ルールを足すだけなら **CORE・UI・CSS は一切不要**。新規ファイル1つ(+ CHANGELOG 1行)で完結する。
@@ -128,6 +139,10 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 - ノーゲスでない盤面は絶対に出さない。`gen` は非同期・キャンセル可。見つからなければ null で失敗(妥協盤面を出さない)。
 - 1ルール=1ファイル=1回の reg。他のルールや CORE に触らない(CORE拡張を頼まれたときを除く)。
 - 推論は単一制約+組合せ(各成分3万ノード上限、超過時は推論せず=安全側)。
+- ルールの意味(nb/cons/推論/生成)を変えたら `js/core/boardver.js` の BOARD_VER を +1 し、ユーザーに「今日と明日の盤面を force で作り直す」手順(DAILY.md の A)を案内する。ルールを足すだけなら上げない。
+- `functions/` に置くファイルは、ファイル名がURLになる。空白・`(1)`・`.js` 以外を作らない(`tools/daily-e2e.js` が検査)。新しいAPIを足したら e2e のルート一覧にも足す。
+- 画面のカウント秒数は `js/ui/daily.js` の `DAILY_UI.cdMs` と `functions/_lib.js` の `CD_MS` の **2か所** を必ず同じ値にする。
+- Actions のログ(公開される)に、翌日の盤面コード・縛りを出さない。
 
 ## 7. CORE拡張の判定と、触る場所
 
@@ -199,3 +214,35 @@ python3 build.py                           # rules ブロック同期 + dist 生
 2. `node tools/headless.js <id>` → OK か、併用NGは妥当か確認。`node tools/smoke-ui.js`。
 3. `python3 build.py`(index.html の RULES ブロックが自動更新される)。手でやるなら index.html の `RULES:BEGIN〜END` 内に `<script src="rules/<id>.js"></script>` を1行足す。
 4. `CHANGELOG.md` に1行追記。
+5. デイリーに関わる変更なら `node tools/daily-e2e.js` も通す(Node 22.5+)。意味を変えたなら BOARD_VER を +1(第6節)。
+
+## 11. デイリー(毎日1盤面・1人1回・タイムランキング)
+
+**構成**: 画面 `js/ui/daily.js` →(同じサイトの `/api/...`)→ Cloudflare Pages Functions(`functions/`)→ D1(`schema.sql`)。盤面は GitHub Actions(`.github/workflows/daily.yml`)が毎日作って、管理API `PUT /api/admin/board` で登録する。公開先: `https://minesweeperplus-6o4.pages.dev`(Git 連携の Pages)。
+
+**日付は全部サーバーの JST**(端末の時計は使わない)。盤面は 0:00 JST に切り替わる。
+
+**API**(すべて JSON・`cache-control: no-store`。ranking だけエッジに600秒):
+- `GET /api/daily/status?token=` → `{day,ver,state}`。state = prep(今日の盤面なし)/new/playing/done。ver = 盤面コードのルールセット番号
+- `POST /api/daily/start {token}` → `{day,code,startedAt}`。盤面を渡す唯一の場所。1日1回(409=played)。応答が届かなかった人は20秒以内なら同じ盤面を再取得できる(RETRY_MS)。503=prep
+- `POST /api/daily/finish {token,day,clear,name}` → `{ok,ms,rank}`。タイムはサーバーが「今−開始−CD_MS」で測る。ランキングに残るのは クリア かつ 上位20位 だけ
+- `GET /api/daily/code?token=` → 今日の盤面コード。**終わった(done)端末にだけ**渡す
+- `GET /api/daily/ranking` → 1〜6日前の盤面コードとランキング(今日の分は出さない)
+- `GET/PUT /api/admin/board`(`Authorization: Bearer DAILY_TOKEN`)。GET は `{exists:true}`(200)/`{exists:false}`(404)。PUT は `{day,code}` で登録。すでにあれば置き換え、その日の plays/ranks を消す(=みんなやり直せる)。日付は今日の −1〜+2 日だけ受け付ける
+- `GET /ping` → `{ok,binding,tables,token}`(D1 の DB 結合・テーブル有無・DAILY_TOKEN の有無。値は返さない)。動作確認用
+
+**画面の状態**: DYS.state = ''(読み込み中)/new/prep/done/err。途中で離れて戻った(サーバー上 playing)人はミス扱いで終了(finish clear:false)。`err` のとき、404 または「200 なのに JSON でない」は「サーバー機能が見つかりません」と表示(Pages は functions が無いと index.html を 200 で返すことがあるため)。
+
+**盤面作り**: `daily.yml`(18:00 JST=09:00 UTC と 00:10 JST=15:10 UTC)。対象日は「今から12時間後の JST の日付」(18:00台→翌日 / 00:10台→今日)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間は `tools/daily-plan.js` の DAILY。
+
+**設定の置き場所**: GitHub の Secrets `DAILY_TOKEN`、Variables `DAILY_SITE`(`https://` から・末尾 `/` なし)。Cloudflare Pages の環境変数 `DAILY_TOKEN`(GitHub と同じ値)、Bindings の D1 変数名 `DB`。D1 に `schema.sql` を1回実行。
+
+**過去にハマった点(原因の切り分け順)**
+1. 画面のアドレスが本番 `minesweeperplus-6o4.pages.dev` でない(プレビュー用の英数字付きアドレス・別ドメイン・保存したHTML)→ `/api/...` に届かず「サーバー機能が見つかりません」。
+2. `functions/` のファイル名に空白・`(1)` が付く(ダウンロードして置くと付きがち)→ そのURLの機能が公開されない。
+3. `DAILY_SITE` を Secrets に入れた/末尾に `/` を付けた(`//api/...` になる)。
+4. 旧 workflow は「HTTP 200=盤面あり」と判定していたため、404 の代わりに index.html が 200 で返ると「すでにある」と誤判定した。今は `"exists":true` だけを見る。
+5. 切り分けはまず `/ping`(false が付いた項目が原因)。
+
+**ユーザー向けの管理手順は `DAILY.md`**(仕様を変えたら必ず更新する)。
+
