@@ -2,7 +2,8 @@
    全体制約系の拡張(grp/liar のような新フック)はここが主戦場。既存の拡張箇所は [grp] [liar] という印(行頭の小さなコメント)で探す。
    不変条件: deduce は sound(確定は必ず真)。必要条件だけで枝刈りし、十分条件を足さない。 */
 
-/* [dd] 隠れ龍(P.dd。dragon.js の dbl:true): 龍の爆弾は数字に2個ぶん。数字 n_i = K_i(8近傍=nbの爆弾数) + D_i(nbに入る龍のマスの数)。
+/* [mir] 鏡爆弾(P.mir): 数字 = nbの爆弾数 + 鏡マス側の鏡爆弾数(ちょうど3個。隠れ状態)。deduce は数字を「nbの爆弾数が n-3〜n」の範囲制約に直す(候補数で締める)。
+   [dd] 隠れ龍(P.dd。dragon.js の dbl:true): 龍の爆弾は数字に2個ぶん。数字 n_i = K_i(8近傍=nbの爆弾数) + D_i(nbに入る龍のマスの数)。
    本物の龍は隠れている(1列に1マス、隣の列とは行が同じか±1、全部爆弾)。龍の道を列ごとのDPで調べ、今の情報(開いたマス/確定爆弾)と矛盾しない道だけを残す(必要条件のみ・sound):
    ある開いた数字マス i について、道ごとに D_i が決まり、K_i=n_i-D_i は「確定爆弾数+未確定の龍のマス数 以上、安全でないマス数 以下」でなければならない。
    残った道すべてでの D_i の最小/最大から、K_i の範囲 lo[i]..hi[i] を返す(ふつうの数字制約の代わりに使う)。残った道がすべて通るマス must[x] は必ず龍=爆弾。
@@ -61,12 +62,17 @@ function deduce(P,st,num,M,skip,all){
  const N=P.nb.length,out=[],K=[],unk=[];let km=0;
  /*[dd]*/const DD=P.dd?ddprop(P,st,num,P.did!==skip):null; /* 隠れ龍: 数字は「爆弾数+龍のマス数」。爆弾数の範囲に直して使う */
  for(let i=0;i<N;i++){if(st[i]==2)km++;if(st[i]==0)unk.push(i)}
+ /*[mir]*/const MR=!!P.mir&&P.mid!==skip;let mpo=null,mzt=0; /* 鏡爆弾: ちょうど3個の爆弾が「鏡爆弾」(上下左右に爆弾が無い)で、数字i = nbの爆弾数 + ms[i]内の鏡爆弾の数。
+   鏡爆弾の候補(mpo) = 開いていなくて、上下左右に確定爆弾が無いマス。ms[i]内の候補数が上限(最大3)、候補が ms[i] の外に3個未満なら下限。さらに上限は、数字i自身(鏡爆弾の+1は数字を超えない)と、点対称のマスが開いていればその数字
+   (ms[i] はその周囲8マスで、鏡爆弾は全部爆弾だから ms[i] の鏡爆弾数 <= その数字)でも締める。全て必要条件のみ・sound */
+ /*[mir]*/if(MR){mpo=new Uint8Array(N);for(let j=0;j<N;j++)if(st[j]!=1&&!P.o4[j].some(y=>st[y]==2)){mpo[j]=1;mzt++}}
  /*[wt]*/const add=(cells,lo,hi,src,d,w)=>{const u=[],uw=w?[]:null;let m=0,sw=0;
   for(let q=0;q<cells.length;q++){const c=cells[q],x=w?w[q]:1;if(st[c]==0){u.push(c);if(w)uw.push(x);sw+=x}else if(st[c]==2)m+=x}
   if(u.length)K.push({cells:u,w:uw,sw,lo:Math.max(0,lo-m),hi:Math.min(sw,hi-m),src,hv:(d||0)-m})};
  for(let i=0;i<N;i++)if(st[i]==1){
   /*[liar]*/if(P.lie){const L=P.nb[i].length,d=num[i],un=P.nb[i].some(c=>st[c]!=1);add(P.nb[i],Math.max(d-1,un?1:0),Math.min(L,d+1),{t:'n',i},d)}
   else if(DD)add(P.nb[i],DD.lo[i],DD.hi[i],{t:'n',i},0)
+  /*[mir]*/else if(MR){let ins=0;for(const j of P.ms[i])ins+=mpo[j];const mi=N-1-i,sh=Math.min(3,ins,num[i],st[mi]==1?num[mi]:3),sl=Math.max(0,3-(mzt-ins));add(P.nb[i],num[i]-sh,num[i]-sl,{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
   else add(P.nb[i],num[i],num[i],{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
  for(const k of P.cons)if(k.src.id!==skip)add(k.cells,k.lo,k.hi,k.src);
  const T=M-km,seen=new Set(),push=(i,mine,tier,src)=>{const key=all?i+src.t+(src.id??src.i??''):i;if(!seen.has(key)){seen.add(key);out.push({i,mine,tier,src})}};
@@ -144,7 +150,7 @@ function deduce(P,st,num,M,skip,all){
    if(TW){ /* 双竜: 龍の爆弾に8近傍で触れる爆弾は、必ず龍の一部。確定の龍(sd)に触れる確定爆弾も龍。龍の道に乗れない未確定マスは、sd に触れていれば安全 */
     for(let h=0;h<sq.length;h++)for(const y of P.adj8[sq[h]])if(S[y]==1&&!sd[y]){sd[y]=1;sq.push(y)}
     for(const x of sq)for(const y of P.adj8[x])if(S[y]==2&&!sd[y]&&!poss(y))push(y,0,1,ds)}}}
- const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[]),...(IM?[P.iid]:[]),...(CM?[P.cnid]:[]),...(DM?[P.did]:[]),...(HM?[P.lid]:[])])]}};
+ const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[]),...(IM?[P.iid]:[]),...(CM?[P.cnid]:[]),...(DM?[P.did]:[]),...(HM?[P.lid]:[]),...(MR?[P.mid]:[])])]}};
  /*[probe]*/if(P.probe&&P.pid!==skip&&!out.length&&unk.length){
   /* 仮定して矛盾を探す推論(failed-literal probing。全列挙より前に試し、見つかれば全列挙を飛ばす=速い): 未確定マスを爆弾/安全と仮定し、全制約(数字・cons・残り爆弾数)の単純な伝播だけで
      矛盾が出たら逆が確定。伝播は各制約の上限/下限の範囲だけを使うので sound。全列挙が3万ノードを超えて諦めるような広い盤面で効く */
@@ -214,8 +220,8 @@ function deduce(P,st,num,M,skip,all){
 
 /* 開始マスから推論のみで解き進めるシミュレーション。真の配置と食い違えばbug。L=liarの表示状態({sh:表示数字}) */
 function sim(P,M,mines,start,skip,L){
- const N=P.nb.length,st=new Uint8Array(N),act=P.nb.map((_,i)=>ncount(P,mines,i)),num=L?L.sh:act;
- const rev=i=>{const q=[i];while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;if(!act[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}};
+ const N=P.nb.length,st=new Uint8Array(N),act=P.nb.map((_,i)=>ncount(P,mines,i)),num=L?L.sh:act,az=P.mir&&L?L.sh:act; /*[mir]*/ /* 数字0の自動開放は「見えている数字」で決める(鏡爆弾は+1するので、実際の爆弾数0でも表示が0とは限らない) */
+ const rev=i=>{const q=[i];while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;if(!az[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}};
  rev(start);let open0=0;for(let i=0;i<N;i++)if(st[i]==1)open0++;
  const kinds=new Set(),safe=N-M;let rounds=0,bug=0;
  for(;;){const d=deduce(P,st,num,M,skip);if(!d.length)break;rounds++;

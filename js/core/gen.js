@@ -7,6 +7,7 @@
    qms秒探索して品質条件を満たさなければ「ノーゲスだが品質未達」を許容、hard秒で打ち切り。
    iso持ちは「8近傍でつながる塊(imax があれば2〜imax個。塊同士は8近傍で触れない)を置く」配置と「塊ごと動かす」山登り。
    下限つき cons(lo>0。例: tidy)は、爆弾を撒いてから違反を min-conflicts で直すサンプラ(lsample)と、valid を保つ swap の山登り(smove)を使う。
+   鏡爆弾(P.mir)は「爆弾のうち上下左右に爆弾が無い3個を鏡爆弾(L.sp)にして、数字 L.sh に反映する」状態を盤面と一緒に作って動かす(mstate)。
    隠れ龍(P.dd。dragon.js の dbl:true)は「本物の龍1本=L.dr」を盤面と一緒に作り、数字=爆弾数+龍のマス数(L.sh)にする。山登りでは龍が壊れたら引き直す(rpath)。
    双竜(dragon:2)は「龍H(左→右)と龍V(上→下)を置き、その8近傍を避けて残りを撒く」配置(tsample)。
    dragon持ちは「左端から右端まで、1列ごとに直進か上下1行ずれで爆弾を並べる(DFS。直進の確率は盤面ごとにランダム)」配置(dsample)と、valid を保つ付け替えの山登り(smove)。
@@ -33,6 +34,20 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   for(let i=0;i<N;i++)if(!m[i]){let a=0;for(const j of P.nb[i])a+=m[j]+isD[j];sh[i]=a}
   return{sh,dr}};
  const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+ /* ---- [mir] 鏡爆弾: 爆弾のうち3個(上下左右に爆弾が無いもの)が鏡爆弾 sp。マスpの鏡爆弾は ms[p](中心と点対称なマスの周囲8マス)の数字を+1する。
+        開始マスの数字は0のままにしたいので、ms[開始マス] の中のマスは鏡爆弾にしない。keep があれば、それをなるべく残す。
+        L={sp,sh}。sh=表示する数字(爆弾マスは0)。見つからなければ null ---- */
+ const MIRM=!!P.mir;
+ /* 開始マスは盤面の中央寄り(中心から縦横 min(R,C)/4 マス以内)。開いた範囲とその点対称側が重なるので、鏡爆弾の+1が見える数字が増え、解き始めやすい(隅だと点対称側が遠く、数字がほぼ使えない) */
+ const mcs=()=>{const d=Math.max(1,Math.floor(Math.min(R,C)/4));let s;do{s=rnd()*N|0}while(Math.abs((s/C|0)-(R-1)/2)>d||Math.abs(s%C-(C-1)/2)>d);return s};
+ const mstate=(m,cs,keep)=>{const bz=new Set(P.ms[cs]),ok=[];
+  for(let j=0;j<N;j++)if(m[j]&&!bz.has(j)&&P.o4[j].every(y=>!m[y]))ok.push(j);
+  const sp=keep?keep.filter(j=>m[j]&&ok.includes(j)):[];
+  const rest=shuf(ok.filter(j=>!sp.includes(j)));while(sp.length<3&&rest.length)sp.push(rest.pop());
+  if(sp.length<3)return null;
+  const ex=new Int8Array(N),sh=new Int8Array(N);for(const p of sp)for(const y of P.ms[p])ex[y]++;
+  for(let i=0;i<N;i++)if(!m[i])sh[i]=ncount(P,m,i)+ex[i];
+  return{sp,sh}};
  /* ---- [liar] 正直な数字: 各行・各列に1つ(安全マスのみ)。ほかの安全マスは±1ズレる(範囲外なら逆向き) ---- */
  const pickHon=m=>{const hon=new Uint8Array(N),used=new Uint8Array(C);let nodes=0;
   const rec=r=>{if(r==R)return true;if(++nodes>3000)return false;const cs=shuf([...Array(C).keys()].filter(c=>!used[c]&&!m[r*C+c]));
@@ -190,7 +205,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   return valid(m)?m:null};
  /* ---- 例盤面用(UIの長押し): 解けるかは見ず、OK例とNG例だけ作る ---- */
  if(o.sampleOnly){let ex=null,bad=null,bc=[];
-  let s0=0;for(let k=0;k<20000&&!ex;k++){s0=rnd()*N|0;ex=sample(s0)}
+  let s0=0;for(let k=0;k<20000&&!ex;k++){s0=rnd()*N|0;ex=sample(s0);if(ex&&MIRM&&!mstate(ex,s0))ex=null}
   const sz0=new Set([s0,...P.nb[s0]]); /* ex の開始マスと数字0の領域(NG例で爆弾を置かない)。下限つき cons は当たりが薄い(lines で約0.05%)ので多めに試す */
   const valid2=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi}); /* NG例が cons の違反でなく龍の違反だけになるように */
   if(P.dragon==2&&ex){ /* 双竜のNG例: OK例の龍以外の爆弾を1つ、龍に8近傍で触れるマスへ動かす(赤枠=動かした爆弾)。龍以外の爆弾が無ければ下のランダム抽選 */
@@ -206,6 +221,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
    if(vi.length||gb.length||ib.length||cb.length||db.length){bad=m;bc=[...new Set([...vi.flatMap(q=>q.cells),...gb,...ib,...cb,...db])]}}
   let L=null;if(LM&&ex)for(let k=0;k<50&&!L;k++)L=lstate(ex);
   if(DDM&&ex)L=ddstate(ex,rpath(ex));
+  if(MIRM&&ex)L=mstate(ex,s0);
   return{P,mines:ex,bad,bc,L}}
  /* ---- 品質判定と本体ループ ---- */
  const qual=(m,s,r,L)=>r.kinds.size>=2&&r.rounds>=3&&r.open0<=.5*r.safe&&nec.every(id=>!sim(P,M,m,s,id,L).ok);
@@ -214,7 +230,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   if(el>hard||cancel())break;
   if(soft&&el>qms)break;
   if(now-last>40){last=now;tick(el,tries);await new Promise(r=>setTimeout(r,0))}
-  if(!cur){cs=rnd()*N|0;cur=sample(cs);inv=it=0;if(!cur)continue;cl=null;if(LM){cl=lstate(cur);if(!cl){cur=null;continue}}else if(DDM){cl=ddstate(cur,rpath(cur));if(!cl){cur=null;continue}}tries++;cr=sim(P,M,cur,cs,undefined,cl);if(cr.bug)throw Error('solver unsound')}
+  if(!cur){cs=MIRM?mcs():rnd()*N|0;cur=sample(cs);inv=it=0;if(!cur)continue;cl=null;if(LM){cl=lstate(cur);if(!cl){cur=null;continue}}else if(DDM){cl=ddstate(cur,rpath(cur));if(!cl){cur=null;continue}}else if(MIRM){cl=mstate(cur,cs);if(!cl){cur=null;continue}}tries++;cr=sim(P,M,cur,cs,undefined,cl);if(cr.bug)throw Error('solver unsound')}
   if(cr.ok){if(qual(cur,cs,cr,cl))return{mines:cur,start:cs,gf:1,q:1,L:cl};soft={mines:cur,start:cs,gf:1,q:0,L:cl};cur=null;continue}
   if(++it>400){cur=null;continue}
   const U=[];for(let i=0;i<N;i++)if(!cr.st[i])U.push(i);
@@ -227,6 +243,8 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   if(DDM){ /* 隠れ龍: 爆弾を動かしたら龍を決め直す(前の龍が残っていれば多くはそのまま)。爆弾を動かさず龍だけ選び直す手もある */
    if(!m2&&rnd()<.5)m2=cur;
    if(m2){const keep=m2!==cur&&cl.dr.every(c=>m2[c])&&rnd()<.8;l2=ddstate(m2,keep?cl.dr:rpath(m2));if(!l2)m2=null}}
+  /*[mir]*/if(MIRM){if(!m2||rnd()<.25)m2=cur; /* 爆弾を動かさず、鏡爆弾の選び直しだけの手もある */
+   const kp=m2===cur?cl.sp.filter(()=>rnd()<.5):(rnd()<.8?cl.sp:null);l2=mstate(m2,cs,kp);if(!l2)m2=null}
   if(!m2||!valid(m2)){if(++inv>40)cur=null;continue}
   const r2=sim(P,M,m2,cs,undefined,l2);if(r2.bug)throw Error('solver unsound');
   if(r2.rv>=cr.rv){cur=m2;cl=l2;cr=r2}}
