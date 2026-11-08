@@ -243,7 +243,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 
 **画面の状態**: DYS.state = ''(読み込み中)/new/prep/done/err。途中で離れて戻った(サーバー上 playing)人はミス扱いで終了(finish clear:false)。`err` のとき、404 または「200 なのに JSON でない」は「サーバー機能が見つかりません」と表示(Pages は functions が無いと index.html を 200 で返すことがあるため)。
 
-**盤面作り**: `daily.yml`(18:00 JST=09:00 UTC と 00:10 JST=15:10 UTC)。対象日は「今から12時間後の JST の日付」(18:00台→翌日 / 00:10台→今日)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間は `tools/daily-plan.js` の DAILY。
+**盤面作り**: `daily.yml`(18:00 JST=09:00 UTC と 22:05 JST=13:05 UTC)。対象日は「今から12時間後の JST の日付」(18:00台→翌日 / 22:05台→翌日)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間は `tools/daily-plan.js` の DAILY。
 
 **設定の置き場所**: GitHub の Secrets `DAILY_TOKEN`、Variables `DAILY_SITE`(`https://` から・末尾 `/` なし)。Cloudflare Pages の環境変数 `DAILY_TOKEN`(GitHub と同じ値)、Bindings の D1 変数名 `DB`。D1 に `schema.sql` を1回実行。
 
