@@ -1,0 +1,6 @@
+# デイリーの生成物(翌日の盤面コードが入るので、コミットしない)
+payload.json
+out.json
+# Cloudflare / node
+.wrangler/
+node_modules/
