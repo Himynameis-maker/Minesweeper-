@@ -34,7 +34,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   for(let i=0;i<N;i++)if(!m[i]){let a=0;for(const j of P.nb[i])a+=m[j]+isD[j];sh[i]=a}
   return{sh,dr}};
  const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
- /* ---- [mir] 鏡爆弾: 爆弾のうち P.mk 個(2個)(上下左右に爆弾が無いもの)が鏡爆弾 sp。マスpの鏡爆弾は ms[p](中心と点対称なマスの周囲8マス)の数字を+1する。
+ /* ---- [mir] 鏡爆弾: 爆弾のうち P.mk 個(1個)(上下左右に爆弾が無いもの)が鏡爆弾 sp。マスpの鏡爆弾は ms[p](中心と点対称なマスの周囲8マス)の数字を+1する。
         開始マスの数字は0のままにしたいので、ms[開始マス] の中のマスは鏡爆弾にしない。keep があれば、それをなるべく残す。
         L={sp,sh}。sh=表示する数字(爆弾マスは0)。見つからなければ null ---- */
  const MIRM=!!P.mir;
