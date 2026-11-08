@@ -12,9 +12,11 @@ async function start(nr,again){const ch=mode()=='c',tk=++TK;
  if(!res){if(ch){$('#ldt').textContent='盤面検索難航中…「引き直す」でもう一度抽選できます';$('#rg').hidden=false;return}
   $('#ld').hidden=true;return msg('ノーゲスの盤面が見つかりませんでした(条件が厳しすぎる可能性)。「設定に戻る」で条件を変えてください')}
  $('#ld').hidden=true;$('#rg').hidden=true;
- const P=prep(cfg),N=cfg.R*cfg.C,act=P.nb.map((_,i)=>ncount(P,res.mines,i)),num=res.L?res.L.sh:act;
+ setBoard(cfg,res);msg(ch?'第'+run.stage+'盤面スタート':cfg.dropped?cfg.dropped+'件の縛りは条件に合わないため外しました':'');draw()}
+/* 盤面を G に作って開始マスを開く。gen の返り値でも、boardDecode の res(盤面コード由来。デイリー)でも同じ形で渡せる */
+function setBoard(cfg,res){const P=prep(cfg),N=cfg.R*cfg.C,act=P.nb.map((_,i)=>ncount(P,res.mines,i)),num=res.L?res.L.sh:act;
  G={cfg,P,N,mines:res.mines,act,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,hint:null};
- flood(res.start);msg(ch?'第'+run.stage+'盤面スタート':cfg.dropped?cfg.dropped+'件の縛りは条件に合わないため外しました':'');draw()}
+ flood(res.start)}
 function flood(i){const q=[i],{st,fl,act:ac,mines,P}=G;while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;fl[x]=0;G.rev++;if(!ac[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}}
 /* チャレンジ: ミスもクリアも盤面はそこで終わり(ミス=爆発して全開示、フリープレイと同じ)。次の盤面は「次の盤面」ボタン */
 function act(i,f){if(!G||G.over||G.done||G.st[i])return;G.hint=null;
