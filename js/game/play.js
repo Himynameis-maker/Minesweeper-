@@ -3,7 +3,7 @@
 /* nr=1: 新しい挑戦を始める / nr=0: 次の盤面へ。again=1: 同じ盤面枠のまま縛りなどを引き直す(チャレンジの「引き直す」) */
 async function start(nr,again){const ch=mode()=='c',tk=++TK;
  if(ch){if(nr||!run||run.end)chNewRun();if(!again)chNewBoard()}else run=null;
- const cfg=plan(ch);G=null;hm=0;$('#g').innerHTML='';$('#st').innerHTML='';$('#nx').hidden=true;$('#hb').disabled=true;$('#fin').hidden=true;
+ const cfg=plan(ch);G=null;hm=0;cpUpd();$('#g').innerHTML='';$('#st').innerHTML='';$('#nx').hidden=true;$('#hb').disabled=true;$('#fin').hidden=true;
  $('#rv').textContent='🧩 縛り ('+cfg.ids.length+')';msg('');$('#ld').hidden=false;$('#rg').hidden=true;$('#ldt').textContent='ノーゲス盤面を探索中…';
  let res=null;
  try{res=await gen(cfg,{cancel:()=>tk!=TK,tick:(el,n)=>{$('#ldt').textContent='ノーゲス盤面を探索中… '+(el/1000|0)+'秒 / 候補 '+n+'件';if(ch&&el>=CHALLENGE.regenSec*1000)$('#rg').hidden=false}})}
@@ -15,7 +15,8 @@ async function start(nr,again){const ch=mode()=='c',tk=++TK;
  setBoard(cfg,res);msg(ch?'第'+run.stage+'盤面スタート':cfg.dropped?cfg.dropped+'件の縛りは条件に合わないため外しました':'');draw()}
 /* 盤面を G に作って開始マスを開く。gen の返り値でも、boardDecode の res(盤面コード由来。デイリー)でも同じ形で渡せる */
 function setBoard(cfg,res){const P=prep(cfg),N=cfg.R*cfg.C,act=P.nb.map((_,i)=>ncount(P,res.mines,i)),num=res.L?res.L.sh:act;
- G={cfg,P,N,mines:res.mines,act,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,hint:null};
+ let code=null;try{code=boardEncode(cfg,res)}catch(e){} /* 盤面コード(ui/copycode のコピーボタン用。作れなければ null=ボタンを出さない) */
+ G={cfg,P,N,mines:res.mines,act,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,hint:null,code};
  flood(res.start)}
 function flood(i){const q=[i],{st,fl,act:ac,mines,P}=G;while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;fl[x]=0;G.rev++;if(!ac[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}}
 /* チャレンジ: ミスもクリアも盤面はそこで終わり(ミス=爆発して全開示、フリープレイと同じ)。次の盤面は「次の盤面」ボタン */

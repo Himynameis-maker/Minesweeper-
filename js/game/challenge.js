@@ -51,5 +51,5 @@ function chEnd(){const win=run.end=='win',st=chStreak();
  $('#fint').textContent=win?'チャレンジ達成!':'ゲームオーバー';
  $('#find').textContent=win?'おみごと! '+run.X+'盤面を乗りきったよ。':(run.prev>0?run.prev+'連勝がストップしちゃった…。':'ライフがなくなっちゃった。')+'もう一回いく?';
  $('#fins').innerHTML='<span class="chip">クリア '+run.total+'盤面</span><span class="chip">挑戦 '+run.stage+'盤面</span><span class="chip">🏆 ウィンストリーク <b>'+st+'</b></span>';
- chFx(win);$('#fin').hidden=false}
+ chFx(win);cpFin(1);$('#fin').hidden=false}
 function chLeave(){$('#fin').hidden=true;chSetup();show('setup')}
