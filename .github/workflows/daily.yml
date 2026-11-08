@@ -21,22 +21,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with:
+          node-version: 22
       - name: 対象の日付
         id: d
-        env: { DAY_IN: '${{ github.event.inputs.day }}' }
+        env:
+          DAY_IN: ${{ github.event.inputs.day }}
         run: |
-          DAY="$DAY_IN"; [ -n "$DAY" ] || DAY=$(TZ=Asia/Tokyo date -d '+12 hours' +%F)
+          DAY="$DAY_IN"
+          [ -n "$DAY" ] || DAY=$(TZ=Asia/Tokyo date -d '+12 hours' +%F)
           echo "day=$DAY" >> "$GITHUB_OUTPUT"
       - name: すでに盤面があるか
         id: ex
         if: ${{ github.event.inputs.force != 'true' }}
-        env: { TOKEN: '${{ secrets.DAILY_TOKEN }}', SITE: '${{ vars.DAILY_SITE }}', DAY: '${{ steps.d.outputs.day }}' }
-        run: echo "code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$SITE/api/admin/board?day=$DAY")" >> "$GITHUB_OUTPUT"
+        env:
+          TOKEN: ${{ secrets.DAILY_TOKEN }}
+          SITE: ${{ vars.DAILY_SITE }}
+          DAY: ${{ steps.d.outputs.day }}
+        run: |
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$SITE/api/admin/board?day=$DAY")
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
       - name: 盤面を作る
         if: ${{ steps.ex.outputs.code != '200' }}
-        run: node tools/daily-gen.js payload.json "${{ steps.d.outputs.day }}"
+        env:
+          DAY: ${{ steps.d.outputs.day }}
+        run: node tools/daily-gen.js payload.json "$DAY"
       - name: サイトへ送る
         if: ${{ steps.ex.outputs.code != '200' }}
-        env: { TOKEN: '${{ secrets.DAILY_TOKEN }}', SITE: '${{ vars.DAILY_SITE }}' }
-        run: curl -fsS -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data @payload.json "$SITE/api/admin/board"
+        env:
+          TOKEN: ${{ secrets.DAILY_TOKEN }}
+          SITE: ${{ vars.DAILY_SITE }}
+        run: |
+          curl -fsS -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data @payload.json "$SITE/api/admin/board"
