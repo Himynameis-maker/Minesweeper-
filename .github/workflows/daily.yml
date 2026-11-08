@@ -46,9 +46,31 @@ jobs:
           echo "$R" | grep -q '"binding":true' || { echo "::error::D1 の Binding(変数名 DB)が Pages に設定されていません"; exit 1; }
           echo "$R" | grep -q '"tables":true' || { echo "::error::D1 に schema.sql が実行されていません(boards テーブルが無い)"; exit 1; }
           echo "$R" | grep -q '"token":true' || { echo "::error::Pages 側の環境変数 DAILY_TOKEN が設定されていません"; exit 1; }
+      - name: メンテナンス中ではないか
+        id: mt
+        env:
+          TOKEN: ${{ secrets.DAILY_TOKEN }}
+          SITE: ${{ vars.DAILY_SITE }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # デイリーが「更新中」の間と、解除されるまでは、盤面を作らない・送らない(古いバージョンの盤面が入るのを防ぐ。保険の自動実行 22:05 も同じ)。
+          # 解除は daily-maint で。そのあとの盤面作りは、この daily-board を手で実行する。サイト側も同じ理由で登録を断る(423)。
+          SITE="${SITE%/}"
+          R=$(curl -sS -m 20 -H "Authorization: Bearer $TOKEN" "$SITE/api/admin/maint" || true)
+          echo "maint: $R" | head -c 300; echo
+          if echo "$R" | grep -q '"boardLocked":true'; then
+            if echo "$R" | grep -q '"phase":"overdue"'; then
+              echo "::error::メンテナンスが解除されていません(更新日は過ぎています)。daily-maint で「解除する」を実行してから、この daily-board を手で実行してください"; exit 1
+            fi
+            if [ "$EVENT" = "schedule" ]; then
+              echo "::notice::更新中(メンテナンス)なので、盤面は作りません。解除は daily-maint で"; echo "locked=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            echo "::error::更新中(メンテナンス)なので、盤面は作れません。先に daily-maint で「解除する」を実行してください"; exit 1
+          fi
+          echo "locked=false" >> "$GITHUB_OUTPUT"
       - name: すでに盤面があるか
         id: ex
-        if: ${{ github.event.inputs.force != 'true' }}
+        if: ${{ steps.mt.outputs.locked != 'true' && github.event.inputs.force != 'true' }}
         env:
           TOKEN: ${{ secrets.DAILY_TOKEN }}
           SITE: ${{ vars.DAILY_SITE }}
@@ -59,12 +81,12 @@ jobs:
           if curl -s -m 20 -H "Authorization: Bearer $TOKEN" "$SITE/api/admin/board?day=$DAY" | grep -q '"exists":true'; then C=200; else C=0; fi
           echo "code=$C" >> "$GITHUB_OUTPUT"
       - name: 盤面を作る
-        if: ${{ steps.ex.outputs.code != '200' }}
+        if: ${{ steps.mt.outputs.locked != 'true' && steps.ex.outputs.code != '200' }}
         env:
           DAY: ${{ steps.d.outputs.day }}
         run: node tools/daily-gen.js payload.json "$DAY"
       - name: サイトへ送る
-        if: ${{ steps.ex.outputs.code != '200' }}
+        if: ${{ steps.mt.outputs.locked != 'true' && steps.ex.outputs.code != '200' }}
         env:
           TOKEN: ${{ secrets.DAILY_TOKEN }}
           SITE: ${{ vars.DAILY_SITE }}
@@ -72,4 +94,4 @@ jobs:
           SITE="${SITE%/}"
           CODE=$(curl -sS -m 30 -o resp.txt -w '%{http_code}' -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data @payload.json "$SITE/api/admin/board")
           echo "HTTP $CODE"; head -c 300 resp.txt; echo
-          [ "$CODE" = "200" ] || { echo "::error::盤面を登録できませんでした(HTTP $CODE)。401=トークン不一致 / 400 range=日付が今日の前後2日の外 / 404=サーバー機能が無い"; exit 1; }
+          [ "$CODE" = "200" ] || { echo "::error::盤面を登録できませんでした(HTTP $CODE)。401=トークン不一致 / 400 range=日付が今日の前後2日の外 / 404=サーバー機能が無い / 423=更新中(メンテナンス)で受け付けない"; exit 1; }
