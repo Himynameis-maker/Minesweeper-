@@ -1,0 +1,42 @@
+name: daily-board
+# 毎日 23:50 JST(=14:50 UTC)に翌日分を作る。GitHub の cron は混むと遅れる/落ちることがあるので、00:10 JST(=15:10 UTC)にも走らせ、
+# 「その日の盤面がまだ無いときだけ」作る安全網にする。対象の日付は「今から15分後の JST の日付」(23:50台→翌日 / 00:10台→今日)。
+on:
+  schedule:
+    - cron: '50 14 * * *'
+    - cron: '10 15 * * *'
+  workflow_dispatch:
+    inputs:
+      day:
+        description: '対象日 YYYY-MM-DD(空なら自動)'
+        required: false
+      force:
+        description: '盤面がすでにあっても作り直す(ルールセット番号を上げた日に使う)'
+        type: boolean
+        default: false
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: 対象の日付
+        id: d
+        env: { DAY_IN: '${{ github.event.inputs.day }}' }
+        run: |
+          DAY="$DAY_IN"; [ -n "$DAY" ] || DAY=$(TZ=Asia/Tokyo date -d '+15 minutes' +%F)
+          echo "day=$DAY" >> "$GITHUB_OUTPUT"
+      - name: すでに盤面があるか
+        id: ex
+        if: ${{ github.event.inputs.force != 'true' }}
+        env: { TOKEN: '${{ secrets.DAILY_TOKEN }}', SITE: '${{ vars.DAILY_SITE }}', DAY: '${{ steps.d.outputs.day }}' }
+        run: echo "code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$SITE/api/admin/board?day=$DAY")" >> "$GITHUB_OUTPUT"
+      - name: 盤面を作る
+        if: ${{ steps.ex.outputs.code != '200' }}
+        run: node tools/daily-gen.js payload.json "${{ steps.d.outputs.day }}"
+      - name: サイトへ送る
+        if: ${{ steps.ex.outputs.code != '200' }}
+        env: { TOKEN: '${{ secrets.DAILY_TOKEN }}', SITE: '${{ vars.DAILY_SITE }}' }
+        run: curl -fsS -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data @payload.json "$SITE/api/admin/board"
