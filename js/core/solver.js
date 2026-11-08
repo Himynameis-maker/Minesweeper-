@@ -2,7 +2,7 @@
    全体制約系の拡張(grp/liar のような新フック)はここが主戦場。既存の拡張箇所は [grp] [liar] という印(行頭の小さなコメント)で探す。
    不変条件: deduce は sound(確定は必ず真)。必要条件だけで枝刈りし、十分条件を足さない。 */
 
-/* [mir] 鏡爆弾(P.mir): 数字 = nbの爆弾数 + 鏡マス側の鏡爆弾数(ちょうど3個。隠れ状態)。deduce は数字を「nbの爆弾数が n-3〜n」の範囲制約に直す(候補数で締める)。
+/* [mir] 鏡爆弾(P.mir): 数字 = nbの爆弾数 + 鏡マス側の鏡爆弾数(ちょうど P.mk 個=2個。隠れ状態)。deduce は数字を「nbの爆弾数が n-3〜n」の範囲制約に直す(候補数で締める)。
    [dd] 隠れ龍(P.dd。dragon.js の dbl:true): 龍の爆弾は数字に2個ぶん。数字 n_i = K_i(8近傍=nbの爆弾数) + D_i(nbに入る龍のマスの数)。
    本物の龍は隠れている(1列に1マス、隣の列とは行が同じか±1、全部爆弾)。龍の道を列ごとのDPで調べ、今の情報(開いたマス/確定爆弾)と矛盾しない道だけを残す(必要条件のみ・sound):
    ある開いた数字マス i について、道ごとに D_i が決まり、K_i=n_i-D_i は「確定爆弾数+未確定の龍のマス数 以上、安全でないマス数 以下」でなければならない。
@@ -62,8 +62,8 @@ function deduce(P,st,num,M,skip,all){
  const N=P.nb.length,out=[],K=[],unk=[];let km=0;
  /*[dd]*/const DD=P.dd?ddprop(P,st,num,P.did!==skip):null; /* 隠れ龍: 数字は「爆弾数+龍のマス数」。爆弾数の範囲に直して使う */
  for(let i=0;i<N;i++){if(st[i]==2)km++;if(st[i]==0)unk.push(i)}
- /*[mir]*/const MR=!!P.mir&&P.mid!==skip;let mpo=null,mzt=0; /* 鏡爆弾: ちょうど3個の爆弾が「鏡爆弾」(上下左右に爆弾が無い)で、数字i = nbの爆弾数 + ms[i]内の鏡爆弾の数。
-   鏡爆弾の候補(mpo) = 開いていなくて、上下左右に確定爆弾が無いマス。ms[i]内の候補数が上限(最大3)、候補が ms[i] の外に3個未満なら下限。さらに上限は、数字i自身(鏡爆弾の+1は数字を超えない)と、点対称のマスが開いていればその数字
+ /*[mir]*/const MR=!!P.mir&&P.mid!==skip;let mpo=null,mzt=0; /* 鏡爆弾: ちょうど P.mk 個の爆弾が「鏡爆弾」(上下左右に爆弾が無い)で、数字i = nbの爆弾数 + ms[i]内の鏡爆弾の数。
+   鏡爆弾の候補(mpo) = 開いていなくて、上下左右に確定爆弾が無いマス。ms[i]内の候補数が上限(最大 P.mk)、候補が ms[i] の外に P.mk 個未満なら下限。さらに上限は、数字i自身(鏡爆弾の+1は数字を超えない)と、点対称のマスが開いていればその数字
    (ms[i] はその周囲8マスで、鏡爆弾は全部爆弾だから ms[i] の鏡爆弾数 <= その数字)でも締める。全て必要条件のみ・sound */
  /*[mir]*/if(MR){mpo=new Uint8Array(N);for(let j=0;j<N;j++)if(st[j]!=1&&!P.o4[j].some(y=>st[y]==2)){mpo[j]=1;mzt++}}
  /*[wt]*/const add=(cells,lo,hi,src,d,w)=>{const u=[],uw=w?[]:null;let m=0,sw=0;
@@ -72,7 +72,7 @@ function deduce(P,st,num,M,skip,all){
  for(let i=0;i<N;i++)if(st[i]==1){
   /*[liar]*/if(P.lie){const L=P.nb[i].length,d=num[i],un=P.nb[i].some(c=>st[c]!=1);add(P.nb[i],Math.max(d-1,un?1:0),Math.min(L,d+1),{t:'n',i},d)}
   else if(DD)add(P.nb[i],DD.lo[i],DD.hi[i],{t:'n',i},0)
-  /*[mir]*/else if(MR){let ins=0;for(const j of P.ms[i])ins+=mpo[j];const mi=N-1-i,sh=Math.min(3,ins,num[i],st[mi]==1?num[mi]:3),sl=Math.max(0,3-(mzt-ins));add(P.nb[i],num[i]-sh,num[i]-sl,{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
+  /*[mir]*/else if(MR){let ins=0;for(const j of P.ms[i])ins+=mpo[j];const mi=N-1-i,sh=Math.min(P.mk,ins,num[i],st[mi]==1?num[mi]:P.mk),sl=Math.max(0,P.mk-(mzt-ins));add(P.nb[i],num[i]-sh,num[i]-sl,{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
   else add(P.nb[i],num[i],num[i],{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
  for(const k of P.cons)if(k.src.id!==skip)add(k.cells,k.lo,k.hi,k.src);
  const T=M-km,seen=new Set(),push=(i,mine,tier,src)=>{const key=all?i+src.t+(src.id??src.i??''):i;if(!seen.has(key)){seen.add(key);out.push({i,mine,tier,src})}};
