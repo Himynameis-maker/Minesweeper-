@@ -1,12 +1,13 @@
 /* [ui/daily] デイリーモードの画面。サーバー(functions/api/daily/*)とのやりとり・3,2,1 のカウント・タイマー・結果・ランキング・盤面入手。
    盤面そのものは core/boardcode.js の boardDecode → play.js の setBoard で作る(ルールを足してもここは触らない)。
-   状態: DYS.state = ''(読み込み中) / new(まだ) / prep(今日の盤面が無い) / done(終わった) / err(通信できない)。
+   状態: DYS.state = ''(読み込み中) / new(まだ) / prep(今日の盤面が無い) / maint(更新中=メンテナンスで今日は遊べない) / done(終わった) / err(通信できない)。
+   maint のときもランキング・盤面入手(遊び終えた端末)は普通に使える。管理者が解除すると、60秒以内(pollMs)に自動でスタートに戻る。
    途中で離れて戻ってきた(サーバー上 playing)場合は、ミス扱いで終わらせて done にする(1日1回の約束)。
    デイリーの盤面を遊んでいる間は DY=1(state.js)。ミス・クリアは play.js の act() の最後が dyEnd() を呼ぶ。 */
 const DAILY_UI={
  cdMs:3000,          // 3,2,1 の長さ。functions/_lib.js の CD_MS と同じ値にすること(サーバーは「開始〜終了」からこれを引いてタイムにする)
  endDelayMs:1100,    // クリア/ミスの盤面を見せてから結果カードを出すまでの時間
- pollMs:60000,       // 「準備中」「エラー」のとき、何ミリ秒ごとに確かめ直すか(タブが見えていないときは確かめない。見える状態に戻ったときに取り直す)
+ pollMs:60000,       // 「準備中」「更新中」「エラー」のとき、何ミリ秒ごとに確かめ直すか(タブが見えていないときは確かめない。見える状態に戻ったときに取り直す)
  tokenKey:'msv.dailyToken',nameKey:'msv.dailyName',nameMax:12
 };
 const DYS={state:'',day:'',ver:null,tok:'',name:'',busy:0,fin:0,clear:false,t0:0,res:null,sent:'',err:0,forfeit:0,tick:0,clock:0,poll:0,last:0,rk:null,rkSel:0};
@@ -45,21 +46,22 @@ async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll
   if(DYS.state=='playing'){ /* 途中で離れた=ミス扱いで終了 */
    const f=await dyApi('/api/daily/finish',{token:dyTok(),day:DYS.day,clear:false});
    DYS.state=f.ok||f.status==409?'done':'err';DYS.err=f.status;DYS.forfeit=DYS.state=='done'}}
- dyRender();if(DYS.state=='prep'||DYS.state=='err')DYS.poll=setTimeout(dyPoll,DAILY_UI.pollMs)}
+ dyRender();if(DYS.state=='prep'||DYS.state=='maint'||DYS.state=='err')DYS.poll=setTimeout(dyPoll,DAILY_UI.pollMs)}
 /* 定期の確かめ直し。タブが見えていないなら通信せず、ここで止める(見えるようになったら visibilitychange が取り直して、また続く) */
 function dyPoll(){if(document.hidden)return;dyRefresh()}
 function dyRender(){const s=DYS.state,g=$('#dyg'),done=s=='done',nameOk=!!dyName();
- $('#dyl').hidden=done;$('#dyg').hidden=done;$('#dyk').hidden=!done;
+ $('#dyl').hidden=done||s=='maint';$('#dyg').hidden=done;$('#dyk').hidden=!done;
  g.disabled=s==''||(s=='new'&&!nameOk);
- g.textContent=s==''?'読み込み中…':s=='new'?'スタート':s=='prep'?'⏳ 準備中(タップで更新)':'🔄 再読み込み';
+ g.textContent=s==''?'読み込み中…':s=='new'?'スタート':s=='prep'?'⏳ 準備中(タップで更新)':s=='maint'?'🛠 更新中(タップで更新)':'🔄 再読み込み';
  let t='';
  if(s=='new')t=nameOk?'準備OK! 押すと 3・2・1 のあとすぐ始まるよ(今日の1回を使います)':'ニックネームを入れてね';
  else if(s=='prep')t=DYS.ver!=null&&DYS.ver<BOARD_VER?'ルールの更新で、今日の盤面を作り直し中です。少し待ってね。':'今日の盤面はまだ準備中です。少し待ってね。';
+ else if(s=='maint')t='🛠 更新中のため遊べません'; /* ランキング・盤面入手は今までどおり使える */
  else if(s=='done')t=(DYS.forfeit?'前回は途中で終わったので、今日の挑戦は終了です。':'今日の挑戦は終わったよ。')+'また明日!(盤面入手で今日の盤面コードをコピーできます)';
  else if(s=='err')t=DYS.err==0?'サーバーにつながりません。通信を確かめてね。':DYS.err==404?'デイリーのサーバー機能が見つかりません(公開サイトで開いていますか?)':'うまく読み込めませんでした(エラー '+DYS.err+')';
  $('#dys').textContent=t}
 async function dyGo(){const s=DYS.state;
- if(s=='prep'||s=='err'){DYS.state='';dyRender();return dyRefresh()}
+ if(s=='prep'||s=='maint'||s=='err'){DYS.state='';dyRender();return dyRefresh()}
  if(s=='new')return dyStart()}
 async function dyCode(){const b=$('#dyk');if(b.disabled)return;b.disabled=true;
  const r=await dyApi('/api/daily/code?token='+dyTok());
@@ -75,6 +77,7 @@ async function dyStart(){if(DYS.busy||DYS.state!='new')return;const name=dyName(
  if(!r.ok){
   if(r.status==409){DYS.state='playing';back();return dyRefresh()} /* すでに始めていた */
   if(r.status==503){DYS.state='prep';back();return dyRefresh()}
+  if(r.status==423){DYS.state='maint';back();return dyRefresh()} /* 画面を開いたあとに更新が始まった */
   return back(r.status==0?'サーバーにつながりませんでした。もう一度押してね。':'うまく始められませんでした(エラー '+r.status+')。少し待ってもう一度。')}
  const d=boardDecode(r.j.code);
  if(!d.ok)return back('盤面を読み込めませんでした('+d.err+(d.id?':'+d.id:'')+')。少し待ってからもう一度。続けて失敗する場合は作者に連絡してね。');

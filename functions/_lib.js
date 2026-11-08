@@ -23,3 +23,12 @@ export const isAdmin=(r,env)=>{const t=env.DAILY_TOKEN,h=r.headers.get('authoriz
 export const rankKey=(request,k,today)=>new Request(new URL('/api/daily/ranking?'+k+'='+today,request.url));
 /* 記録が変わったときにキャッシュを捨てる(ks=['t'] など)。キャッシュが無い環境・失敗は黙って無視(最大 TODAY_CACHE_S 秒で自然に切れる) */
 export const dropRankCache=async(request,today,ks)=>{try{if(typeof caches=='undefined'||!caches.default)return;await Promise.all(ks.map(k=>caches.default.delete(rankKey(request,k,today))))}catch(e){}};
+/* ---- メンテナンス(アプデのためデイリーを止める)。maint テーブルに1行(id=1)だけ。day=止め始める日(JST)。管理者(DAILY_TOKEN)だけが予約・解除できる ----
+   phase: none(なし) / reserved(予約中。day はまだ先) / active(day の当日 0:00〜次の 0:00。デイリーは遊べない+盤面ロック) / overdue(day を過ぎたが未解除。遊べるが、解除されるまで盤面ロックのまま)
+   遊べない=phase が active のとき / 盤面を作らない・受け付けない=phase が active か overdue のとき(=解除されるまで) */
+export const MAINT_AHEAD=30; // 予約できるのは今日から何日先まで
+export const getMaint=async db=>{try{const r=await db.prepare('SELECT day FROM maint WHERE id=1').first();return r&&okDay(r.day)?r.day:null}
+ catch(e){if(/no such table/i.test(String(e&&e.message)))return null;throw e}}; /* テーブルがまだ無い(schema.sql 未実行)ときは「メンテなし」。それ以外のエラーは握りつぶさない */
+export const maintPhase=(mday,today)=>!mday?'none':today<mday?'reserved':today==mday?'active':'overdue';
+export const playBlocked=(mday,today)=>maintPhase(mday,today)=='active';
+export const boardLocked=(mday,today)=>{const p=maintPhase(mday,today);return p=='active'||p=='overdue'};

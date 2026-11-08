@@ -6,3 +6,5 @@ CREATE TABLE IF NOT EXISTS plays(day TEXT NOT NULL, token TEXT NOT NULL, started
 -- ranks: クリアかつ上位20位だけ。21位以下になった記録はその場で消える。過去6日分だけ残す
 CREATE TABLE IF NOT EXISTS ranks(day TEXT NOT NULL, name TEXT NOT NULL, ms INTEGER NOT NULL, at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS ranks_day ON ranks(day, ms, at);
+-- maint: メンテナンス(アプデのためデイリーを止める)の予約。常に0〜1行。day=止め始める日(JST)。解除すると行が消える。管理者だけが操作する(.github/workflows/daily-maint.yml)
+CREATE TABLE IF NOT EXISTS maint(id INTEGER PRIMARY KEY CHECK(id=1), day TEXT NOT NULL);

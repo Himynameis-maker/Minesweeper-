@@ -60,9 +60,10 @@ tools/
   daily-e2e.js        デイリーの通しテスト(偽D1+偽DOM。functions/ の本物を動かす): node tools/daily-e2e.js (Node 22.5+)
 js/ui/daily.js        デイリー画面(スタート/3,2,1/タイマー/結果/ランキング/盤面入手)。サーバーとの通信もここ
 js/core/boardcode.js  盤面コードの符号化(boardEncode/boardDecode)。js/core/boardver.js = ルールセット番号 BOARD_VER
-functions/            Cloudflare Pages Functions(デイリーのサーバー側)。★ファイル名がそのままURLになる。_lib.js=共通, ping.js=動作確認, api/daily/{status,start,finish,code,ranking}.js, api/admin/board.js
+functions/            Cloudflare Pages Functions(デイリーのサーバー側)。★ファイル名がそのままURLになる。_lib.js=共通(メンテナンス判定 getMaint/maintPhase/playBlocked/boardLocked もここ), ping.js=動作確認, api/daily/{status,start,finish,code,ranking}.js, api/admin/board.js, api/admin/maint.js(メンテの予約・解除。第11節)
 schema.sql            D1(SQLite)のテーブル定義。Cloudflare の D1 → Console に貼って1回実行
-.github/workflows/daily.yml   毎日の盤面作りの自動実行(GitHub Actions)
+.github/workflows/daily.yml   毎日の盤面作りの自動実行(GitHub Actions。メンテ中は作らない)
+.github/workflows/daily-maint.yml   メンテナンス(デイリーを止める)の予約・解除・状態確認。管理者が手で実行するだけ
 DAILY.md              ★ユーザー向けのデイリー管理ガイド(非エンジニア向け)。仕様を変えたらここも直す
 ```
 
@@ -147,6 +148,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 - `functions/` に置くファイルは、ファイル名がURLになる。空白・`(1)`・`.js` 以外を作らない(`tools/daily-e2e.js` が検査)。新しいAPIを足したら e2e のルート一覧にも足す。
 - 画面のカウント秒数は `js/ui/daily.js` の `DAILY_UI.cdMs` と `functions/_lib.js` の `CD_MS` の **2か所** を必ず同じ値にする。
 - Actions のログ(公開される)に、翌日の盤面コード・縛りを出さない。
+- デイリーの「更新中」判定は `functions/_lib.js` の `playBlocked` / `boardLocked` の2つだけ(status・start・admin/board が使う)。新しい API で盤面を配る・受け付けるなら、同じ判定を入れる。
 
 ## 7. CORE拡張の判定と、触る場所
 
@@ -227,21 +229,22 @@ python3 build.py                           # rules ブロック同期 + dist 生
 **日付は全部サーバーの JST**(端末の時計は使わない)。盤面は 0:00 JST に切り替わる。
 
 **API**(すべて JSON・`cache-control: no-store`。ranking だけエッジにキャッシュ: 過去分600秒・今日の分60秒):
-- `GET /api/daily/status?token=` → `{day,ver,state}`。state = prep(今日の盤面なし)/new/playing/done。ver = 盤面コードのルールセット番号
-- `POST /api/daily/start {token}` → `{day,code,startedAt}`。盤面を渡す唯一の場所。1日1回(409=played)。応答が届かなかった人は20秒以内なら同じ盤面を再取得できる(RETRY_MS)。503=prep
+- `GET /api/daily/status?token=` → `{day,ver,state}`。state = prep(今日の盤面なし)/new/playing/done/**maint**(更新中。まだ始めていない端末にだけ。始めた/終えた端末は今までどおり)。ver = 盤面コードのルールセット番号
+- `POST /api/daily/start {token}` → `{day,code,startedAt}`。盤面を渡す唯一の場所。1日1回(409=played)。応答が届かなかった人は20秒以内なら同じ盤面を再取得できる(RETRY_MS)。503=prep。423=maint(更新中。新しく始める端末だけ断る)
 - `POST /api/daily/finish {token,day,clear,name}` → `{ok,ms,rank}`。タイムはサーバーが「今−開始−CD_MS」で測る。ランキングに残るのは クリア かつ 上位20位 だけ
 - `GET /api/daily/code?token=` → 今日の盤面コード。**終わった(done)端末にだけ**渡す
 - `GET /api/daily/ranking` → `{today, days}`。先頭が「今日」(`today:true`・順位は今の分が見える・**`code` は常に null=今日の盤面コードは出さない**)、続けて1〜6日前(盤面コードと順位)。過去分は別キー(`?d=日付`)でエッジに600秒、今日の分も別キー(`?t=日付`)で60秒キャッシュ(TODAY_CACHE_S・PAST_CACHE_S は `_lib.js`)。他の人のクリアは今日の順位に最大60秒遅れて載る。ただし `finish` が記録を入れたとき(と admin PUT のとき)は `dropRankCache` でキャッシュを捨てるので、クリアした本人は自分の記録がすぐ見える。Cache API が無い環境では毎回 D1 から読む(従来どおり)
 - `GET/PUT /api/admin/board`(`Authorization: Bearer DAILY_TOKEN`)。GET は `{exists:true}`(200)/`{exists:false}`(404)。PUT は `{day,code}` で登録。すでにあれば置き換え、その日の plays/ranks を消す(=みんなやり直せる)。日付は今日の −1〜+2 日だけ受け付ける
-- `GET /ping` → `{ok,binding,tables,token}`(D1 の DB 結合・テーブル有無・DAILY_TOKEN の有無。値は返さない)。動作確認用
+- `GET/PUT/DELETE /api/admin/maint`(`Authorization: Bearer DAILY_TOKEN`)→ メンテナンス(第11節末)。GET は `{today,day,phase,playBlocked,boardLocked}`、PUT は `{day}` で予約(今日〜+30日。実行中は 409)、DELETE は解除
+- `GET /ping` → `{ok,binding,tables,maint,token}`(D1 の DB 結合・テーブル有無・メンテ用テーブルの有無・DAILY_TOKEN の有無。値は返さない)。動作確認用。`maint` は `tables` に混ぜない(schema.sql 未実行でも既存の workflow が止まらないように)
 
 **今日のランキング**: ランキング画面の最初のタブは「今日」。順位(名前とタイム)は見えるが、盤面コードは「明日から見られます」と出し、コードは API の応答にも含めない。
 
 **古いルールセット番号の盤面コード**: ランキング画面と「盤面入手」は、コードの番号 < BOARD_VER(`bcOld`)なら、コードを出さず(=コピーできず)「🔒 バージョンアップのため利用できません」と表示する。フリープレイの貼り付け欄(`js/ui/freecode.js`)も同じ理由で断る。
 
-**サーバーへの定期通信(最小限)**: 画面が「準備中(prep)」か「エラー(err)」のときだけ、60秒ごと(`DAILY_UI.pollMs`)に `/api/daily/status` を取り直す。**タブが見えていない間は通信しない**(`dyPoll`)。見えるようになったとき(`visibilitychange` / `focus` / `pageshow`。5秒以内の連続は無視)と、0:00(JST)の直後(見えているタブだけ)にも1回取り直す。ランキングは画面を開いたときだけ読む(自動更新なし)。
+**サーバーへの定期通信(最小限)**: 画面が「準備中(prep)」「更新中(maint)」「エラー(err)」のときだけ、60秒ごと(`DAILY_UI.pollMs`)に `/api/daily/status` を取り直す。**タブが見えていない間は通信しない**(`dyPoll`)。見えるようになったとき(`visibilitychange` / `focus` / `pageshow`。5秒以内の連続は無視)と、0:00(JST)の直後(見えているタブだけ)にも1回取り直す。ランキングは画面を開いたときだけ読む(自動更新なし)。
 
-**画面の状態**: DYS.state = ''(読み込み中)/new/prep/done/err。途中で離れて戻った(サーバー上 playing)人はミス扱いで終了(finish clear:false)。`err` のとき、404 または「200 なのに JSON でない」は「サーバー機能が見つかりません」と表示(Pages は functions が無いと index.html を 200 で返すことがあるため)。
+**画面の状態**: DYS.state = ''(読み込み中)/new/prep/**maint**/done/err。maint は「🛠 更新中のため遊べません」+ボタン「更新中(タップで更新)」(スタート・ニックネーム欄は隠す)。途中で離れて戻った(サーバー上 playing)人はミス扱いで終了(finish clear:false)。`err` のとき、404 または「200 なのに JSON でない」は「サーバー機能が見つかりません」と表示(Pages は functions が無いと index.html を 200 で返すことがあるため)。
 
 **盤面作り**: `daily.yml`(18:00 JST=09:00 UTC と 22:05 JST=13:05 UTC)。対象日は「今から12時間後の JST の日付」(18:00台→翌日 / 22:05台→翌日)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間は `tools/daily-plan.js` の DAILY。
 
@@ -253,6 +256,14 @@ python3 build.py                           # rules ブロック同期 + dist 生
 3. `DAILY_SITE` を Secrets に入れた/末尾に `/` を付けた(`//api/...` になる)。
 4. 旧 workflow は「HTTP 200=盤面あり」と判定していたため、404 の代わりに index.html が 200 で返ると「すでにある」と誤判定した。今は `"exists":true` だけを見る。
 5. 切り分けはまず `/ping`(false が付いた項目が原因)。
+
+**メンテナンス(アプデのためデイリーを止める。管理者だけ)**: D1 の `maint` テーブルに0〜1行(id=1, `day`=止め始める日 JST)。`schema.sql` に定義があるが、`PUT /api/admin/maint` が `CREATE TABLE IF NOT EXISTS` で自動作成するので実行しなくても動く(テーブルが無いときの `getMaint` は「なし」。`no such table` 以外のエラーは握りつぶさない)。操作は `daily-maint.yml`(action=状態を見る/予約する/解除する、day=空欄で明日)だけ。画面に管理操作は無い。
+- **phase**(`_lib.js` の `maintPhase`): `none` / `reserved`(day が先) / `active`(今日==day) / `overdue`(今日>day で未解除)。
+- **遊べない**(`playBlocked`)= `active` のとき(day の 0:00〜次の 0:00)。`status` は、まだ始めていない端末にだけ `maint` を返し、`start` は 423。すでに始めた/終えた端末は今までどおり(再取得・盤面入手・finish)。**ランキング・盤面入手(code)・finish は止めない。**
+- **盤面を作らない・受け付けない**(`boardLocked`)= `active` か `overdue`(=**解除されるまで**。次の 0:00 では自動で戻らない)。`PUT /api/admin/board` は 423。`daily.yml` の「メンテナンス中ではないか」ステップが先に `GET /api/admin/maint` を見て、`active` なら schedule 実行は緑のままスキップ(`::notice::`)・手動実行は赤、`overdue` は schedule も手動も赤(解除忘れの通知)。22:05 の保険も同じ。解除後の自動作り直し(保険)は**入れていない**(古いバージョンのまま作られるのを避けるため。解除後は管理者が daily-board を手で実行)。
+- 予約: day は今日〜+30日(今日=今すぐ)。`reserved` なら日付を置き換え可、`active`/`overdue` は 409(先に解除)。解除は予約の取り消しも兼ねる。解除した瞬間に遊べる・盤面も受け付ける。
+- BOARD_VER とは別物(ルールの意味を変えたら上げる、は今までどおり)。`/ping` の `maint` は `tables` と別。
+- 検査: `node tools/daily-e2e.js` の第11節(予約・更新中・解除・overdue・テーブル無し・画面の表示)。
 
 **ユーザー向けの管理手順は `DAILY.md`**(仕様を変えたら必ず更新する)。
 
