@@ -25,10 +25,11 @@ function dailyPlan(noRules){const ri=(a,b)=>a+(rnd()*(b-a+1)|0),R=ri(DAILY.sizeM
  let k=ri(0,mx),set=noRules?[]:null;
  while(!set&&k>=0){set=dailyFind(R,C,M,ids,k);if(!set)k--}
  return{R,C,M,ids:set||[]}}
-/* 生成。genSec 秒で見つからない/品質未達なら、全部引き直す。log には盤面の中身(コード・縛り)を出さない(公開リポジトリのログから翌日の盤面が漏れるため) */
+/* 生成。genSec 秒で見つからない/品質未達なら、全部引き直す。log には盤面の中身(コード・縛り)を出さない(公開リポジトリのログから翌日の盤面が漏れるため)。
+   例外: 手元で set DAILY_DEBUG=1 をつけたときだけ、失敗した抽選(サイズ・爆弾数・縛り)を出す。調整用。workflow では付けない */
 async function dailyMake(log){const t0=Date.now();
  for(let n=1;;n++){const el=(Date.now()-t0)/1000;if(el>DAILY.giveUpSec)throw Error('生成できませんでした('+n+'回)');
   const cfg=dailyPlan(el>DAILY.fallbackSec);let res=null;
   try{res=await gen(cfg,{qms:DAILY.genSec*1000,hard:DAILY.genSec*1000})}catch(e){log('試行'+n+': エラー '+e.message)}
   if(res&&res.gf&&res.q)return{cfg,res,tries:n,sec:(Date.now()-t0)/1000};
-  log('試行'+n+': '+(res?'品質未達':'見つからず')+' → 引き直し')}}
+  log('試行'+n+': '+(res?'品質未達':'見つからず')+' → 引き直し'+(typeof DAILY_DEBUG!='undefined'&&DAILY_DEBUG?' ['+cfg.R+'x'+cfg.C+' 爆弾'+cfg.M+' '+(cfg.ids.join('+')||'縛りなし')+']':''))}}
