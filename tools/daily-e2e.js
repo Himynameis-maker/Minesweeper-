@@ -59,6 +59,9 @@ $('#mdy').onclick();await sleep(100);
 ok(run("mode()")=='d'&&!$('#dyc').hidden&&$('#go').hidden,'デイリーに切り替わる');
 ok($('#dyg').textContent=='スタート'&&$('#dyg').disabled,'名前が空だとスタートは押せない');
 $('#dyn').value='  テスト<太郎>  ';$('#dyn').oninput();ok(!$('#dyg').disabled,'名前を入れると押せる');
+LS['msv.dailyStreak']=JSON.stringify({last:'2026-01-01',n:2}); /* 旧形式(連続日数)。休んだ日があっても連勝として引き継ぐ */
+ok(run('dyStreakNow()')==2,'連勝記録: 旧形式の n を引き継ぐ(日付が離れていても 0 にならない)');
+const sget=()=>JSON.parse(LS['msv.dailyStreak']||'{}');
 const t0=Date.now();$('#dyg').onclick();
 await sleep(300);ok($('#cdn').hidden==false&&['3','2','1'].includes($('#cdnn').textContent),'3,2,1 のカウントが出る');
 const seen=[];const w=setInterval(()=>{const t=$('#cdnn').textContent;if(seen[seen.length-1]!=t)seen.push(t)},20);
@@ -66,6 +69,7 @@ while(run('DYS.t0')==0&&Date.now()-t0<6000)await sleep(10);clearInterval(w);{con
 const cd=run('DYS.t0');ok(cd>0,'カウント後にタイマーが動き出す');
 ok(seen.join()=='3,2,1,GO!'||seen.join()=='2,1,GO!'||seen.join()=='1,GO!'||seen.includes('GO!'),'表示の順番 '+seen.join('→'));
 ok(run('DY')==1&&run('G')&&$('#g').style.visibility=='','盤面が見えてプレイ開始');
+ok(sget().pend==today&&sget().n==2&&!sget().won,'連勝記録: 盤面を受け取った時点で「保留」が保存される');
 ok(Date.now()-t0>=2950&&Date.now()-t0<3600,'開始から約3秒でスタート('+(Date.now()-t0)+'ms)');
 ok($('#hb').hidden&&$('#bk').hidden&&$('#nx').hidden,'ヒント・戻る・次の盤面ボタンは隠れる');
 r=await call('/api/daily/start',{method:'POST',body:JSON.stringify({token:run('DYS.tok')})});
@@ -73,31 +77,45 @@ r=await call('/api/daily/start',{method:'POST',body:JSON.stringify({token:run('D
 await sleep(1500);
 run(`(()=>{for(let i=0;i<G.N;i++)if(!G.mines[i]&&!G.st[i]&&!G.done)act(i,0)})()`);
 ok(run('G.done')==1,'全部開けてクリア');
+ok(sget().won==1&&sget().n==2,'連勝記録: クリアは送信前は控えるだけ(まだ +1 しない)');
 await sleep(2200);
 ok(!$('#fin').hidden&&$('#fint').textContent=='クリア!','結果カードが出る: '+$('#find').textContent);
 j=run('DYS.res');ok(j&&j.ok&&j.ms>=1400&&j.ms<4500,'サーバー計測タイム '+j.ms+'ms(待ち約1.5秒+操作)');
 ok(j.rank==1,'ランキング1位');
 ok($('#fins').innerHTML.includes('⏱'),'タイム表示');
+ok(sget().n==3&&sget().pend==''&&!sget().won&&$('#fins').innerHTML.includes('<b>3</b>連勝'),'連勝記録: サーバーが受け付けたら +1(2→3)・保留は消える');
 /* 同じ端末で2回目は不可 */
 r=await call('/api/daily/start',{method:'POST',body:JSON.stringify({token:run('DYS.tok')})});
 ok(r.status==409||(await r.json()).startedAt===undefined,'同じ端末は今日もう始められない');
 $('#finb').onclick();await sleep(300);
 ok(run('DYS.state')=='done'&&!$('#dyk').hidden&&$('#dyg').hidden,'戻るとスタートが盤面入手に置き換わる');
+ok($('#dyw').textContent=='🔥 3連勝','連勝記録: デイリー欄の表示は「N連勝」');
 $('#dyk').onclick();await sleep(300);ok(ctx.__clip===CODE,'盤面入手で盤面コードがコピーされる');
 await sleep(1800);
 /* ---- 7. 別の端末: ミス ---- */
+LS['msv.dailyStreak']=JSON.stringify({n:5,pend:'',won:0});
 const tok2='ZZZZZZZZZZZZZZZZZZ';LS['msv.dailyToken']=tok2;run("DYS.tok=''");run("DYS.state=''");$('#dyn').value='ミスさん';
 $('#mf').onclick();$('#mdy').onclick();await sleep(300);ok(run('DYS.state')=='new','別端末は new');
 $('#dyg').onclick();await sleep(3600);ok(run('DY')==1,'2人目スタート');
 run(`(()=>{const i=[...Array(G.N).keys()].find(i=>G.mines[i]&&!G.st[i]);act(i,0)})()`);ok(run('G.over')==1,'爆弾を踏む=即終了');
+ok(sget().n==0&&sget().pend=='','連勝記録: ミスは通信を待たず、その場で 0 に保存される(5→0)');
 await sleep(2000);ok(!$('#fin').hidden&&$('#fint').textContent=='ミス…'&&$('#fin').className=='lose','ミスの結果カード');
+ok($('#find').textContent.includes('5連勝がストップ'),'連勝記録: ミスの結果に「5連勝がストップ」');
 $('#finb').onclick();await sleep(300);ok(run('DYS.state')=='done','ミスでも今日は終了');
 /* ---- 8. 途中で離れた人(start だけして finish しない) ---- */
 const tok3='YYYYYYYYYYYYYYYYYY';r=await call('/api/daily/start',{method:'POST',body:JSON.stringify({token:tok3})});ok(r.status==200,'3人目: start');
 r=await call('/api/daily/status?token='+tok3);j=await r.json();ok(j.state=='playing','途中は playing');
 r=await call('/api/daily/code?token='+tok3);ok(r.status==403,'途中の人には盤面コードを渡さない');
-LS['msv.dailyToken']=tok3;run("DYS.tok=''");run("DYS.state=''");$('#mf').onclick();$('#mdy').onclick();await sleep(500);
+LS['msv.dailyStreak']=JSON.stringify({n:4,pend:'',won:0});LS['msv.dailyToken']=tok3;run("DYS.tok=''");run("DYS.state=''");$('#mf').onclick();$('#mdy').onclick();await sleep(500);
 ok(run('DYS.state')=='done'&&run('DYS.forfeit')==1,'戻ってきたらミス扱いで終了(1日1回)');
+ok(sget().n==0,'連勝記録: 途中で離れて戻った人は 0(4→0)');
+/* 8b. ズル対策: 始めて、そのままタブを閉じた(リロードも通信もしない)。次に開いたとき、保留が残っていればミス扱い */
+const tok4='XXXXXXXXXXXXXXXXXX';LS['msv.dailyToken']=tok4;run("DYS.tok=''");run("DYS.state=''");LS['msv.dailyStreak']=JSON.stringify({n:3,pend:'',won:0});$('#dyn').value='放置さん';
+$('#mf').onclick();$('#mdy').onclick();await sleep(300);$('#dyg').onclick();await sleep(3600);ok(run('DY')==1&&sget().pend==today&&sget().n==3,'ズル対策: 4人目スタート(保留あり・連勝はまだ3)');
+run("clearInterval(DYS.tick);DY=0;DYS.busy=0;G=null;show('setup')"); /* タブを閉じた=この画面の状態が消える */
+run('dyAbandon()');ok(sget().n==0&&sget().pend=='','ズル対策: 閉じて放置 → 次に開いたとき 0(3→0)');
+run('dyAbandon()');ok(sget().n==0,'ズル対策: 何度呼んでも同じ');
+
 /* ---- 9. ランキング画面(過去日を直接入れて確認) ---- */
 const yday=run(`(()=>{const d=new Date(today+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10)})()`.replace('today',"'"+today+"'"));
 sql.prepare('INSERT INTO boards(day,code) VALUES(?,?)').run(yday,CODE);
@@ -109,16 +127,17 @@ ok(j.days[1].day==yday&&j.days[1].code===CODE,'ランキングAPI: 昨日以前�
 const selTab=n=>$('#rkt').onclick({target:{closest:()=>({dataset:{n:String(n)}})}});
 $('#dyr').onclick();await sleep(300);
 ok($('#rkt').innerHTML.includes('>今日<')&&$('#rkl').innerHTML.includes('テスト太郎'),'ランキング画面: 最初は「今日」のタブで今日の順位が出る');
-ok($('#rkl').innerHTML.includes('明日から見られます')&&!$('#rkl').innerHTML.includes('MS1.')&&!$('#rkl').innerHTML.includes('data-c'),'ランキング画面: 今日は「盤面コードは明日から」でコードもコピーも無し');
+ok($('#rkc').innerHTML.includes('明日から見られます')&&!$('#rkl').innerHTML.includes('MS1.')&&!$('#rkc').innerHTML.includes('MS1.')&&!$('#rkc').innerHTML.includes('data-c'),'ランキング画面: 今日は「盤面コードは明日から」でコードもコピーも無し');
 selTab(1);
 ok(!$('#rk').hidden&&$('#rkl').innerHTML.includes('0:12.35')||$('#rkl').innerHTML.includes('0:12.34'),'ランキングにタイム表示');
 ok($('#rkl').innerHTML.includes('&lt;b&gt;')&&!$('#rkl').innerHTML.includes('<b>先頭'),'名前はHTMLエスケープされる');
-ok($('#rkl').innerHTML.includes('bcode')&&$('#rkl').innerHTML.includes(CODE),'盤面コードが小さく載る');
+ok($('#rkc').innerHTML.includes('data-c')&&!$('#rkc').innerHTML.includes('MS1.')&&!$('#rkl').innerHTML.includes('MS1.'),'ランキング: 過去日は「盤面コードをコピー」ボタン(コード自体は画面に出さない)');
+ctx.__clip=null;$('#rkc').onclick({target:{closest:()=>({dataset:{c:'1'}})}});await sleep(100);ok(ctx.__clip===CODE,'ランキング: ボタンで盤面コードがコピーされる');
 ok($('#rkt').innerHTML.split('<button').length-1==7,'今日+1〜6日前のタブが7つ');
 if(run('BOARD_VER')>0){const oldC=CODE.replace(/^MS1\.\d+\./,'MS1.0.');sql.prepare('UPDATE boards SET code=? WHERE day=?').run(oldC,yday);
- $('#dyr').onclick();await sleep(300);selTab(1);const h=$('#rkl').innerHTML;
+ $('#dyr').onclick();await sleep(300);selTab(1);const h=$('#rkc').innerHTML;
  ok(h.includes('バージョンアップ')&&!h.includes(oldC)&&!h.includes('data-c'),'ランキング: 古い番号の盤面コードは出さず「バージョンアップのため利用不可」(コピーもできない)');
- ctx.__clip=null;$('#rkl').onclick({target:{closest:s=>s=='.bcode[data-c]'?null:null}});ok(ctx.__clip==null,'ランキング: 古い盤面コードをタップしてもコピーされない');
+ ctx.__clip=null;$('#rkc').onclick({target:{closest:()=>({dataset:{c:'1'}})}});await sleep(100);ok(ctx.__clip==null,'ランキング: 古い盤面コードをタップしてもコピーされない');
  sql.prepare('UPDATE boards SET code=? WHERE day=?').run(CODE,yday)}
 /* ---- 10. 古い番号の盤面は準備中扱い ---- */
 const old=CODE.replace(/^MS1\.\d+\./,'MS1.0.');sql.prepare('UPDATE boards SET code=? WHERE day=?').run(old.replace(/^(MS1\.0\.)/,'MS1.0.'),today);
