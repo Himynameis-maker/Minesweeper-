@@ -3,7 +3,7 @@
    DYS.rules=今日の縛りの id の一覧(status が返す。盤面の中身は含まない)。スタート前に「🧩 今日の縛り」ボタン(#dyu)で見せる。null=まだ/見せない(準備中・更新中・エラー)。
    状態: DYS.state = ''(読み込み中) / new(まだ) / prep(今日の盤面が無い) / maint(更新中=メンテナンスで今日は遊べない) / done(終わった) / err(通信できない)。
    maint のときもランキング・盤面入手(遊び終えた端末)は普通に使える。管理者が解除すると、60秒以内(pollMs)に自動でスタートに戻る。
-   途中で離れて戻ってきた(サーバー上 playing)場合は、ミス扱いで終わらせて done にする(1日1回の約束)。
+   途中で離れて戻ってきた(サーバー上 playing)場合は、ミス扱いで終わらせて done にする(1日1回の約束)。連勝記録(🔥N連勝)は下の dyStreak* とその前のコメント。
    デイリーの盤面を遊んでいる間は DY=1(state.js)。ミス・クリアは play.js の act() の最後が dyEnd() を呼ぶ。 */
 const DAILY_UI={
  cdMs:3000,          // 3,2,1 の長さ。functions/_lib.js の CD_MS と同じ値にすること(サーバーは「開始〜終了」からこれを引いてタイムにする)
@@ -11,7 +11,7 @@ const DAILY_UI={
  pollMs:60000,       // 「準備中」「更新中」「エラー」のとき、何ミリ秒ごとに確かめ直すか(タブが見えていないときは確かめない。見える状態に戻ったときに取り直す)
  tokenKey:'msv.dailyToken',nameKey:'msv.dailyName',streakKey:'msv.dailyStreak',nameMax:12
 };
-const DYS={state:'',day:'',ver:null,tok:'',name:'',busy:0,fin:0,clear:false,t0:0,res:null,sent:'',err:0,forfeit:0,tick:0,clock:0,poll:0,last:0,rk:null,rkSel:0,rules:null};
+const DYS={state:'',day:'',ver:null,tok:'',name:'',busy:0,fin:0,clear:false,t0:0,res:null,sent:'',err:0,forfeit:0,tick:0,clock:0,poll:0,last:0,rk:null,rkSel:0,rules:null,prev:0};
 const dySleep=ms=>new Promise(r=>setTimeout(r,ms));
 const dyEsc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* 時間表示 m:ss.t(dec=1)/ m:ss.tt(dec=2) */
@@ -22,16 +22,29 @@ function dyTok(){if(DYS.tok)return DYS.tok;let t='';try{t=localStorage.getItem(D
   if(typeof crypto!='undefined'&&crypto.getRandomValues)crypto.getRandomValues(a);else for(let i=0;i<24;i++)a[i]=Math.random()*256|0;
   t=bcB64(a);try{localStorage.setItem(DAILY_UI.tokenKey,t)}catch(e){}}
  return DYS.tok=t}
-/* 連続クリア日数(この端末だけの記録。ブラウザに保存。消す・別の端末だと数えられない)。
-   クリアした日が1日ずつ続いている間だけ増える。ミス・途中で離れた(ミス扱い)ら 0。遊ばない日があると途切れる(最後にクリアした日が昨日より前なら 0 と表示)。
-   記録は {last:最後に結果が出た日, n:その日までの連続日数}。同じ日を2回数えない。 */
+/* 連勝記録(この端末だけの記録。ブラウザに保存。消す・別の端末だと数えられない)。
+   デイリーを何回続けてクリアしたか。日付は関係ない(遊ばない日があっても途切れない)。ミスすると 0。
+   ズル対策=「始めたのに、結果が残っていない」は全部ミス扱い。記録は {n:連勝数, pend:始めたが結果が確定していない日(なければ ''), won:その日の盤面を画面上でクリアした(サーバーの受け付け待ち)なら 1}。
+   ・盤面を受け取った瞬間に pend=その日 を保存する。リロード・タブを閉じる・アプリを落とす・圏外にして放置、どれをしても次に開いたとき pend が残っていて、ミス扱い(0)になる
+   ・ミスは、サーバーへ送る前に 0 にして保存する(送信を邪魔しても取り消せない)
+   ・クリアは、サーバーが受け付けたとき(dySend)だけ +1。pend がその日と合わないクリアは数えない(同じ日を2回数えない/別タブで先にミス扱いになった日は数えない)
+   ・旧形式 {last,n}(連続日数)の n は、そのまま連勝数として引き継ぐ */
 const dyJst=ms=>new Date(ms+9*36e5).toISOString().slice(0,10);
-const dyPrev=d=>{const t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()-1);return t.toISOString().slice(0,10)};
+const DY_DAY=/^\d{4}-\d{2}-\d{2}$/;
 function dyStreakGet(){let s=null;try{s=JSON.parse(localStorage.getItem(DAILY_UI.streakKey)||'null')}catch(e){}
- return s&&/^\d{4}-\d{2}-\d{2}$/.test(s.last)&&Number.isInteger(s.n)&&s.n>=0?s:{last:'',n:0}}
-const dyStreakNow=()=>{const s=dyStreakGet(),t=dyJst(Date.now());return s.last==t||s.last==dyPrev(t)?s.n:0}; /* 表示する日数: 今日か昨日までつながっていなければ 0 */
-function dyStreakSet(day,win){const s=dyStreakGet();if(s.last>=day)return; /* 同じ日の2回目(もう一度送る)や、古い日は無視 */
- const n=win?(s.last==dyPrev(day)?s.n:0)+1:0;try{localStorage.setItem(DAILY_UI.streakKey,JSON.stringify({last:day,n}))}catch(e){}}
+ return s&&Number.isInteger(s.n)&&s.n>=0?{n:s.n,pend:DY_DAY.test(s.pend)?s.pend:'',won:s.won?1:0}:{n:0,pend:'',won:0}}
+const dyStreakPut=s=>{try{localStorage.setItem(DAILY_UI.streakKey,JSON.stringify(s))}catch(e){}};
+const dyStreakNow=()=>dyStreakGet().n;
+function dyStreakStart(day){dyStreakPut({n:dyStreakGet().n,pend:day,won:0})} /* 盤面を受け取った: 結果が出るまで「保留」 */
+function dyStreakWon(day){const s=dyStreakGet();if(s.pend==day)dyStreakPut({n:s.n,pend:day,won:1})} /* 画面上でクリアした(サーバーへ送る前に控える。送信前に閉じても、あとで受け付け済みと分かれば数える) */
+function dyStreakWin(day){const s=dyStreakGet();if(s.pend==day)dyStreakPut({n:s.n+1,pend:'',won:0})} /* サーバーが受け付けた: +1 */
+function dyStreakLoss(){dyStreakPut({n:0,pend:'',won:0})} /* ミス・途中で離れた: 0。何度呼んでも同じ */
+const dyStreakEnd=win=>win?dyStreakWin(DYS.day):dyStreakLoss();
+/* 開いた直後(通信なし): 始めたのにクリアも控えていない保留は、途中で離れた=ミス */
+function dyAbandon(){const s=dyStreakGet();if(s.pend&&!s.won&&!DY)dyStreakLoss()}
+/* status を取れたあと: 画面上でクリアして保留のままの日は、サーバーが「今日・done」と言うときだけ数える。それ以外(別の日・playing・new など=受け付けが確認できない)はミス */
+function dySettle(today,state){const s=dyStreakGet();if(!s.pend||DY)return;
+ if(s.won&&s.pend==today&&state=='done')dyStreakWin(today);else dyStreakLoss()}
 /* ニックネーム。サーバー(functions/_lib.js の cleanName)と同じ掃除をして、空になる名前は弾く */
 const dyClean=n=>Array.from(String(n||'').normalize('NFC').replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff<>]/g,'').trim()).slice(0,DAILY_UI.nameMax).join('').trim();
 const dyName=()=>dyClean($('#dyn').value);
@@ -53,17 +66,17 @@ async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll
  const r=await dyApi('/api/daily/status?token='+dyTok());if(DYS.busy)return;
  DYS.rules=null;
  if(!r.ok||!r.j.state){DYS.state='err';DYS.err=r.ok?404:r.status} /* 200 なのに JSON でない=index.html が返っている=サーバー機能(functions/)が公開されていない。404 と同じ案内にする */
- else{DYS.day=r.j.day;DYS.ver=r.j.ver==null?null:+r.j.ver; /* null=サーバーが番号を返さない(古い status.js)→ 判定しない */DYS.state=r.j.state;
+ else{DYS.day=r.j.day;DYS.ver=r.j.ver==null?null:+r.j.ver; /* null=サーバーが番号を返さない(古い status.js)→ 判定しない */DYS.state=r.j.state;dySettle(DYS.day,DYS.state);
   if(DYS.state=='new'&&DYS.ver!=null&&DYS.ver<BOARD_VER)DYS.state='prep'; /* ルール更新後で、盤面がまだ古い番号のまま(作り直し待ち) */
   if(Array.isArray(r.j.rules)&&(DYS.state=='new'||DYS.state=='playing'||DYS.state=='done'))DYS.rules=r.j.rules; /* 古い番号の盤面(prep)や更新中は見せない */
   if(DYS.state=='playing'){ /* 途中で離れた=ミス扱いで終了 */
    const f=await dyApi('/api/daily/finish',{token:dyTok(),day:DYS.day,clear:false});
-   DYS.state=f.ok||f.status==409?'done':'err';DYS.err=f.status;DYS.forfeit=DYS.state=='done';if(DYS.forfeit)dyStreakSet(DYS.day,0)}}
+   DYS.state=f.ok||f.status==409?'done':'err';DYS.err=f.status;DYS.forfeit=DYS.state=='done';if(DYS.forfeit)dyStreakLoss()}}
  dyRender();if(DYS.state=='prep'||DYS.state=='maint'||DYS.state=='err')DYS.poll=setTimeout(dyPoll,DAILY_UI.pollMs)}
 /* 定期の確かめ直し。タブが見えていないなら通信せず、ここで止める(見えるようになったら visibilitychange が取り直して、また続く) */
 function dyPoll(){if(document.hidden)return;dyRefresh()}
 function dyRender(){const s=DYS.state,g=$('#dyg'),done=s=='done',nameOk=!!dyName();
- {const w=$('#dyw'),n=dyStreakNow();w.textContent='🔥 '+n+'日連続';w.classList.toggle('on',n>0)} /* 見出しの横の連続クリア日数 */
+ {const w=$('#dyw'),n=dyStreakNow();w.textContent='🔥 '+n+'連勝';w.classList.toggle('on',n>0)} /* 見出しの横の連勝記録 */
  $('#dyu').hidden=!(DYS.rules&&(s=='new'||s=='done')); /* 今日の縛りボタン: 縛りが分かっているときだけ出す(クリア後も見られる) */
  $('#dyl').hidden=done||s=='maint';$('#dyg').hidden=done;$('#dyk').hidden=!done;
  g.disabled=s==''||(s=='new'&&!nameOk);
@@ -94,6 +107,7 @@ async function dyStart(){if(DYS.busy||DYS.state!='new')return;const name=dyName(
   if(r.status==503){DYS.state='prep';back();return dyRefresh()}
   if(r.status==423){DYS.state='maint';back();return dyRefresh()} /* 画面を開いたあとに更新が始まった */
   return back(r.status==0?'サーバーにつながりませんでした。もう一度押してね。':'うまく始められませんでした(エラー '+r.status+')。少し待ってもう一度。')}
+ DYS.prev=dyStreakNow();dyStreakStart(r.j.day); /* ここから結果が出るまで「保留」。リロード・閉じる・圏外放置はミス扱い */
  const d=boardDecode(r.j.code);
  if(!d.ok)return back('盤面を読み込めませんでした('+d.err+(d.id?':'+d.id:'')+')。少し待ってからもう一度。続けて失敗する場合は作者に連絡してね。');
  DYS.day=r.j.day;DYS.name=name;DYS.fin=0;DYS.res=null;DYS.sent='';
@@ -116,24 +130,24 @@ function dyCount(){return new Promise(res=>{const o=$('#cdn'),n=$('#cdnn'),t0=pe
 /* ---- 終了(ミスかクリア): すぐサーバーへ送り、盤面を少し見せてから結果カード ---- */
 async function dyEnd(){if(!DY||DYS.fin)return;DYS.fin=1;clearInterval(DYS.tick);
  DYS.clear=!!G.done&&!G.over;DYS.local=performance.now()-DYS.t0;
+ if(DYS.clear)dyStreakWon(DYS.day);else dyStreakLoss(); /* ミスは通信の前に 0 で保存(送信を邪魔しても戻せない)。クリアはサーバーが受け付けたら +1(dySend) */
  $('#dyt').textContent=dyFmt(DYS.local,2);msg(DYS.clear?'🎉 クリア!':'💥 ミス! 今日の挑戦は終了です');
  await Promise.all([dySend(),dySleep(DAILY_UI.endDelayMs)]);if(DY&&DYS.fin)dyShow()}
 async function dySend(){DYS.sent='sending';let net=0;
  for(let i=0;i<3;i++){const r=await dyApi('/api/daily/finish',{token:dyTok(),day:DYS.day,clear:DYS.clear,name:DYS.name});
-  if(r.ok&&r.j.ok){DYS.res=r.j;DYS.sent='ok';return}
-  if(r.status==409)return void(DYS.sent=net?'unk':'rej'); /* 通信エラーのあとの409=1回目が届いていた可能性 */
-  if(r.status>=400&&r.status<500){DYS.sent='rej';DYS.err=r.j.err||r.status;return}
+  if(r.ok&&r.j.ok){DYS.res=r.j;DYS.sent='ok';dyStreakEnd(DYS.clear);return}
+  if(r.status==409){DYS.sent=net?'unk':'rej';dyStreakEnd(DYS.clear&&!!net);return} /* 通信エラーのあとの409=1回目が届いていた可能性(クリアは数える)。通信エラーなしの409=この日はもう終わっていた(別タブでミス扱いなど)ので数えない */
+  if(r.status>=400&&r.status<500){DYS.sent='rej';DYS.err=r.j.err||r.status;dyStreakEnd(false);return}
   net=1;await dySleep(1200)}
  DYS.sent='fail'}
 function dyShow(){const win=DYS.clear,sent=DYS.sent,r=DYS.res,ms=r?r.ms:DYS.local,bad=win&&sent=='fail'; /* bad=クリアしたのに結果を送れていない */
- if(win){if(sent=='ok')dyStreakSet(DYS.day,1)}else dyStreakSet(DYS.day,0); /* 連続クリア日数: クリアが登録できたら+1、ミスなら0 */
  let ic,tt,ds;
  if(bad){ic='📡';tt='通信エラー';ds='結果を送れませんでした。電波のいい場所で「もう一度送る」を押してね。このまま戻ると、今日の記録は残りません。'}
- else if(!win){ic='💥';tt='ミス…';ds='今日の挑戦は終了です。また明日!(盤面入手で今日の盤面コードをコピーできます)'}
+ else if(!win){ic='💥';tt='ミス…';ds=(DYS.prev>0?DYS.prev+'連勝がストップしちゃった…。':'')+'今日の挑戦は終了です。また明日!(盤面入手で今日の盤面コードをコピーできます)'}
  else if(sent=='ok'){ic='🏆';tt='クリア!';ds=r.rank?r.rank+'位にランクイン! 今のランキングは設定画面の「ランキング」で見られるよ。':'クリア! 惜しくもランキング圏外(上位20位まで)でした。'}
  else{ic='🏆';tt='クリア!';ds=sent=='unk'?'結果が届いたか確認できませんでした。ランキングで確かめてね。':'今日の記録は登録できませんでした('+DYS.err+')。'}
  $('#fin').className=win&&!bad?'win':'lose';$('#fini').textContent=ic;$('#fint').textContent=tt;$('#find').textContent=ds;
- $('#fins').innerHTML='<span class="chip">⏱ <b>'+dyFmt(ms,2)+'</b></span>'+(win&&sent=='ok'&&r&&r.rank?'<span class="chip">🏅 '+r.rank+'位</span>':'');
+ $('#fins').innerHTML='<span class="chip">⏱ <b>'+dyFmt(ms,2)+'</b></span>'+(win&&sent=='ok'&&r&&r.rank?'<span class="chip">🏅 '+r.rank+'位</span>':'')+(win&&!bad&&sent!='rej'?'<span class="chip">🔥 <b>'+dyStreakNow()+'</b>連勝</span>':'');
  $('#finr').hidden=!bad;$('#finr').textContent='📡 もう一度送る';$('#finb').textContent='デイリーに戻る';cpFin(0);
  chFx(win&&!bad);$('#fin').hidden=false}
 async function dyRetry(){if(DYS.sent=='sending')return;$('#finr').disabled=true;$('#finr').textContent='送信中…';await dySend();$('#finr').disabled=false;dyShow()}
@@ -155,6 +169,7 @@ function dyRankDraw(){const ds=DYS.rk||[],d=ds[DYS.rkSel];if(!d)return;
  $('#rkl').innerHTML=(d.ranks.length?d.ranks.map((x,i)=>'<div class="rkr"><span class="rkn">'+(i+1)+'</span><span class="rkm">'+dyEsc(x.name)+'</span><b>'+dyFmt(x.ms,2)+'</b></div>').join(''):'<p class="mut">'+(d.today?'まだクリア記録はありません':d.code?'この日のクリア記録はありません':'この日の盤面はありません')+'</p>')}
 
 window.addEventListener('load',()=>{
+ dyAbandon();
  $('#dyg').onclick=dyGo;$('#dyk').onclick=dyCode;$('#dyr').onclick=dyRank;$('#dyu').onclick=()=>{if(DYS.rules)openM('dy')};
  $('#dyn').oninput=()=>{if(DYS.state=='new')dyRender()};
  $('#rkx').onclick=()=>$('#rk').hidden=true;$('#rk').onclick=e=>{if(e.target.id=='rk')$('#rk').hidden=true};
