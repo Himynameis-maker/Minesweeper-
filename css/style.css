@@ -119,3 +119,7 @@ input[type=text]{font:inherit;font-size:16px;color:var(--fg);background:var(--o)
 .rkcp:active{transform:none;background:var(--ac);color:#fff}
 .rkcn{background:var(--o);color:var(--mut);font-size:13px;user-select:none;-webkit-user-select:none}
 #fincpw{margin:10px 0 0}
+/* デイリー見出しの横の連続クリア日数(同じ行に小さく。カードの大きさは変えない) */
+#dyw{font-size:13px;font-weight:700;color:var(--mut);margin-left:6px;white-space:nowrap;vertical-align:middle}#dyw.on{color:#f26a1b}
+/* 幅320pxほどの狭い画面: ランキング/今日の縛りの2ボタンが折り返さないよう、文字と余白を少し小さく(広い画面は変えない) */
+@media(max-width:340px){#dyr,#dyu{font-size:15px;padding:15px 6px}}
