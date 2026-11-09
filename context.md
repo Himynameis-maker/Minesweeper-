@@ -233,7 +233,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 **日付は全部サーバーの JST**(端末の時計は使わない)。盤面は 0:00 JST に切り替わる。
 
 **API**(すべて JSON・`cache-control: no-store`。ranking だけエッジにキャッシュ: 過去分600秒・今日の分60秒):
-- `GET /api/daily/status?token=` → `{day,ver,state}`。state = prep(今日の盤面なし)/new/playing/done/**maint**(更新中。まだ始めていない端末にだけ。始めた/終えた端末は今までどおり)。ver = 盤面コードのルールセット番号
+- `GET /api/daily/status?token=` → `{day,ver,state,rules}`。rules = 今日の縛りの id の配列(盤面コードの縛り欄だけ。爆弾の位置は含まない)。画面の「🧩 今日の縛り」ボタン(#dyu。`DYS.rules`、モーダルは modal.js の MODE='dy')がスタート前に使う。state = prep(今日の盤面なし)/new/playing/done/**maint**(更新中。まだ始めていない端末にだけ。始めた/終えた端末は今までどおり)。ver = 盤面コードのルールセット番号
 - `POST /api/daily/start {token}` → `{day,code,startedAt}`。盤面を渡す唯一の場所。1日1回(409=played)。応答が届かなかった人は20秒以内なら同じ盤面を再取得できる(RETRY_MS)。503=prep。423=maint(更新中。新しく始める端末だけ断る)
 - `POST /api/daily/finish {token,day,clear,name}` → `{ok,ms,rank}`。タイムはサーバーが「今−開始−CD_MS」で測る。ランキングに残るのは クリア かつ 上位20位 だけ
 - `GET /api/daily/code?token=` → 今日の盤面コード。**終わった(done)端末にだけ**渡す
