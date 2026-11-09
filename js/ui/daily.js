@@ -1,5 +1,6 @@
 /* [ui/daily] デイリーモードの画面。サーバー(functions/api/daily/*)とのやりとり・3,2,1 のカウント・タイマー・結果・ランキング・盤面入手。
    盤面そのものは core/boardcode.js の boardDecode → play.js の setBoard で作る(ルールを足してもここは触らない)。
+   DYS.rules=今日の縛りの id の一覧(status が返す。盤面の中身は含まない)。スタート前に「🧩 今日の縛り」ボタン(#dyu)で見せる。null=まだ/見せない(準備中・更新中・エラー)。
    状態: DYS.state = ''(読み込み中) / new(まだ) / prep(今日の盤面が無い) / maint(更新中=メンテナンスで今日は遊べない) / done(終わった) / err(通信できない)。
    maint のときもランキング・盤面入手(遊び終えた端末)は普通に使える。管理者が解除すると、60秒以内(pollMs)に自動でスタートに戻る。
    途中で離れて戻ってきた(サーバー上 playing)場合は、ミス扱いで終わらせて done にする(1日1回の約束)。
@@ -10,7 +11,7 @@ const DAILY_UI={
  pollMs:60000,       // 「準備中」「更新中」「エラー」のとき、何ミリ秒ごとに確かめ直すか(タブが見えていないときは確かめない。見える状態に戻ったときに取り直す)
  tokenKey:'msv.dailyToken',nameKey:'msv.dailyName',nameMax:12
 };
-const DYS={state:'',day:'',ver:null,tok:'',name:'',busy:0,fin:0,clear:false,t0:0,res:null,sent:'',err:0,forfeit:0,tick:0,clock:0,poll:0,last:0,rk:null,rkSel:0};
+const DYS={state:'',day:'',ver:null,tok:'',name:'',busy:0,fin:0,clear:false,t0:0,res:null,sent:'',err:0,forfeit:0,tick:0,clock:0,poll:0,last:0,rk:null,rkSel:0,rules:null};
 const dySleep=ms=>new Promise(r=>setTimeout(r,ms));
 const dyEsc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* 時間表示 m:ss.t(dec=1)/ m:ss.tt(dec=2) */
@@ -40,9 +41,11 @@ function dyClockTick(){const left=864e5-((Date.now()+9*36e5)%864e5),s=Math.floor
  if(left>86396e3&&DYS.state!=''&&!document.hidden&&Date.now()-DYS.last>5000)dyRefresh()} /* 0:00 を過ぎた直後は状態を取り直す(見えていないタブは、見えるようになったときに取り直す) */
 async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll);DYS.last=Date.now();
  const r=await dyApi('/api/daily/status?token='+dyTok());if(DYS.busy)return;
+ DYS.rules=null;
  if(!r.ok||!r.j.state){DYS.state='err';DYS.err=r.ok?404:r.status} /* 200 なのに JSON でない=index.html が返っている=サーバー機能(functions/)が公開されていない。404 と同じ案内にする */
  else{DYS.day=r.j.day;DYS.ver=r.j.ver==null?null:+r.j.ver; /* null=サーバーが番号を返さない(古い status.js)→ 判定しない */DYS.state=r.j.state;
   if(DYS.state=='new'&&DYS.ver!=null&&DYS.ver<BOARD_VER)DYS.state='prep'; /* ルール更新後で、盤面がまだ古い番号のまま(作り直し待ち) */
+  if(Array.isArray(r.j.rules)&&(DYS.state=='new'||DYS.state=='playing'||DYS.state=='done'))DYS.rules=r.j.rules; /* 古い番号の盤面(prep)や更新中は見せない */
   if(DYS.state=='playing'){ /* 途中で離れた=ミス扱いで終了 */
    const f=await dyApi('/api/daily/finish',{token:dyTok(),day:DYS.day,clear:false});
    DYS.state=f.ok||f.status==409?'done':'err';DYS.err=f.status;DYS.forfeit=DYS.state=='done'}}
@@ -50,6 +53,7 @@ async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll
 /* 定期の確かめ直し。タブが見えていないなら通信せず、ここで止める(見えるようになったら visibilitychange が取り直して、また続く) */
 function dyPoll(){if(document.hidden)return;dyRefresh()}
 function dyRender(){const s=DYS.state,g=$('#dyg'),done=s=='done',nameOk=!!dyName();
+ $('#dyu').hidden=!(DYS.rules&&(s=='new'||s=='done')); /* 今日の縛りボタン: 縛りが分かっているときだけ出す(クリア後も見られる) */
  $('#dyl').hidden=done||s=='maint';$('#dyg').hidden=done;$('#dyk').hidden=!done;
  g.disabled=s==''||(s=='new'&&!nameOk);
  g.textContent=s==''?'読み込み中…':s=='new'?'スタート':s=='prep'?'⏳ 準備中(タップで更新)':s=='maint'?'🛠 更新中(タップで更新)':'🔄 再読み込み';
@@ -139,7 +143,7 @@ function dyRankDraw(){const ds=DYS.rk||[],d=ds[DYS.rkSel];if(!d)return;
  $('#rkl').innerHTML=(d.ranks.length?d.ranks.map((x,i)=>'<div class="rkr"><span class="rkn">'+(i+1)+'</span><span class="rkm">'+dyEsc(x.name)+'</span><b>'+dyFmt(x.ms,2)+'</b></div>').join(''):'<p class="mut">'+(d.today?'まだクリア記録はありません':d.code?'この日のクリア記録はありません':'この日の盤面はありません')+'</p>')}
 
 window.addEventListener('load',()=>{
- $('#dyg').onclick=dyGo;$('#dyk').onclick=dyCode;$('#dyr').onclick=dyRank;
+ $('#dyg').onclick=dyGo;$('#dyk').onclick=dyCode;$('#dyr').onclick=dyRank;$('#dyu').onclick=()=>{if(DYS.rules)openM('dy')};
  $('#dyn').oninput=()=>{if(DYS.state=='new')dyRender()};
  $('#rkx').onclick=()=>$('#rk').hidden=true;$('#rk').onclick=e=>{if(e.target.id=='rk')$('#rk').hidden=true};
  $('#rkt').onclick=e=>{const b=e.target.closest&&e.target.closest('button');if(b){DYS.rkSel=+b.dataset.n;dyRankDraw()}};

@@ -5,9 +5,9 @@ const vis=()=>{const q=$('#mq').value.trim().toLowerCase();return Object.values(
 function renderList(){const L=$('#ml');
  if(MODE=='pick'){$('#mt').textContent='縛りを選ぶ ('+SEL.size+'/'+Object.keys(RULES).length+')';
   L.innerHTML=vis().map(r=>{const d=blockers(r.id).length;return '<label class="ri'+(d?' dis':'')+'" data-rid="'+r.id+'"><input type="checkbox" data-id="'+r.id+'"'+(SEL.has(r.id)?' checked':'')+(d?' disabled':'')+'><div><b>'+r.name+'</b>'+tags(r)+'<div class="mut" style="margin:0">'+r.desc+'</div></div></label>'}).join('')||'<p class="mut">該当する縛りがありません</p>'}
- else{const h=G&&G.hint,hr=h?h.rs:[];
-  L.innerHTML=G.cfg.ids.map(id=>'<div class="ri '+(hr.includes(id)?'hl':'')+'" data-rid="'+id+'"><div><b>'+RULES[id].name+'</b>'+tags(RULES[id])+'<div class="mut" style="margin:0">'+RULES[id].desc+'</div></div></div>').join('')||'<p class="mut">この盤面に縛りはありません</p>'}}
-function openM(m){MODE=m;const p=m=='pick';if(!p)$('#mt').textContent='この盤面の縛り';$('#mh').textContent=!p&&hm?'ヒントON: 縛りをタップすると、その縛りから分かることを教えます':'縛りを長押しすると、例の盤面が表示されます';$('#mq').hidden=$('#mfoot').hidden=!p;$('#mq').value='';$('#md').hidden=false;renderList()}
+ else{const h=MODE=='dy'?null:G&&G.hint,hr=h?h.rs:[],ids=MODE=='dy'?(DYS.rules||[]).filter(id=>RULES[id]):G.cfg.ids; /* dy=デイリーのスタート前に見る「今日の縛り」(ui/daily.js) */
+  L.innerHTML=ids.map(id=>'<div class="ri '+(hr.includes(id)?'hl':'')+'" data-rid="'+id+'"><div><b>'+RULES[id].name+'</b>'+tags(RULES[id])+'<div class="mut" style="margin:0">'+RULES[id].desc+'</div></div></div>').join('')||'<p class="mut">この盤面に縛りはありません</p>'}}
+function openM(m){MODE=m;const p=m=='pick';if(!p)$('#mt').textContent=m=='dy'?'今日のデイリーの縛り':'この盤面の縛り';$('#mh').textContent=m!='dy'&&!p&&hm?'ヒントON: 縛りをタップすると、その縛りから分かることを教えます':'縛りを長押しすると、例の盤面が表示されます';$('#mq').hidden=$('#mfoot').hidden=!p;$('#mq').value='';$('#md').hidden=false;renderList()}
 function closeM(){$('#md').hidden=true;updSel();upd()}
 function updSel(){const n=[...SEL].map(id=>RULES[id].name);$('#sel').textContent=n.length?n.length+'件: '+n.join(' / '):'未選択(縛りなし)'}
 /* ---- 競合(併用不可)と例盤面 ---- */
