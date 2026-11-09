@@ -259,7 +259,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 
 **画面の状態**: DYS.state = ''(読み込み中)/new/prep/**maint**/done/err。maint は「🛠 更新中のため遊べません」+ボタン「更新中(タップで更新)」(スタート・ニックネーム欄は隠す)。途中で離れて戻った(サーバー上 playing)人はミス扱いで終了(finish clear:false)。`err` のとき、404 または「200 なのに JSON でない」は「サーバー機能が見つかりません」と表示(Pages は functions が無いと index.html を 200 で返すことがあるため)。
 
-**盤面作り**: `daily.yml`(毎日 09:33〜16:33 JST の毎時33分=00:33〜07:33 UTC、計8回。cron は `33 0-7 * * *`)。対象日は「JST の明日」(`date -d '+1 day'`)で、何時に走っても常に翌日分。GitHub の cron は混むと遅れる/落ちるので何度も試し、すでに盤面があれば何もしない(何度走っても害なし)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間は `tools/daily-plan.js` の DAILY。
+**盤面作り**: `daily.yml`(毎日 日本時間の2:33〜8:33までの計7回。対象日は「JST の明日」(`date -d '+1 day'`)で、何時に走っても常に翌日分。GitHub の cron は混むと遅れる/落ちるので何度も試し、すでに盤面があれば何もしない(何度走っても害なし)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間は `tools/daily-plan.js` の DAILY。
 
 **設定の置き場所**: GitHub の Secrets `DAILY_TOKEN`、Variables `DAILY_SITE`(`https://` から・末尾 `/` なし)。Cloudflare Pages の環境変数 `DAILY_TOKEN`(GitHub と同じ値)、Bindings の D1 変数名 `DB`。D1 に `schema.sql` を1回実行。
 
