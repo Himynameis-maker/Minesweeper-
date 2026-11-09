@@ -9,7 +9,7 @@ const DAILY_UI={
  cdMs:3000,          // 3,2,1 の長さ。functions/_lib.js の CD_MS と同じ値にすること(サーバーは「開始〜終了」からこれを引いてタイムにする)
  endDelayMs:1100,    // クリア/ミスの盤面を見せてから結果カードを出すまでの時間
  pollMs:60000,       // 「準備中」「更新中」「エラー」のとき、何ミリ秒ごとに確かめ直すか(タブが見えていないときは確かめない。見える状態に戻ったときに取り直す)
- tokenKey:'msv.dailyToken',nameKey:'msv.dailyName',nameMax:12
+ tokenKey:'msv.dailyToken',nameKey:'msv.dailyName',streakKey:'msv.dailyStreak',nameMax:12
 };
 const DYS={state:'',day:'',ver:null,tok:'',name:'',busy:0,fin:0,clear:false,t0:0,res:null,sent:'',err:0,forfeit:0,tick:0,clock:0,poll:0,last:0,rk:null,rkSel:0,rules:null};
 const dySleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -22,6 +22,16 @@ function dyTok(){if(DYS.tok)return DYS.tok;let t='';try{t=localStorage.getItem(D
   if(typeof crypto!='undefined'&&crypto.getRandomValues)crypto.getRandomValues(a);else for(let i=0;i<24;i++)a[i]=Math.random()*256|0;
   t=bcB64(a);try{localStorage.setItem(DAILY_UI.tokenKey,t)}catch(e){}}
  return DYS.tok=t}
+/* 連続クリア日数(この端末だけの記録。ブラウザに保存。消す・別の端末だと数えられない)。
+   クリアした日が1日ずつ続いている間だけ増える。ミス・途中で離れた(ミス扱い)ら 0。遊ばない日があると途切れる(最後にクリアした日が昨日より前なら 0 と表示)。
+   記録は {last:最後に結果が出た日, n:その日までの連続日数}。同じ日を2回数えない。 */
+const dyJst=ms=>new Date(ms+9*36e5).toISOString().slice(0,10);
+const dyPrev=d=>{const t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()-1);return t.toISOString().slice(0,10)};
+function dyStreakGet(){let s=null;try{s=JSON.parse(localStorage.getItem(DAILY_UI.streakKey)||'null')}catch(e){}
+ return s&&/^\d{4}-\d{2}-\d{2}$/.test(s.last)&&Number.isInteger(s.n)&&s.n>=0?s:{last:'',n:0}}
+const dyStreakNow=()=>{const s=dyStreakGet(),t=dyJst(Date.now());return s.last==t||s.last==dyPrev(t)?s.n:0}; /* 表示する日数: 今日か昨日までつながっていなければ 0 */
+function dyStreakSet(day,win){const s=dyStreakGet();if(s.last>=day)return; /* 同じ日の2回目(もう一度送る)や、古い日は無視 */
+ const n=win?(s.last==dyPrev(day)?s.n:0)+1:0;try{localStorage.setItem(DAILY_UI.streakKey,JSON.stringify({last:day,n}))}catch(e){}}
 /* ニックネーム。サーバー(functions/_lib.js の cleanName)と同じ掃除をして、空になる名前は弾く */
 const dyClean=n=>Array.from(String(n||'').normalize('NFC').replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff<>]/g,'').trim()).slice(0,DAILY_UI.nameMax).join('').trim();
 const dyName=()=>dyClean($('#dyn').value);
@@ -48,11 +58,12 @@ async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll
   if(Array.isArray(r.j.rules)&&(DYS.state=='new'||DYS.state=='playing'||DYS.state=='done'))DYS.rules=r.j.rules; /* 古い番号の盤面(prep)や更新中は見せない */
   if(DYS.state=='playing'){ /* 途中で離れた=ミス扱いで終了 */
    const f=await dyApi('/api/daily/finish',{token:dyTok(),day:DYS.day,clear:false});
-   DYS.state=f.ok||f.status==409?'done':'err';DYS.err=f.status;DYS.forfeit=DYS.state=='done'}}
+   DYS.state=f.ok||f.status==409?'done':'err';DYS.err=f.status;DYS.forfeit=DYS.state=='done';if(DYS.forfeit)dyStreakSet(DYS.day,0)}}
  dyRender();if(DYS.state=='prep'||DYS.state=='maint'||DYS.state=='err')DYS.poll=setTimeout(dyPoll,DAILY_UI.pollMs)}
 /* 定期の確かめ直し。タブが見えていないなら通信せず、ここで止める(見えるようになったら visibilitychange が取り直して、また続く) */
 function dyPoll(){if(document.hidden)return;dyRefresh()}
 function dyRender(){const s=DYS.state,g=$('#dyg'),done=s=='done',nameOk=!!dyName();
+ {const w=$('#dyw'),n=dyStreakNow();w.textContent='🔥 '+n+'日連続';w.classList.toggle('on',n>0)} /* 見出しの横の連続クリア日数 */
  $('#dyu').hidden=!(DYS.rules&&(s=='new'||s=='done')); /* 今日の縛りボタン: 縛りが分かっているときだけ出す(クリア後も見られる) */
  $('#dyl').hidden=done||s=='maint';$('#dyg').hidden=done;$('#dyk').hidden=!done;
  g.disabled=s==''||(s=='new'&&!nameOk);
@@ -115,6 +126,7 @@ async function dySend(){DYS.sent='sending';let net=0;
   net=1;await dySleep(1200)}
  DYS.sent='fail'}
 function dyShow(){const win=DYS.clear,sent=DYS.sent,r=DYS.res,ms=r?r.ms:DYS.local,bad=win&&sent=='fail'; /* bad=クリアしたのに結果を送れていない */
+ if(win){if(sent=='ok')dyStreakSet(DYS.day,1)}else dyStreakSet(DYS.day,0); /* 連続クリア日数: クリアが登録できたら+1、ミスなら0 */
  let ic,tt,ds;
  if(bad){ic='📡';tt='通信エラー';ds='結果を送れませんでした。電波のいい場所で「もう一度送る」を押してね。このまま戻ると、今日の記録は残りません。'}
  else if(!win){ic='💥';tt='ミス…';ds='今日の挑戦は終了です。また明日!(盤面入手で今日の盤面コードをコピーできます)'}
