@@ -259,7 +259,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 
 **画面の状態**: DYS.state = ''(読み込み中)/new/prep/**maint**/done/err。maint は「🛠 更新中のため遊べません」+ボタン「更新中(タップで更新)」(スタート・ニックネーム欄は隠す)。途中で離れて戻った(サーバー上 playing)人はミス扱いで終了(finish clear:false)。`err` のとき、404 または「200 なのに JSON でない」は「サーバー機能が見つかりません」と表示(Pages は functions が無いと index.html を 200 で返すことがあるため)。
 
-**盤面作り**: `daily.yml`(18:00 JST=09:00 UTC と 22:05 JST=13:05 UTC)。対象日は「今から12時間後の JST の日付」(18:00台→翌日 / 22:05台→翌日)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間は `tools/daily-plan.js` の DAILY。
+**盤面作り**: `daily.yml`(毎日 09:33〜16:33 JST の毎時33分=00:33〜07:33 UTC、計8回。cron は `33 0-7 * * *`)。対象日は「JST の明日」(`date -d '+1 day'`)で、何時に走っても常に翌日分。GitHub の cron は混むと遅れる/落ちるので何度も試し、すでに盤面があれば何もしない(何度走っても害なし)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間は `tools/daily-plan.js` の DAILY。
 
 **設定の置き場所**: GitHub の Secrets `DAILY_TOKEN`、Variables `DAILY_SITE`(`https://` から・末尾 `/` なし)。Cloudflare Pages の環境変数 `DAILY_TOKEN`(GitHub と同じ値)、Bindings の D1 変数名 `DB`。D1 に `schema.sql` を1回実行。
 
@@ -273,7 +273,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 **メンテナンス(アプデのためデイリーを止める。管理者だけ)**: D1 の `maint` テーブルに0〜1行(id=1, `day`=止め始める日 JST)。`schema.sql` に定義があるが、`PUT /api/admin/maint` が `CREATE TABLE IF NOT EXISTS` で自動作成するので実行しなくても動く(テーブルが無いときの `getMaint` は「なし」。`no such table` 以外のエラーは握りつぶさない)。操作は `daily-maint.yml`(action=状態を見る/予約する/解除する、day=空欄で明日)だけ。画面に管理操作は無い。
 - **phase**(`_lib.js` の `maintPhase`): `none` / `reserved`(day が先) / `active`(今日==day) / `overdue`(今日>day で未解除)。
 - **遊べない**(`playBlocked`)= `active` のとき(day の 0:00〜次の 0:00)。`status` は、まだ始めていない端末にだけ `maint` を返し、`start` は 423。すでに始めた/終えた端末は今までどおり(再取得・盤面入手・finish)。**ランキング・盤面入手(code)・finish は止めない。**
-- **盤面を作らない・受け付けない**(`boardLocked`)= `active` か `overdue`(=**解除されるまで**。次の 0:00 では自動で戻らない)。`PUT /api/admin/board` は 423。`daily.yml` の「メンテナンス中ではないか」ステップが先に `GET /api/admin/maint` を見て、`active` なら schedule 実行は緑のままスキップ(`::notice::`)・手動実行は赤、`overdue` は schedule も手動も赤(解除忘れの通知)。22:05 の保険も同じ。解除後の自動作り直し(保険)は**入れていない**(古いバージョンのまま作られるのを避けるため。解除後は管理者が daily-board を手で実行)。
+- **盤面を作らない・受け付けない**(`boardLocked`)= `active` か `overdue`(=**解除されるまで**。次の 0:00 では自動で戻らない)。`PUT /api/admin/board` は 423。`daily.yml` の「メンテナンス中ではないか」ステップが先に `GET /api/admin/maint` を見て、`active` なら schedule 実行は緑のままスキップ(`::notice::`)・手動実行は赤、`overdue` は schedule も手動も赤(解除忘れの通知)。毎時の自動実行はどの回も同じ。解除後の自動作り直しは**入れていない**(古いバージョンのまま作られるのを避けるため。解除後は管理者が daily-board を手で実行)。
 - 予約: day は今日〜+30日(今日=今すぐ)。`reserved` なら日付を置き換え可、`active`/`overdue` は 409(先に解除)。解除は予約の取り消しも兼ねる。解除した瞬間に遊べる・盤面も受け付ける。
 - BOARD_VER とは別物(ルールの意味を変えたら上げる、は今までどおり)。`/ping` の `maint` は `tables` と別。
 - 検査: `node tools/daily-e2e.js` の第11節(予約・更新中・解除・overdue・テーブル無し・画面の表示)。
