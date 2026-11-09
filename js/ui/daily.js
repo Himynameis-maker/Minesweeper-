@@ -125,24 +125,26 @@ function dyLeave(){$('#fin').hidden=true;clearInterval(DYS.tick);DY=0;DYS.busy=0
  $('#hb').hidden=$('#bk').hidden=false;$('#dyt').hidden=true;$('#finr').hidden=false;$('#finr').textContent='もう一度挑戦';$('#finb').textContent='タイトルへ';
  DYS.state='';show('setup');dyRender();dyRefresh()}
 
-/* ---- ランキング(今日〜6日前)。今日の分は順位だけで、盤面コードは出さない(明日から)。盤面コードは地味に小さく置く。コピーしても反応は出さない ---- */
-async function dyRank(){$('#rk').hidden=false;$('#rkt').innerHTML='';$('#rkl').innerHTML='<p class="mut">読み込み中…</p>';
+/* ---- ランキング(今日〜6日前)。今日の分は順位だけで、盤面コードは出さない(明日から)。盤面コードは順位の一覧の上(#rkc)に「コピー」ボタンで置く。押すとボタンの文字が1.5秒だけ変わる ---- */
+const RK_CP='📋 盤面コードをコピー';
+async function dyRank(){$('#rk').hidden=false;$('#rkt').innerHTML='';$('#rkc').innerHTML='';$('#rkl').innerHTML='<p class="mut">読み込み中…</p>';
  const r=await dyApi('/api/daily/ranking');
  if(!r.ok||!r.j.days){$('#rkl').innerHTML='<p class="mut">読み込めませんでした。あとでもう一度開いてね。</p>';return}
  DYS.rk=r.j.days;DYS.rkSel=0;dyRankDraw()}
 function dyRankDraw(){const ds=DYS.rk||[],d=ds[DYS.rkSel];if(!d)return;
  $('#rkt').innerHTML=ds.map((x,i)=>'<button data-n="'+i+'"'+(i==DYS.rkSel?' class="on"':'')+'>'+(x.today?'今日':x.day.slice(5).replace('-','/'))+'</button>').join('');
- $('#rkl').innerHTML=(d.ranks.length?d.ranks.map((x,i)=>'<div class="rkr"><span class="rkn">'+(i+1)+'</span><span class="rkm">'+dyEsc(x.name)+'</span><b>'+dyFmt(x.ms,2)+'</b></div>').join(''):'<p class="mut">'+(d.today?'まだクリア記録はありません':d.code?'この日のクリア記録はありません':'この日の盤面はありません')+'</p>')
-  +(d.today?'<div class="bcode old"><div>盤面コード</div>🔒 今日の盤面コードは、明日から見られます</div>' /* 今日の分: コードは出さない */
-  :d.code?(bcOld(d.code)?'<div class="bcode old"><div>盤面コード</div>🔒 バージョンアップのため、この盤面は利用できません</div>' /* 古い番号: コードは出さない=コピーできない */
-  :'<div class="bcode" data-c="1"><div>盤面コード</div>'+dyEsc(d.code)+'</div>'):'')}
+ $('#rkc').innerHTML=d.today?'<div class="rkcn">🔒 今日の盤面コードは、明日から見られます</div>' /* 今日の分: コードは出さない */
+  :d.code?(bcOld(d.code)?'<div class="rkcn">🔒 バージョンアップのため、この盤面は利用できません</div>' /* 古い番号: コードは出さない=コピーできない */
+  :'<button class="rkcp" data-c="1">'+RK_CP+'</button>'):'';
+ $('#rkl').innerHTML=(d.ranks.length?d.ranks.map((x,i)=>'<div class="rkr"><span class="rkn">'+(i+1)+'</span><span class="rkm">'+dyEsc(x.name)+'</span><b>'+dyFmt(x.ms,2)+'</b></div>').join(''):'<p class="mut">'+(d.today?'まだクリア記録はありません':d.code?'この日のクリア記録はありません':'この日の盤面はありません')+'</p>')}
 
 window.addEventListener('load',()=>{
  $('#dyg').onclick=dyGo;$('#dyk').onclick=dyCode;$('#dyr').onclick=dyRank;
  $('#dyn').oninput=()=>{if(DYS.state=='new')dyRender()};
  $('#rkx').onclick=()=>$('#rk').hidden=true;$('#rk').onclick=e=>{if(e.target.id=='rk')$('#rk').hidden=true};
  $('#rkt').onclick=e=>{const b=e.target.closest&&e.target.closest('button');if(b){DYS.rkSel=+b.dataset.n;dyRankDraw()}};
- $('#rkl').onclick=e=>{if(e.target.closest&&e.target.closest('.bcode[data-c]')){const d=(DYS.rk||[])[DYS.rkSel];if(d&&d.code&&!bcOld(d.code))dyCopy(d.code)}}; /* 反応なしでコピー */
+ $('#rkc').onclick=async e=>{const b=e.target.closest&&e.target.closest('button[data-c]');if(!b)return;const d=(DYS.rk||[])[DYS.rkSel];if(!d||d.today||!d.code||bcOld(d.code))return;
+  const ok=await dyCopy(d.code);clearTimeout(b._t);b.textContent=ok?'✅ コピーしました':'コピーできませんでした';b._t=setTimeout(()=>{b.textContent=RK_CP},1500)}; /* 横幅いっぱいのボタンなので、文字が変わっても画面は動かない */
  /* アプリに戻ってきたとき(別アプリ・別タブから)。遊んでいる最中は触らない */
  const back=()=>{if(mode()=='d'&&!DYS.busy&&!$('#setup').hidden&&Date.now()-DYS.last>5000)dyRefresh()};
  window.addEventListener('focus',back);window.addEventListener('pageshow',back);
