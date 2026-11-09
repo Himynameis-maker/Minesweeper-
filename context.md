@@ -58,6 +58,7 @@ tools/
   daily-plan.js       デイリー盤面の抽選と生成。数値の調整は先頭の DAILY だけ(盤面サイズ・爆弾率・生成の制限時間)
   daily-gen.js        daily-plan を core+rules と読み込み、盤面コードを JSON に書く: node tools/daily-gen.js payload.json YYYY-MM-DD (workflow が使う)
   daily-e2e.js        デイリーの通しテスト(偽D1+偽DOM。functions/ の本物を動かす): node tools/daily-e2e.js (Node 22.5+)
+  daily-streak.js     デイリーの連勝記録だけの検査(通信・ズル対策の分岐。サーバー不要): node tools/daily-streak.js
 js/ui/daily.js        デイリー画面(スタート/3,2,1/タイマー/結果/ランキング/盤面入手)。サーバーとの通信もここ
 js/core/boardcode.js  盤面コードの符号化(boardEncode/boardDecode)。js/core/boardver.js = ルールセット番号 BOARD_VER
 functions/            Cloudflare Pages Functions(デイリーのサーバー側)。★ファイル名がそのままURLになる。_lib.js=共通(メンテナンス判定 getMaint/maintPhase/playBlocked/boardLocked もここ), ping.js=動作確認, api/daily/{status,start,finish,code,ranking}.js, api/admin/board.js, api/admin/maint.js(メンテの予約・解除。第11節)
@@ -247,6 +248,14 @@ python3 build.py                           # rules ブロック同期 + dist 生
 **古いルールセット番号の盤面コード**: ランキング画面と「盤面入手」は、コードの番号 < BOARD_VER(`bcOld`)なら、コードを出さず(=コピーできず)「🔒 バージョンアップのため利用できません」と表示する。フリープレイの貼り付け欄(`js/ui/freecode.js`)も同じ理由で断る。
 
 **サーバーへの定期通信(最小限)**: 画面が「準備中(prep)」「更新中(maint)」「エラー(err)」のときだけ、60秒ごと(`DAILY_UI.pollMs`)に `/api/daily/status` を取り直す。**タブが見えていない間は通信しない**(`dyPoll`)。見えるようになったとき(`visibilitychange` / `focus` / `pageshow`。5秒以内の連続は無視)と、0:00(JST)の直後(見えているタブだけ)にも1回取り直す。ランキングは画面を開いたときだけ読む(自動更新なし)。
+
+**連勝記録(デイリー欄の「🔥 N連勝」。この端末だけ・localStorage `msv.dailyStreak`)**: デイリーを**続けて何回クリアしたか**。日付は関係なく、遊ばない日があっても途切れない。ミスで 0。保存は `{n,pend,won}`(旧形式 `{last,n}` の n はそのまま引き継ぐ)。ズル対策は「**始めたのに結果が残っていない=ミス**」の一点で、サーバーの1日1回(playing で戻ると finish clear:false)とは別に、端末側でも持つ:
+- 盤面を受け取った瞬間に `pend=その日` を保存(`dyStreakStart`)。リロード・タブを閉じる・アプリを落とす・圏外にして放置、どれでも次に開いたとき(window load の `dyAbandon`)に pend が残っていれば 0。
+- ミスは `dyEnd` で**通信の前に** 0 で保存(送信を邪魔しても戻せない)。クリアは `dyEnd` で `won=1` と控えるだけで、**サーバーが受け付けた(`dySend` の ok / 通信エラー後の409)ときだけ +1**。通信エラーなしの409・その他の4xx・送信失敗のまま閉じる、は数えない(送信失敗のまま「戻る」「閉じる」はミス)。
+- クリアを控えたまま閉じた場合だけは、次の status で「同じ日で state=done」と分かれば +1、それ以外(別の日・playing)はミス(`dySettle`)。
+- pend がその日と合わないクリアは数えない(二重送信・別タブが先にミス扱いにした日)。
+- 端末の保存を消す/別端末は数えられない(アカウントなし方針。トークンを消すズルと同じで許容)。
+- 検査は `node tools/daily-streak.js`(分岐)と `tools/daily-e2e.js`(画面の通し)。
 
 **画面の状態**: DYS.state = ''(読み込み中)/new/prep/**maint**/done/err。maint は「🛠 更新中のため遊べません」+ボタン「更新中(タップで更新)」(スタート・ニックネーム欄は隠す)。途中で離れて戻った(サーバー上 playing)人はミス扱いで終了(finish clear:false)。`err` のとき、404 または「200 なのに JSON でない」は「サーバー機能が見つかりません」と表示(Pages は functions が無いと index.html を 200 で返すことがあるため)。
 
