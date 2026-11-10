@@ -35,8 +35,8 @@ js/core/              推論と生成。DOM非依存(node でも動く)
   util.js             rnd, D8/D4/KN, offs, gcd (0.5KB)
   registry.js         RULES, reg, conflict, stepOf/mfit/mok/mnear/mpick (2.1KB)
   prep.js             prep(cfg)→P(問題定義), gcomps (2KB)
-  solver.js           deduce(確定推論エンジン), sim(解き進めシミュ) (11KB)  ★全体制約の主戦場。[probe]=仮定して矛盾を探す推論
-  gen.js              gen(ノーゲス盤面の生成・山登り・品質判定) (15KB)   ★配置様式の主戦場。下限つき cons 用は lsample/smove
+  solver.js           deduce(確定推論エンジン), sim(解き進めシミュ) (11KB)  ★全体制約の主戦場。[probe]=仮定して矛盾を探す推論。各手の `cost`(難易度の物差し)は下の「難易度の上限」
+  gen.js              gen(ノーゲス盤面の生成・山登り・品質判定。品質は `o.maxCost` で難易度の上限も見る) (15KB)   ★配置様式の主戦場。下限つき cons 用は lsample/smove
   selftest.js         selfTest(単体+併用ペア検査), buildReport (2.1KB)
 js/game/              盤面の進行(DOMを読み書きする)
   state.js            グローバル状態 G/run/SEL..., $ v chk mode msg show (0.7KB)
@@ -55,7 +55,7 @@ rules/                1ルール=1ファイル(ファイル名=id)。_始まり�
 tools/
   headless.js         ブラウザ無しで検査: node tools/headless.js [id...] | --combo a,b,c
   smoke-ui.js         偽DOMでUI一式+チャレンジの通し(抽選範囲/ヒント/ミス/達成/ゲームオーバー/引き直し/ウィンストリーク)を動かす: node tools/smoke-ui.js
-  daily-plan.js       デイリー盤面の抽選と生成。数値の調整は先頭の DAILY だけ(盤面サイズ・爆弾率・生成の制限時間)
+  daily-plan.js       デイリー盤面の抽選と生成。数値の調整は先頭の DAILY だけ(盤面サイズ・爆弾率・生成の制限時間・難易度の上限 `maxCost`)
   daily-gen.js        daily-plan を core+rules と読み込み、盤面コードを JSON に書く: node tools/daily-gen.js payload.json YYYY-MM-DD (workflow が使う)
   daily-e2e.js        デイリーの通しテスト(偽D1+偽DOM。functions/ の本物を動かす): node tools/daily-e2e.js (Node 22.5+)
   daily-streak.js     デイリーの連勝記録だけの検査(通信・ズル対策の分岐。サーバー不要): node tools/daily-streak.js
@@ -259,7 +259,12 @@ python3 build.py                           # rules ブロック同期 + dist 生
 
 **画面の状態**: DYS.state = ''(読み込み中)/new/prep/**maint**/done/err。maint は「🛠 更新中のため遊べません」+ボタン「更新中(タップで更新)」(スタート・ニックネーム欄は隠す)。途中で離れて戻った(サーバー上 playing)人はミス扱いで終了(finish clear:false)。`err` のとき、404 または「200 なのに JSON でない」は「サーバー機能が見つかりません」と表示(Pages は functions が無いと index.html を 200 で返すことがあるため)。
 
-**盤面作り**: `daily.yml`(毎日 日本時間のAM2:33〜8:33までの計7回。対象日は「JST の明日」(`date -d '+1 day'`)で、何時に走っても常に翌日分。GitHub の cron は混むと遅れる/落ちるので何度も試し、すでに盤面があれば何もしない(何度走っても害なし)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間は `tools/daily-plan.js` の DAILY。
+**盤面作り**: `daily.yml`(毎日 日本時間のAM2:33〜8:33までの計7回。対象日は「JST の明日」(`date -d '+1 day'`)で、何時に走っても常に翌日分。GitHub の cron は混むと遅れる/落ちるので何度も試し、すでに盤面があれば何もしない(何度走っても害なし)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間・難易度の上限は `tools/daily-plan.js` の DAILY。
+
+**難易度の上限(2026-11-10 追加。`DAILY.maxCost`、現行 16)**: `solver.js` の `deduce` は各手に `cost`=「その手を決めるのに要る配置の通りの数」を付ける(tier1 は未設定=0 扱い。全列挙の手=その成分の成り立つ配置の数 `sols`(打ち切りは Infinity)/自由マスの確定(`3c`)=他の成分の爆弾数の取りうる値の合計 / probe=固定の 4・6)。`sim` はラウンドごとに「確定できた手のうち一番易しい手の cost」を取り、盤面内の最大を `maxc` として返す(詰まりのうち最も重い所=人間が一番頭を使う所)。`gen` は `o.maxCost` を超える盤面を**品質未達**にする(未指定=上限なし。フリープレイ・チャレンジは未指定なので影響なし)。デイリーだけ `maxCost:16` を渡す。判定には使わない(解けるかどうかは従来どおり)ので盤面の意味は変わらず、**BOARD_VER は上げない**。
+- 根拠(実測。上限なしで21盤面): 14盤面は maxc が 9 以下、残りは 63〜7938 と二極化(9〜63 の間に谷)。高い方は、縛りを4〜5個重ねた小盤面(582・377)、嘘つき数字を含む盤面(216〜7938)、鏡爆弾(63)。16 は人間が場合分けできる目安(普通は8〜12通り、最大でも24通り程度)とこの谷の両方から決めた。上限16で9盤面を作ると全部通り(最大10)、嘘つき+グループ爆弾・手繋ぎ・長方形+ナイトなどの縛りも残った。弾かれた盤面は作り直しになり、1盤面あたり最長約60秒(上限は giveUpSec=900)。
+- 注意: cost は「つながった成分全体の配置の数」で、人間が局所で解ける手も多めに数える(縛りが多い盤面ほど厳しめの判定)。サンプルが少ないので、数日運用して `maxCost` を調整する。値を上げると難しい盤面も出る。
+- 計測: 本番と同じ生成を回して `maxc` を集計する(本番コードは変えない)。`deduce` の中の `cost` / `sols` / `maxc` を消すと元に戻る。
 
 **設定の置き場所**: GitHub の Secrets `DAILY_TOKEN`、Variables `DAILY_SITE`(`https://` から・末尾 `/` なし)。Cloudflare Pages の環境変数 `DAILY_TOKEN`(GitHub と同じ値)、Bindings の D1 変数名 `DB`。D1 に `schema.sql` を1回実行。
 
