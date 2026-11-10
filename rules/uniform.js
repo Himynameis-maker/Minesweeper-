@@ -10,6 +10,6 @@ reg({id:'uniform',
  conflicts:['groupBomb','noIsolate','allConnected','dragon','twinDragon'],
  why:'盤面は3×3より大きいものだけ(3×4以上)',
  /* 爆弾数の下限: 盤面を2x2で区切った個数(縦÷2 × 横÷2、切り捨て)。上限: 盤面の4割(5割を超えると生成が極端に遅い/失敗する) */
- ok:c=>c.R>=3&&c.C>=3&&c.R*c.C>=12&&c.M>=Math.floor(c.R/2)*Math.floor(c.C/2)&&c.M<=Math.floor(c.R*c.C*0.5),
+ ok:c=>c.R>=3&&c.C>=3&&c.R*c.C>=12&&c.M>=Math.floor(c.R/2)*Math.floor(c.C/2)&&c.M<=Math.floor(c.R*c.C*0.4),
  cons:(R,C)=>{const o=[];for(let r=0;r+1<R;r++)for(let c=0;c+1<C;c++){const i=r*C+c;o.push({cells:[i,i+1,i+C,i+C+1],lo:1,hi:4})}return o}
 });
