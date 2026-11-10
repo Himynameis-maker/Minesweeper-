@@ -5,7 +5,8 @@ const DAILY={
  bombMin:.30,bombMax:.45,  // 爆弾率。チャレンジ(.30〜.40)より上限を少し増やした
  genSec:30,                // 1回の生成がこの秒数で見つからなければ、サイズ・爆弾数・縛りを全部引き直す
  fallbackSec:300,          // 引き直しがこの秒数を超えたら、縛りなしの盤面に切り替える(0時に盤面が無い事態を避ける保険)
- giveUpSec:900             // これを超えたら失敗として終了(workflow が失敗扱いになりメールが来る)
+ giveUpSec:900,            // これを超えたら失敗として終了(workflow が失敗扱いになりメールが来る)
+ maxCost:16                // 難易度の上限。盤面のどの手も「その手を決めるのに要る配置の通りの数」が16以下(solver の cost の盤面内の最大)。小さいほど易しい。Infinity=上限なし。実測では多くの盤面が9以下で、数百以上になる盤面(縛りの重ねすぎ・嘘つき・鏡の一部)だけが弾かれる
 };
 const dShuf=a=>{for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const dOk=(R,C,M,cur,id)=>cur.every(x=>!conflict(RULES[x],RULES[id]))&&mok(R,C,M,[...cur,id]);
@@ -30,6 +31,6 @@ function dailyPlan(noRules){const ri=(a,b)=>a+(rnd()*(b-a+1)|0),R=ri(DAILY.sizeM
 async function dailyMake(log){const t0=Date.now();
  for(let n=1;;n++){const el=(Date.now()-t0)/1000;if(el>DAILY.giveUpSec)throw Error('生成できませんでした('+n+'回)');
   const cfg=dailyPlan(el>DAILY.fallbackSec);let res=null;
-  try{res=await gen(cfg,{qms:DAILY.genSec*1000,hard:DAILY.genSec*1000})}catch(e){log('試行'+n+': エラー '+e.message)}
+  try{res=await gen(cfg,{qms:DAILY.genSec*1000,hard:DAILY.genSec*1000,maxCost:DAILY.maxCost})}catch(e){log('試行'+n+': エラー '+e.message)}
   if(res&&res.gf&&res.q)return{cfg,res,tries:n,sec:(Date.now()-t0)/1000};
   log('試行'+n+': '+(res?'品質未達':'見つからず')+' → 引き直し'+(typeof DAILY_DEBUG!='undefined'&&DAILY_DEBUG?' ['+cfg.R+'x'+cfg.C+' 爆弾'+cfg.M+' '+(cfg.ids.join('+')||'縛りなし')+']':''))}}
