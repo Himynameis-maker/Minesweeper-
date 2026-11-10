@@ -17,7 +17,10 @@ async function start(nr,again){const ch=mode()=='c',tk=++TK;
 function setBoard(cfg,res){const P=prep(cfg),N=cfg.R*cfg.C,act=P.nb.map((_,i)=>ncount(P,res.mines,i)),num=res.L?res.L.sh:act;
  let code=null;try{code=boardEncode(cfg,res)}catch(e){} /* 盤面コード(ui/copycode のコピーボタン用。作れなければ null=ボタンを出さない) */
  G={cfg,P,N,mines:res.mines,act,az:P.mir&&res.L?num:act,num,st:new Uint8Array(N),fl:new Uint8Array(N),rev:0,over:0,done:0,gf:res.gf,q:res.q,hint:null,code};
- flood(res.start)}
+ flood(res.start);
+ /*[s1]*/if(P.s1)try{ /* 開始マスだけ開く縛り(均一な配置): 最初の1マスの数字から確実に安全と言えるマスも、最初から開けておく(1マスだけだと毎回ほぼ同じ出だしで寂しいため)。
+   盤面コードに入れなくても、盤面と開始マスから毎回同じ結果になる。推論は gen の sim の最初の1手と同じなので、ノーゲスは崩れない */
+  for(const e of deduce(P,G.st,num,cfg.M))if(!e.mine&&!res.mines[e.i]&&!G.st[e.i])flood(e.i)}catch(e){}}
 function flood(i){const q=[i],{st,fl,mines,P}=G,ac=G.az||G.act; /* az=数字0の自動開放に使う値。鏡爆弾のときだけ「見えている数字」(それ以外は act と同じ) */while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;fl[x]=0;G.rev++;if(!ac[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}}
 /* チャレンジ: ミスもクリアも盤面はそこで終わり(ミス=爆発して全開示、フリープレイと同じ)。次の盤面は「次の盤面」ボタン */
 function act(i,f){if(!G||G.over||G.done||G.st[i])return;G.hint=null;
