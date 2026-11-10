@@ -1,0 +1,83 @@
+name: picks-board
+# 厳選盤面を1つ作ってサイトへ送る。毎日 6回(UTC 0,4,8,12,16,20 時の 47 分 = JST 9:47, 13:47, 17:47, 21:47, 1:47, 5:47)。daily-board(毎時 33 分)とは別のジョブで、時刻もずらしてある。
+# 1日(JST)に入るのは最大3つ。今日の枠が埋まっていれば何もしない。GitHub の cron は混むと遅れる/落ちることがあるので、1日に何度も呼ぶ。1つも出ない日があってもよい。
+# 見つからなかった回も失敗にはしない(daily-board と違い、失敗メールは来ない)。手動で実行するときは Actions → picks-board → Run workflow(上限は同じ。サーバーが断る)。
+on:
+  schedule:
+    - cron: '47 */4 * * *'
+  workflow_dispatch:
+concurrency:
+  group: picks-board
+  cancel-in-progress: false
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: サイトの設定を確かめる
+        env:
+          TOKEN: ${{ secrets.DAILY_TOKEN }}
+          SITE: ${{ vars.DAILY_SITE }}
+        run: |
+          [ -n "$SITE" ] || { echo "::error::DAILY_SITE が空です。Settings → Secrets and variables → Actions の「Variables」タブに入れてください(daily-board と同じもの)"; exit 1; }
+          [ -n "$TOKEN" ] || { echo "::error::DAILY_TOKEN が空です。「Secrets」タブに入れてください(daily-board と同じもの)"; exit 1; }
+          case "$SITE" in https://*) ;; *) echo "::error::DAILY_SITE は https:// から始めてください"; exit 1;; esac
+          SITE="${SITE%/}"
+          R=$(curl -sS -m 20 "$SITE/ping" || true)
+          echo "ping: $R" | head -c 300; echo
+          echo "$R" | grep -q '"ok":true' || { echo "::error::$SITE/ping が JSON を返しません。Cloudflare Pages の functions/ が公開されていません"; exit 1; }
+          echo "$R" | grep -q '"binding":true' || { echo "::error::D1 の Binding(変数名 DB)が Pages に設定されていません"; exit 1; }
+          echo "$R" | grep -q '"token":true' || { echo "::error::Pages 側の環境変数 DAILY_TOKEN が設定されていません"; exit 1; }
+      - name: メンテナンス中ではないか
+        id: mt
+        env:
+          TOKEN: ${{ secrets.DAILY_TOKEN }}
+          SITE: ${{ vars.DAILY_SITE }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # 更新中(メンテナンス)と、解除されるまでは作らない・送らない(古いバージョンの盤面が入るのを防ぐ。サイト側も 423 で断る)。
+          # 自動実行の回は、更新日を過ぎて未解除でも失敗にはしない(通知は daily-board が出す)。手動のときだけ理由を出して失敗にする。
+          SITE="${SITE%/}"
+          R=$(curl -sS -m 20 -H "Authorization: Bearer $TOKEN" "$SITE/api/admin/maint" || true)
+          echo "maint: $R" | head -c 300; echo
+          if echo "$R" | grep -q '"boardLocked":true'; then
+            if [ "$EVENT" = "schedule" ]; then
+              echo "::notice::更新中(メンテナンス)なので、厳選盤面は作りません。解除は daily-maint で"; echo "locked=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            echo "::error::更新中(メンテナンス)なので、厳選盤面は作れません。先に daily-maint で「解除する」を実行してください"; exit 1
+          fi
+          echo "locked=false" >> "$GITHUB_OUTPUT"
+      - name: 今日の枠が空いているか
+        id: q
+        if: ${{ steps.mt.outputs.locked != 'true' }}
+        env:
+          TOKEN: ${{ secrets.DAILY_TOKEN }}
+          SITE: ${{ vars.DAILY_SITE }}
+        run: |
+          SITE="${SITE%/}"
+          R=$(curl -sS -m 20 -H "Authorization: Bearer $TOKEN" "$SITE/api/admin/pick" || true)
+          echo "pick: $R" | head -c 300; echo
+          # 「"full":true」と返ってきたときだけ「埋まっている」。それ以外は作る(登録時にサーバーが上限を守る)
+          if echo "$R" | grep -q '"full":true'; then echo "full=true" >> "$GITHUB_OUTPUT"; echo "::notice::今日の枠(1日3つ)は埋まっています"; else echo "full=false" >> "$GITHUB_OUTPUT"; fi
+      - name: 厳選盤面を作る
+        if: ${{ steps.mt.outputs.locked != 'true' && steps.q.outputs.full != 'true' }}
+        run: node tools/pick-gen.js payload.json
+      - name: サイトへ送る
+        if: ${{ steps.mt.outputs.locked != 'true' && steps.q.outputs.full != 'true' && hashFiles('payload.json') != '' }}
+        env:
+          TOKEN: ${{ secrets.DAILY_TOKEN }}
+          SITE: ${{ vars.DAILY_SITE }}
+        run: |
+          SITE="${SITE%/}"
+          CODE=$(curl -sS -m 30 -o resp.txt -w '%{http_code}' -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data @payload.json "$SITE/api/admin/pick")
+          echo "HTTP $CODE"; head -c 300 resp.txt; echo
+          case "$CODE" in
+            200) ;;
+            409) if grep -q '"err":"limit"' resp.txt; then echo "::notice::今日の枠が埋まったので送りませんでした"; else echo "::error::サイトにある盤面より古いルールセット番号です(このリポジトリの js/core/boardver.js が古い?)"; exit 1; fi ;;
+            423) echo "::notice::更新中(メンテナンス)で受け付けられませんでした" ;;
+            *) echo "::error::登録できませんでした(HTTP $CODE)。401=トークン不一致 / 404=サーバー機能が無い"; exit 1 ;;
+          esac
