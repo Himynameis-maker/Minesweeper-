@@ -155,16 +155,34 @@ function deduce(P,st,num,M,skip,all){
   /* 仮定して矛盾を探す推論(failed-literal probing。全列挙より前に試し、見つかれば全列挙を飛ばす=速い): 未確定マスを爆弾/安全と仮定し、全制約(数字・cons・残り爆弾数)の単純な伝播だけで
      矛盾が出たら逆が確定。伝播は各制約の上限/下限の範囲だけを使うので sound。全列挙が3万ノードを超えて諦めるような広い盤面で効く */
   const nU=unk.length,idx=new Int32Array(N).fill(-1);unk.forEach((c,j)=>idx[c]=j);
-  const KK=K.map(k=>({c:k.cells.map(c=>idx[c]),w:k.w,lo:k.lo,hi:k.hi,sw:k.sw}));
-  KK.push({c:unk.map((_,j)=>j),w:null,lo:T,hi:T,sw:nU});
+  const KK=K.map(k=>({c:k.cells.map(c=>idx[c]),w:k.w,lo:k.lo,hi:k.hi,sw:k.sw,n:k.src.t=='n'}));
+  KK.push({c:unk.map((_,j)=>j),w:null,lo:T,hi:T,sw:nU,n:false});
   const nK=KK.length,bc=unk.map(()=>[]);
   KK.forEach((k,q)=>k.c.forEach((j,p)=>bc[j].push([q,k.w?k.w[p]:1])));
   const a0=new Float64Array(nK),u0=Float64Array.from(KK,k=>k.sw),v0=new Int8Array(nU).fill(-1);
+  /*[pk]*/ /* 重ならない下限の合計: 数字の制約 q の中に、別の制約 r(下限あり)が丸ごと収まっているとき、互いに重ならない r たちがそれぞれ要る爆弾の数の合計が、q の残りの爆弾数(上限)を超えたら矛盾。
+     例: 真ん中の「2」(周囲8マスに爆弾2個)で、斜めの1マス(北西)を爆弾と仮定すると、残り1個では「右上の2×2」と「左下の2×2」(重ならない・各1個以上)を両方は満たせない → 北西は安全。
+     数えるだけの必要条件なので sound。重みつきの制約(wt)は対象外 */
+  const pms=new Int32Array(nU);let pmt=0;
+  const pkc=KK.map((k,q)=>{if(!k.n||k.w||q==nK-1)return null;pmt++;for(const j of k.c)pms[j]=pmt;const L=[];
+   for(let r=0;r<nK-1;r++){const kr=KK[r];if(r==q||kr.w||kr.lo<=0)continue;let ok=true;for(const j of kr.c)if(pms[j]!=pmt){ok=false;break}if(ok)L.push(r)}
+   return L.length?L:null});
+  /* 重ならない選び方は全部調べる(候補は数個なので速い。最初に見つけたものだけだと、選び方が悪くて取りこぼす) */
+  const pcn=new Uint8Array(nU);
+  const pkd=(cs,rs,sf,i,need,cap,v)=>{if(need>cap)return true;if(need+sf[i]<=cap)return false;
+   for(let t=i;t<cs.length;t++){const kr=KK[cs[t]];let ok=true;for(const j of kr.c)if(v[j]<0&&pcn[j]){ok=false;break}
+    if(!ok)continue;for(const j of kr.c)if(v[j]<0)pcn[j]=1;
+    const z=pkd(cs,rs,sf,t+1,need+rs[t],cap,v);for(const j of kr.c)if(v[j]<0)pcn[j]=0;if(z)return true}
+   return false};
+  const pkchk=(q,a,v)=>{const cap=KK[q].hi-a[q],cs=[],rs=[];for(const r of pkc[q]){const e=KK[r].lo-a[r];if(e>0){cs.push(r);rs.push(e)}}
+   if(!cs.length)return true;const sf=new Array(cs.length+1).fill(0);for(let t=cs.length-1;t>=0;t--)sf[t]=sf[t+1]+rs[t];
+   return !pkd(cs,rs,sf,0,0,cap,v)};
   const prop=(v,a,u,j0,b0)=>{const qu=[],inq=new Uint8Array(nK);
    const asg=(j,b)=>{if(v[j]>=0)return v[j]==b;v[j]=b;for(const[q,x]of bc[j]){u[q]-=x;a[q]+=b*x;const k=KK[q];if(a[q]>k.hi||a[q]+u[q]<k.lo)return false;if(!inq[q]){inq[q]=1;qu.push(q)}}return true};
    if(j0>=0&&!asg(j0,b0))return false;
    if(j0<0)for(let q=0;q<nK;q++){inq[q]=1;qu.push(q)}
    for(let h=0;h<qu.length;h++){const q=qu[h],k=KK[q];inq[q]=0;
+    if(pkc[q]&&!pkchk(q,a,v))return false;
     for(let p=0;p<k.c.length;p++){const j=k.c[p];if(v[j]>=0)continue;const x=k.w?k.w[p]:1;
      if(a[q]+x>k.hi){if(!asg(j,0))return false}else if(a[q]+u[q]-x<k.lo){if(!asg(j,1))return false}}}
    return true};
