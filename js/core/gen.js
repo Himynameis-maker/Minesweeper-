@@ -12,7 +12,7 @@
    双竜(dragon:2)は「龍H(左→右)と龍V(上→下)を置き、その8近傍を避けて残りを撒く」配置(tsample)。
    dragon持ちは「左端から右端まで、1列ごとに直進か上下1行ずれで爆弾を並べる(DFS。直進の確率は盤面ごとにランダム)」配置(dsample)と、valid を保つ付け替えの山登り(smove)。
    新しい配置様式(例: ヘビ)のルールは、[grp] と同じ位置に「専用の sample と move」を足す(context.md 第6節)。 */
-async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
+async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,MC=o.maxCost??Infinity,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
  const{R,C,M,ids}=cfg,N=R*C,P=prep(cfg),t0=performance.now(),kc=P.cons;
  if(P.grp&&M%P.grp)throw Error('爆弾数が'+P.grp+'の倍数ではありません');
  const byC=[...Array(N)].map(()=>[]);kc.forEach((k,q)=>k.cells.forEach(c=>byC[c].push(q)));
@@ -224,7 +224,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,can
   if(MIRM&&ex)L=mstate(ex,s0);
   return{P,mines:ex,bad,bc,L}}
  /* ---- 品質判定と本体ループ ---- */
- const qual=(m,s,r,L)=>r.kinds.size>=2&&r.rounds>=3&&r.open0<=.5*r.safe&&nec.every(id=>!sim(P,M,m,s,id,L).ok);
+ const qual=(m,s,r,L)=>r.kinds.size>=2&&r.rounds>=3&&r.open0<=.5*r.safe&&r.maxc<=MC&&nec.every(id=>!sim(P,M,m,s,id,L).ok);
  let cur=null,cl=null,cs=0,cr=null,soft=null,inv=0,it=0,tries=0,last=t0;
  for(;;){const now=performance.now(),el=now-t0;
   if(el>hard||cancel())break;

@@ -75,7 +75,7 @@ function deduce(P,st,num,M,skip,all){
   /*[mir]*/else if(MR){let ins=0;for(const j of P.ms[i])ins+=mpo[j];const mi=N-1-i,sh=Math.min(P.mk,ins,num[i],st[mi]==1?num[mi]:P.mk),sl=Math.max(0,P.mk-(mzt-ins));add(P.nb[i],num[i]-sh,num[i]-sl,{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
   else add(P.nb[i],num[i],num[i],{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
  for(const k of P.cons)if(k.src.id!==skip)add(k.cells,k.lo,k.hi,k.src);
- const T=M-km,seen=new Set(),push=(i,mine,tier,src)=>{const key=all?i+src.t+(src.id??src.i??''):i;if(!seen.has(key)){seen.add(key);out.push({i,mine,tier,src})}};
+ const T=M-km,seen=new Set(),push=(i,mine,tier,src,cost)=>{const key=all?i+src.t+(src.id??src.i??''):i;if(!seen.has(key)){seen.add(key);out.push({i,mine,tier,src,cost})}}; /* cost=その手を決めるのに要る通りの数(tier1は未設定=0扱い。人間向けの難易度の物差し。判定には使わない) */
  /*[grp]*/const GN=(P.grp&&P.gid!==skip)?P.grp:0;let S=null,vis=null,sp=0,hb=0;
  /*[grp]*/const reach=(x,onlyB,cap)=>{const q=[x];vis[x]=++sp;hb=S[x]==1?1:0;
   for(let h=0;h<q.length&&q.length<cap;h++)for(const y of P.adj[q[h]])if(vis[y]!=sp&&(onlyB?S[y]==1:S[y]!=0)){vis[y]=sp;q.push(y);if(S[y]==1)hb=1}
@@ -171,10 +171,10 @@ function deduce(P,st,num,M,skip,all){
   const pb=(j,b)=>{const a=a0.slice(),u=u0.slice(),v=v0.slice();return prop(v,a,u,j,b)};
   const b0=a0.slice(),bu=u0.slice(),bv=v0.slice();
   if(!prop(bv,b0,bu,-1,0)){/* 矛盾(通常起きない): 何も言わない */}
-  else{for(let j=0;j<nU;j++)if(bv[j]>=0)push(unk[j],bv[j],2,why(unk[j]));
+  else{for(let j=0;j<nU;j++)if(bv[j]>=0)push(unk[j],bv[j],2,why(unk[j]),4);
    if(!out.length)for(let j=0;j<nU;j++){
     const c1=pb(j,1),c0=pb(j,0);
-    if(!c1&&c0)push(unk[j],0,2,why(unk[j]));else if(!c0&&c1)push(unk[j],1,2,why(unk[j]))}}}
+    if(!c1&&c0)push(unk[j],0,2,why(unk[j]),6);else if(!c0&&c1)push(unk[j],1,2,why(unk[j]),6)}}}
  if(out.length&&!all)return out;
  /*[probe]*/const NL=(P.probe&&P.pid!==skip)?500:30000; /* probe ルールは全列挙が広がりやすい。見つからなければ早く諦める(諦めても sound) */
  const par={},f=x=>par[x]===x?x:(par[x]=f(par[x]));
@@ -188,9 +188,9 @@ function deduce(P,st,num,M,skip,all){
   const cc=K.filter(k=>gs.has(k.cells[0])).map(k=>({cells:k.cells.map(c=>pos[c]),w:k.w,lo:k.lo,hi:k.hi,a:0,u:k.sw,y:k.src.t=='n'?k.src.i:-1,hv:k.hv}));
   /*[wt]*/const byCell=g.map(()=>[]),byW=g.map(()=>[]);cc.forEach(k=>k.cells.forEach((j,q)=>{byCell[j].push(k);byW[j].push(k.w?k.w[q]:1)}));
   const ks=new Uint8Array(n+1),mk=g.map(()=>new Uint8Array(n+1)),sk=g.map(()=>new Uint8Array(n+1)),a=new Array(n);
-  let nodes=0,over=false,cnt=0;
+  let nodes=0,over=false,cnt=0,sols=0;
   const rec=j=>{if(over)return;if(++nodes>NL){over=true;return}
-   if(j==n){ks[cnt]=1;for(let x=0;x<n;x++)(a[x]?mk:sk)[x][cnt]=1;return}
+   if(j==n){sols++;ks[cnt]=1;for(let x=0;x<n;x++)(a[x]?mk:sk)[x][cnt]=1;return}
    for(const v of[0,1]){const bj=byCell[j],wj=byW[j];for(let q=0;q<bj.length;q++){bj[q].u-=wj[q];bj[q].a+=v*wj[q]}
     let bad=false;for(const k of bj)if(k.a>k.hi||k.a+k.u<k.lo)bad=true;
     /*[grp]*/if(!bad&&GN){S[g[j]]=v;if(!gchk(g[j],v))bad=true}
@@ -205,17 +205,17 @@ function deduce(P,st,num,M,skip,all){
     /*[grp]*/if(GN||IM||CM||DM)S[g[j]]=2;
     for(let q=0;q<bj.length;q++){bj[q].u+=wj[q];bj[q].a-=v*wj[q]}}};
   rec(0);
-  if(over||!ks.some(x=>x)){ks.fill(1);comps.push({cells:g,ks,mk:g.map(()=>ks),sk:g.map(()=>ks),n})}
-  else comps.push({cells:g,ks,mk,sk,n})}
+  if(over||!ks.some(x=>x)){ks.fill(1);comps.push({cells:g,ks,mk:g.map(()=>ks),sk:g.map(()=>ks),n,sols:Infinity})}
+  else comps.push({cells:g,ks,mk,sk,n,sols})}
  const fr=unk.filter(c=>par[c]===undefined),fn=fr.length;
  if(fn){const ks=new Uint8Array(fn+1).fill(1),mk=new Uint8Array(fn+1),sk=new Uint8Array(fn+1);
   for(let k=0;k<=fn;k++){mk[k]=k>=1?1:0;sk[k]=k<=fn-1?1:0}
   comps.push({cells:fr,ks,mk:fr.map(()=>mk),sk:fr.map(()=>sk),n:fn,free:1})}
  const conv=(A,B)=>{const r=new Uint8Array(A.length+B.length-1);for(let i=0;i<A.length;i++)if(A[i])for(let j=0;j<B.length;j++)if(B[j])r[i+j]=1;return r};
- comps.forEach((cj,j)=>{let O=Uint8Array.of(1);comps.forEach((c,q)=>{if(q!=j)O=conv(O,c.ks)});
+ comps.forEach((cj,j)=>{let O=Uint8Array.of(1),cf=0;comps.forEach((c,q)=>{if(q!=j){O=conv(O,c.ks);if(!c.free)cf+=c.ks.reduce((a,b)=>a+b,0)}});const cc=cj.free?Math.max(1,cf):cj.sols; /* 自由マスの確定=他の領域の爆弾数の取りうる値を突き合わせる手間。それ以外=その領域の成り立つ配置の数 */
   cj.cells.forEach((x,p)=>{let m=0,s=0;
    for(let k=0;k<=cj.n;k++)if(T-k>=0&&T-k<O.length&&O[T-k]){if(cj.mk[p][k])m=1;if(cj.sk[p][k])s=1}
-   if(m&&!s)push(x,1,3,cj.free?{t:'c'}:why(x));else if(s&&!m)push(x,0,3,cj.free?{t:'c'}:why(x))})});
+   if(m&&!s)push(x,1,3,cj.free?{t:'c'}:why(x),cc);else if(s&&!m)push(x,0,3,cj.free?{t:'c'}:why(x),cc)})});
  return out}
 
 /* 開始マスから推論のみで解き進めるシミュレーション。真の配置と食い違えばbug。L=liarの表示状態({sh:表示数字}) */
@@ -223,9 +223,9 @@ function sim(P,M,mines,start,skip,L){
  const N=P.nb.length,st=new Uint8Array(N),act=P.nb.map((_,i)=>ncount(P,mines,i)),num=L?L.sh:act,az=P.mir&&L?L.sh:act; /*[mir]*/ /* 数字0の自動開放は「見えている数字」で決める(鏡爆弾は+1するので、実際の爆弾数0でも表示が0とは限らない) */
  const rev=i=>{const q=[i];while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;if(!az[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}};
  rev(start);let open0=0;for(let i=0;i<N;i++)if(st[i]==1)open0++;
- const kinds=new Set(),safe=N-M;let rounds=0,bug=0;
- for(;;){const d=deduce(P,st,num,M,skip);if(!d.length)break;rounds++;
+ const kinds=new Set(),safe=N-M;let rounds=0,bug=0,maxc=0;
+ for(;;){const d=deduce(P,st,num,M,skip);if(!d.length)break;rounds++;maxc=Math.max(maxc,Math.min(...d.map(e=>e.cost||0)));
   for(const e of d){if(!!mines[e.i]!=!!e.mine)bug=1;if(st[e.i])continue;kinds.add(e.tier+e.src.t);if(e.mine)st[e.i]=2;else rev(e.i)}
   if(bug)break}
  let rv=0;for(let i=0;i<N;i++)if(st[i]==1)rv++;
- return{ok:rv==safe&&!bug,bug,rv,open0,rounds,kinds,safe,st}}
+ return{ok:rv==safe&&!bug,bug,rv,open0,rounds,kinds,safe,st,maxc}}
