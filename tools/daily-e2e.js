@@ -13,7 +13,7 @@ const ok=(c,m)=>{if(!c){console.error('FAIL: '+m);process.exit(1)}console.log('o
 const routes={};const walk=(d,pre)=>{for(const f of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,f.name);
  if(f.isDirectory())walk(p,pre+f.name+'/');else{if(/\s/.test(f.name)||!f.name.endsWith('.js'))ok(false,'functions のファイル名が不正: "'+pre+f.name+'"');routes['/'+pre+f.name.replace(/\.js$/,'')]=p}}};
 walk(path.join(root,'functions'),'');
-for(const r of['/api/daily/status','/api/daily/start','/api/daily/finish','/api/daily/code','/api/daily/ranking','/api/admin/board','/api/admin/maint','/ping'])ok(routes[r],'ルートがある '+r);
+for(const r of['/api/daily/status','/api/daily/start','/api/daily/finish','/api/daily/code','/api/daily/ranking','/api/admin/board','/api/admin/maint','/api/admin/pick','/api/picks','/ping'])ok(routes[r],'ルートがある '+r);
 /* ---- 2. D1 もどき ---- */
 const sql=new DatabaseSync(':memory:');sql.exec(fs.readFileSync(path.join(root,'schema.sql'),'utf8'));
 const stmt=q=>{let a=[];const o={bind:(...x)=>{a=x;return o},
@@ -28,14 +28,14 @@ const call=async(url,opt={})=>{const u=new URL(url,'https://x.test'),f=routes[u.
 /* ---- 3. 画面(偽DOM)を読み込む ---- */
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const srcs=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m=>m[1]);
-ok(srcs.includes('js/ui/daily.js'),'index.html が daily.js を読んでいる');
-for(const id of['mdy','dyc','dyn','dyg','dyk','dyr','dys','dyx','dyl','dyt','cdn','cdnn','rk','rkt','rkl','rkx'])ok(html.includes('id="'+id+'"'),'index.html に #'+id);
+ok(srcs.includes('js/ui/daily.js'),'index.html が daily.js を読んでいる');ok(srcs.includes('js/ui/picks.js')&&srcs.indexOf('js/ui/picks.js')>srcs.indexOf('js/ui/daily.js'),'index.html が picks.js を daily.js のあとに読んでいる');
+for(const id of['mdy','dyc','dyn','dyg','dyk','dyr','dys','dyx','dyl','dyt','cdn','cdnn','rk','rkt','rkl','rkx','pkb','pkm','pkl','pkx'])ok(html.includes('id="'+id+'"'),'index.html に #'+id);
 const code=srcs.map(f=>fs.readFileSync(path.join(root,f),'utf8')).join('\n');
 const els={},loads=[],LS={};
 function El(id){this.id=id;this.value='';this.hidden=false;this.innerHTML='';this.textContent='';this.className='';this.dataset={};this.disabled=false;this.style={setProperty(){}};
  const on=new Set(id=='mf'||id=='fo'?['on']:[]);this.classList={toggle:(c,f)=>{(f===undefined?!on.has(c):f)?on.add(c):on.delete(c)},add:c=>on.add(c),remove:c=>on.delete(c),contains:c=>on.has(c)};
  this.addEventListener=()=>{};this.select=()=>{};this.closest=()=>null}
-const document={querySelector:s=>els[s]||(els[s]=new El(s.replace(/^#/,''))),createElement:()=>new El('a')};
+const document={querySelector:s=>els[s]||(els[s]=new El(s.replace(/^#/,''))),createElement:()=>new El('a'),documentElement:{clientWidth:400}}; /* board.js の draw が幅を読む */
 const window={addEventListener:(t,f)=>t=='load'&&loads.push(f)};
 const fetch=async(url,o={})=>{const r=await call(url,o);return r};
 const ctx=vm.createContext({localStorage:{getItem:k=>LS[k]??null,setItem:(k,v)=>{LS[k]=String(v)}},document,window,performance,setTimeout,clearTimeout,setInterval,clearInterval,console,Date,Uint8Array,Int8Array,Int32Array,
@@ -219,5 +219,64 @@ else console.log('(BOARD_VER=0 のため、古い番号の検査は省略)');
  r=await mt('GET');ok(r.s==200&&r.j.phase=='none','テーブルが無いときの GET は「なし」');
  r=await mt('PUT',{day:tomorrow});ok(r.s==200&&r.j.phase=='reserved','予約するとテーブルが自動で作られる');
  r=await mt('DELETE');ok(r.j.lifted===true,'後片づけ(解除)');
+}
+/* ---- 厳選盤面(サーバー: /api/admin/pick, /api/picks / 画面: js/ui/picks.js) ---- */
+{const ad=(d,n)=>{const t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)},
+ pc=(ids,k)=>run(`(()=>{const mines=new Uint8Array(36);[${k},8,14,20,27,33].forEach(i=>mines[i]=1);return boardEncode({R:6,C:6,M:6,ids:${JSON.stringify(ids)}},{mines,start:35})})()`),
+ pj=async(m,b,h)=>{const r=await call('/api/admin/pick',{method:m,headers:h===undefined?adm:h,body:b?JSON.stringify(b):undefined});let j={};try{j=await r.json()}catch(e){}return{s:r.status,j}},
+ list=async()=>(await(await call('/api/picks')).json()).picks,cnt=()=>sql.prepare('SELECT COUNT(*) AS n FROM picks').get().n;
+ sql.exec('DELETE FROM picks');
+ let L=await list(),r=await call('/api/picks');ok(r.status==200&&Array.isArray(L)&&L.length==0,'厳選: 最初は空の一覧');
+ r=await pj('GET',null,{});ok(r.s==401,'厳選: 管理API はトークンなしだと 401');
+ r=await pj('PUT',{code:pc([],1)},{'content-type':'application/json'});ok(r.s==401,'厳選: 登録もトークンなしだと 401');
+ r=await pj('PUT',{code:'x'});ok(r.s==400,'厳選: 形が違うコードは 400');
+ r=await pj('PUT',{code:'MS1.x.6x6.1..AAAA.'+'abcd'});ok(r.s==400,'厳選: ルールセット番号が数字でないコードは 400');
+ r=await pj('GET');ok(r.s==200&&r.j.count==0&&r.j.limit==3&&r.j.max==21&&r.j.full===false,'厳選: 今日0個・枠3・まだ埋まっていない');
+ const C0=pc([],1),C1=pc(['cross'],2),C2=pc(['cross','knight'],3),C3=pc(['lines'],4);
+ for(const[c,n]of[[C0,0],[C1,1],[C2,2]]){r=await pj('PUT',{code:c});ok(r.s==200&&r.j.ok&&r.j.n==n&&r.j.day==today,'厳選: 登録(縛り'+n+'個・作成日は今日のJST)');await sleep(5)}
+ r=await pj('PUT',{code:C3});ok(r.s==409&&r.j.err=='limit','厳選: 1日3つまで → 4つ目は 409 limit');
+ r=await pj('PUT',{code:C1});ok(r.s==200&&r.j.dup===true&&cnt()==3,'厳選: 同じコードは増えない(200 dup)');
+ r=await pj('GET');ok(r.j.count==3&&r.j.full===true,'厳選: 今日3個 → full=true(workflow はここで生成を省く)');
+ L=await list();ok(L.length==3&&L.map(x=>x.n).join()=='2,1,0'&&L.every(x=>x.day==today&&typeof x.code=='string'),'厳選: 新しい順・縛りの数・作成日が返る');
+ /* 日が変われば、また3つまで入る */
+ sql.prepare('UPDATE picks SET day=?').run(ad(today,-1));
+ r=await pj('PUT',{code:C3});ok(r.s==200&&r.j.ok,'厳選: 日が変わると、また入る(昨日の3つ+今日の1つ)');
+ L=await list();ok(L.length==4&&L[0].day==today&&L[1].day==ad(today,-1),'厳選: 今日の分が先頭、昨日の分が続く');
+ /* 全体で21個まで。古いものから消える */
+ sql.exec('DELETE FROM picks');
+ for(let i=0;i<21;i++)sql.prepare('INSERT INTO picks(code,day,at,ver,n) VALUES(?,?,?,?,?)').run('MS1.1.6x6.1..z'+i,ad(today,-1-(i/3|0)),1000+i,1,0);
+ r=await pj('PUT',{code:C0});ok(r.s==200&&cnt()==21,'厳選: 21個のところへ入れても 21個のまま');
+ ok(!sql.prepare('SELECT 1 FROM picks WHERE code=?').get('MS1.1.6x6.1..z18')&&!!sql.prepare('SELECT 1 FROM picks WHERE code=?').get('MS1.1.6x6.1..z19')&&!!sql.prepare('SELECT 1 FROM picks WHERE code=?').get(C0),'厳選: いちばん古い1つだけが消え、新しいコードは残る');
+ /* ルールセット番号 */
+ sql.exec('DELETE FROM picks');
+ const V0=C0.replace(/^MS1\.\d+\./,'MS1.0.'),V9=C0.replace(/^MS1\.\d+\./,'MS1.9.');
+ await pj('PUT',{code:C1});r=await pj('PUT',{code:V0});ok(r.s==409&&r.j.err=='old','厳選: いまある盤面より古い番号のコードは 409 old');
+ r=await pj('PUT',{code:V9});ok(r.s==200&&cnt()==1&&(await list())[0].code==V9,'厳選: 新しい番号のコードが入ると、古い番号のものは消える');
+ /* メンテナンス中は受け付けない */
+ sql.exec('DELETE FROM picks');
+ r=await call('/api/admin/maint',{method:'PUT',headers:adm,body:JSON.stringify({day:today})});ok(r.status==200,'(メンテナンスを開始)');
+ r=await pj('PUT',{code:C1});ok(r.s==423&&r.j.err=='maint'&&cnt()==0,'厳選: 更新中(メンテナンス)は 423 で受け付けない');
+ r=await call('/api/picks');ok(r.status==200,'厳選: 更新中も一覧は見られる');
+ r=await call('/api/admin/maint',{method:'DELETE',headers:adm});ok(r.status==200,'(メンテナンスを解除)');
+ r=await pj('PUT',{code:C1});ok(r.s==200,'厳選: 解除したら受け付ける');
+ /* 画面: 古い番号は出さない・日ごとにまとめる・縛りの数・コピー */
+ sql.exec('DELETE FROM picks');const ins=sql.prepare('INSERT INTO picks(code,day,at,ver,n) VALUES(?,?,?,?,?)');
+ ins.run(C0,ad(today,-1),1,1,0);ins.run(C2,today,2,1,2);ins.run(C1,today,3,1,1);ins.run(V0,today,4,0,0);
+ $('#pkb').onclick();await sleep(300);
+ const h=$('#pkl').innerHTML;
+ ok(!$('#pkm').hidden,'画面: 「厳選盤面」ボタンで一覧が開く');
+ ok((h.match(/data-i=/g)||[]).length==3,'画面: コピーボタンは3つ(古い番号の1つは出さない)');
+ ok(h.includes('今日')&&h.includes('縛りなし')&&h.includes('縛り <b>2</b>')&&h.includes('縛り <b>1</b>'),'画面: 日ごとにまとめ、縛りの数が横に出る');
+ ok(h.indexOf('縛り <b>1</b>')<h.indexOf('縛り <b>2</b>')&&h.indexOf('縛り <b>2</b>')<h.indexOf('縛りなし'),'画面: 新しい順(同じ日は後から作ったものが上)');
+ const fb={dataset:{i:'0'},textContent:'コード',classList:{toggle(){},remove(){}}};
+ ctx.__clip=null;await $('#pkl').onclick({target:{closest:()=>fb}});ok(ctx.__clip===C1&&fb.textContent=='copied','画面: コピーボタンで盤面コードがコピーされ、「copied」になる');
+ $('#pkx').onclick();ok($('#pkm').hidden===true,'画面: 閉じるで閉じる');
+ /* schema.sql を実行していない環境(picks テーブルが無い) */
+ sql.exec('DROP TABLE picks');
+ r=await call('/ping');j=await r.json();ok(j.ok&&j.tables===true&&j.picks===false,'厳選: /ping は picks=false でも tables は true(既存の workflow は止まらない)');
+ L=await list();ok(Array.isArray(L)&&L.length==0,'厳選: テーブルが無くても一覧は空で返る');
+ r=await pj('GET');ok(r.s==200&&r.j.count==0,'厳選: テーブルが無くても管理APIの確認は動く(自動で作る)');
+ r=await pj('PUT',{code:C2});ok(r.s==200&&cnt()==1,'厳選: 登録もできる');
+ r=await call('/ping');j=await r.json();ok(j.picks===true,'厳選: 作ったあとは /ping が picks=true');
 }
 console.log('E2E OK');process.exit(0)})().catch(e=>{console.error(e);process.exit(1)});

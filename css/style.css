@@ -123,3 +123,14 @@ input[type=text]{font:inherit;font-size:16px;color:var(--fg);background:var(--o)
 #dyw{font-size:13px;font-weight:700;color:var(--mut);margin-left:6px;white-space:nowrap;vertical-align:middle}#dyw.on{color:#f26a1b}
 /* 幅320pxほどの狭い画面: ランキング/今日の縛りの2ボタンが折り返さないよう、文字と余白を少し小さく(広い画面は変えない) */
 @media(max-width:340px){#dyr,#dyu{font-size:15px;padding:15px 6px}}
+/* 厳選盤面(タイトルの横のボタンと一覧) */
+.pkb{font-size:12px;font-weight:700;letter-spacing:0;padding:4px 10px;margin-left:6px;vertical-align:middle;border:1.5px solid var(--ac);background:var(--card);color:var(--ac);border-radius:10px;white-space:nowrap;box-shadow:0 1px 3px rgba(91,108,255,.28)}
+.pkb:active{transform:none;background:var(--ac);color:#fff}
+#pkm{position:fixed;inset:0;background:rgba(10,12,25,.55);display:flex;align-items:flex-end;justify-content:center;z-index:11}
+#pkd{background:var(--card);width:100%;max-width:640px;height:80vh;border-radius:22px 22px 0 0;display:flex;flex-direction:column;padding:16px}
+#pkd .row{align-items:center;justify-content:space-between}
+#pkl{overflow:auto;flex:1;margin:6px 0}
+.pkh{margin:14px 0 2px;font-size:13px;font-weight:700;color:var(--mut)}
+.pkr{display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--l)}
+.pkn{flex:1}
+

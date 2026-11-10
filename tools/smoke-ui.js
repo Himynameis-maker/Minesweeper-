@@ -13,7 +13,7 @@ function El(id){this.id=id;this.value=defaults[id]??'';this.checked=false;this.h
  const on=new Set(id=='mf'||id=='fo'?['on']:[]);
  this.classList={toggle:(c,f)=>{(f===undefined?!on.has(c):f)?on.add(c):on.delete(c)},add:c=>on.add(c),remove:c=>on.delete(c),contains:c=>on.has(c)};
  this.style={setProperty(){}};this.addEventListener=()=>{};this.select=()=>{};this.closest=()=>null}
-const document={querySelector:s=>els[s]||(els[s]=new El(s.replace(/^#/,''))),createElement:()=>new El('a')};
+const document={querySelector:s=>els[s]||(els[s]=new El(s.replace(/^#/,''))),createElement:()=>new El('a'),documentElement:{clientWidth:400}}; /* board.js の draw が幅を読む */
 const window={addEventListener:(t,f)=>t=='load'&&loads.push(f)};
 const driver=`
 (async()=>{const log=[],ok=(c,m)=>{if(!c)throw Error('FAIL: '+m);log.push('ok: '+m);console.log('ok: '+m)};

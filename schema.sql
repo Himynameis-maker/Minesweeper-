@@ -8,3 +8,6 @@ CREATE TABLE IF NOT EXISTS ranks(day TEXT NOT NULL, name TEXT NOT NULL, ms INTEG
 CREATE INDEX IF NOT EXISTS ranks_day ON ranks(day, ms, at);
 -- maint: メンテナンス(アプデのためデイリーを止める)の予約。常に0〜1行。day=止め始める日(JST)。解除すると行が消える。管理者だけが操作する(.github/workflows/daily-maint.yml)
 CREATE TABLE IF NOT EXISTS maint(id INTEGER PRIMARY KEY CHECK(id=1), day TEXT NOT NULL);
+-- picks: 厳選盤面(.github/workflows/picks.yml が1日に最大3つ入れる。全体で最大21個。古いものから消える。盤面コードのルールセット番号が古いものも消える)。day=作られた日(JST)、at=作られた時刻(ms)、ver=盤面コードのルールセット番号、n=縛りの数
+CREATE TABLE IF NOT EXISTS picks(code TEXT PRIMARY KEY, day TEXT NOT NULL, at INTEGER NOT NULL, ver INTEGER NOT NULL, n INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS picks_day ON picks(day, at);

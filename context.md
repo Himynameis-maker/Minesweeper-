@@ -47,6 +47,7 @@ js/ui/                描画と配線
   board.js            draw (チャレンジ中は ✅クリア X/N・第N盤面・❤・💡 のチップ、「次の盤面」ボタンの出し分けもここ) (2.6KB)
   modal.js            縛りモーダル, tags(縛りのタグ), 例盤面 mini/exHtml, longpress (5.4KB)
   copycode.js         盤面コードのコピーボタン(盤面画面の上 #cp / チャレンジ終了カード #fincp)。daily.js の dyCopy を使うので daily.js より後に読む (cpUpd/cpFin/cpCopy)
+  picks.js            厳選盤面の一覧(タイトル横の「🎯 厳選盤面」#pkb → #pkm)。日ごとにまとめ、縛りの数+コードのコピーボタン。daily.js の dyApi/dyCopy を使うので daily.js より後に読む (pkOpen/pkDraw/pkCopy)
   freecode.js         フリープレイの「盤面コード(貼り付け専用)」欄。貼る→サイズ/爆弾数/縛りが入り「キャンセル/スタート」だけになる。古い番号のコードは断る (FC, fcApply/fcCancel/fcStart)
   main.js             upd, setMode, 検査レポート欄(?repo をつけたときだけ表示), 全イベント配線(load) (3.3KB)
 rules/                1ルール=1ファイル(ファイル名=id)。_始まりは読み込まれない
@@ -57,13 +58,16 @@ tools/
   smoke-ui.js         偽DOMでUI一式+チャレンジの通し(抽選範囲/ヒント/ミス/達成/ゲームオーバー/引き直し/ウィンストリーク)を動かす: node tools/smoke-ui.js
   daily-plan.js       デイリー盤面の抽選と生成。数値の調整は先頭の DAILY だけ(盤面サイズ・爆弾率・生成の制限時間・難易度の上限 `maxCost`)
   daily-gen.js        daily-plan を core+rules と読み込み、盤面コードを JSON に書く: node tools/daily-gen.js payload.json YYYY-MM-DD (workflow が使う)
+  pick-plan.js        厳選盤面の抽選と生成(作り方はデイリーと同じで、難易度の下限だけ違う)。数値の調整は先頭の PICK だけ(minCost/minDeep/minDep・制限時間)
+  pick-gen.js         pick-plan を core+rules+daily-plan と読み込み、盤面コードを JSON に書く。見つからなければファイルを書かず正常終了: node tools/pick-gen.js payload.json (workflow が使う)
   daily-e2e.js        デイリーの通しテスト(偽D1+偽DOM。functions/ の本物を動かす): node tools/daily-e2e.js (Node 22.5+)
   daily-streak.js     デイリーの連勝記録だけの検査(通信・ズル対策の分岐。サーバー不要): node tools/daily-streak.js
 js/ui/daily.js        デイリー画面(スタート/3,2,1/タイマー/結果/ランキング/盤面入手)。サーバーとの通信もここ
 js/core/boardcode.js  盤面コードの符号化(boardEncode/boardDecode)。js/core/boardver.js = ルールセット番号 BOARD_VER
-functions/            Cloudflare Pages Functions(デイリーのサーバー側)。★ファイル名がそのままURLになる。_lib.js=共通(メンテナンス判定 getMaint/maintPhase/playBlocked/boardLocked もここ), ping.js=動作確認, api/daily/{status,start,finish,code,ranking}.js, api/admin/board.js, api/admin/maint.js(メンテの予約・解除。第11節)
+functions/            Cloudflare Pages Functions(デイリーのサーバー側)。★ファイル名がそのままURLになる。_lib.js=共通(メンテナンス判定 getMaint/maintPhase/playBlocked/boardLocked もここ), ping.js=動作確認, api/daily/{status,start,finish,code,ranking}.js, api/admin/board.js, api/picks.js(厳選盤面の一覧。公開), api/admin/pick.js(厳選盤面の登録・今日の本数。管理者), api/admin/maint.js(メンテの予約・解除。第11節)
 schema.sql            D1(SQLite)のテーブル定義。Cloudflare の D1 → Console に貼って1回実行
 .github/workflows/daily.yml   毎日の盤面作りの自動実行(GitHub Actions。メンテ中は作らない)
+.github/workflows/picks.yml   厳選盤面を作る自動実行(毎日6回。手動実行も可。見つからなくても失敗にしない)
 .github/workflows/daily-maint.yml   メンテナンス(デイリーを止める)の予約・解除・状態確認。管理者が手で実行するだけ
 DAILY.md              ★ユーザー向けのデイリー管理ガイド(非エンジニア向け)。仕様を変えたらここも直す
 ```
@@ -85,6 +89,7 @@ DAILY.md              ★ユーザー向けのデイリー管理ガイド(非エ
 | UIの見た目・操作の変更 | `context.md` + `index.html` + `css/style.css` + 該当の `js/ui/*.js` `js/game/*.js` |
 | デイリーの不具合(サーバー機能・登録・準備中など) | `context.md` + 症状(画面のメッセージ / `/ping` の表示 / Actions の赤い行)。コードは `functions/` `.github/workflows/daily.yml` `js/ui/daily.js` |
 | デイリーの盤面(大きさ・爆弾率・生成) | `context.md` + `tools/daily-plan.js` |
+| 厳選盤面(難易度の下限・出る頻度・画面) | `context.md` + `tools/pick-plan.js`(下限) / `.github/workflows/picks.yml`(頻度) / `js/ui/picks.js` `index.html` `css/style.css`(画面) |
 | 配布用の単一HTMLが欲しい | プロジェクト全体 → `python3 build.py` の結果 `dist/minesweeper-variants.html` |
 
 ルールを足すだけなら **CORE・UI・CSS は一切不要**。新規ファイル1つ(+ CHANGELOG 1行)で完結する。
@@ -284,4 +289,20 @@ python3 build.py                           # rules ブロック同期 + dist 生
 - 検査: `node tools/daily-e2e.js` の第11節(予約・更新中・解除・overdue・テーブル無し・画面の表示)。
 
 **ユーザー向けの管理手順は `DAILY.md`**(仕様を変えたら必ず更新する)。
+
+### 厳選盤面(2026-11-10 追加。デイリーとは別の仕組みで、同じ作り方に「難易度の下限」だけ足したもの)
+**何か**: やりごたえのある盤面を、1日に最大3つ、全体で最大21個まで置いておく。誰でもコードをコピーして、フリープレイの盤面コード欄に貼って遊べる(ランキング・1日1回などは無し)。画面はタイトルの横の「🎯 厳選盤面」→ 一覧(作られた日(JST)ごとにまとめ、新しい日が上。各行に「縛り N」(または「縛りなし」)と「コード」ボタン。押すと「copied」)。
+**構成**: `.github/workflows/picks.yml` → `tools/pick-gen.js`(`pick-plan.js`)で生成 → `PUT /api/admin/pick` で登録(管理者。`DAILY_TOKEN`、デイリーと同じ Secrets/Variables を使う)→ D1 `picks` → 画面が `GET /api/picks`(公開)で一覧を取る。
+**生成**: `dailyPlan(false)`(サイズ・爆弾率・縛りの抽選はデイリーと同じ。上限 `DAILY.maxCost` も同じ)で抽選し、`gen` に下限 `minCost`/`minDeep`/`minDep` を渡す(`gen.js` の `qual`)。下限は縛りの有無・種類に依らない(四方向縛りだけ・縛りなしでも、下限を満たす盤面だけ採用)。
+- `minCost`(現行6): 一番重い手が「6通り以上」。= 少なくとも1回は場合分け(背理法)が要る。上限は 16(`DAILY.maxCost`)なので「人間が解ける範囲で、場合分けが要る」帯になる。
+- `minDeep`(現行3): 単一制約で進めず、全列挙が要る場面(`sim` の `deep`=詰まった回数)が3回以上。
+- `minDep`(現行.15): 縛りを外すと解けなくなるマスが、安全マスの15%以上(縛りが飾りでない。`nec` の縛りだけが対象。数字の定義を変える縛りは対象外=従来どおり)。
+- 実測の目安: 上限16・下限なしで作った9盤面のうち、minCost・minDeep を満たしたのは5盤面(minDep は未計測)。厳選の生成を3回回すと、1秒・15秒・2分33秒で1つずつできた。`pickMake` は genSec=30 で引き直し、giveUpSec=840 であきらめる(null。**失敗にしない**=厳選は出なくてもよい)。
+**サーバー**(`functions/api/admin/pick.js`): 縛りの数・ルールセット番号・作成日は、送られた値を信じずコードと時計(JST)から決める。`PICK_PER_DAY=3`・`PICK_MAX=21`(`_lib.js`)。1文の `INSERT … SELECT … WHERE (今日の本数)<3` で入れるので、同時に届いても3を超えない。上限なら 409 `limit`、同じコードなら 200 `dup`、いまある盤面より古い番号なら 409 `old`、メンテナンス中(`boardLocked`)なら 423。入れたついでに、**ルールセット番号がそのコードより古いものと、新しい順で21個を超えたものを削除**。`GET /api/admin/pick` は `{day,count,limit,max,total,full}`(workflow が `full` で生成を省く)。`picks` テーブルは `schema.sql` にあるが、管理APIが `CREATE TABLE IF NOT EXISTS` で自動作成する(一覧は無ければ空)。`/ping` の `picks` は `tables` に混ぜない(既存の daily workflow が止まらないように)。
+**画面**(`js/ui/picks.js`): 縛りの数は盤面コードの縛り欄から数える。`bcOld` のコードは出さない。
+**workflow**(`picks.yml`): 毎日 UTC 0,4,8,12,16,20 時の47分(JST 9:47, 13:47, 17:47, 21:47, 1:47, 5:47)。daily-board(毎時33分)とは別ジョブ・別時刻。手動実行も可(Run workflow。上限はサーバーが守る)。手順: 設定確認 → メンテ中なら何もしない → 今日の枠が `full` なら何もしない → 生成 → (ファイルがあれば)送る。見つからなかった回・枠が埋まった回・メンテ中は **緑のまま**(失敗メールは来ない)。`concurrency` で同時に2つ走らない。
+**BOARD_VER**: 盤面の意味は変わらないので上げない。ルールの意味を変えて上げたときは、次に新しい番号の厳選盤面が入った時点で古い番号のものが消える(それまでも画面は古い番号を出さない)。
+**調整**: 難しさの下限は `PICK`(上げるほど歯ごたえ重視で、生成に時間がかかり、出る回が減る)。出る頻度は `picks.yml` の cron(1日の上限は3固定=`_lib.js` の `PICK_PER_DAY`)。
+**検査**: `node tools/daily-e2e.js` の末尾(登録・1日3つ・21個・古い番号・メンテ中・テーブル無し・画面の表示とコピー)。生成そのものは `node tools/pick-gen.js out.json`(手元で動く)。
+**D1 の準備**: `schema.sql` の `picks` の2行を、Cloudflare の D1 → Console で1回実行しておくとよい(実行しなくても、最初の登録時に自動で作られる)。
 

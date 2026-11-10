@@ -223,9 +223,9 @@ function sim(P,M,mines,start,skip,L){
  const N=P.nb.length,st=new Uint8Array(N),act=P.nb.map((_,i)=>ncount(P,mines,i)),num=L?L.sh:act,az=P.mir&&L?L.sh:act; /*[mir]*/ /* 数字0の自動開放は「見えている数字」で決める(鏡爆弾は+1するので、実際の爆弾数0でも表示が0とは限らない) */
  const rev=i=>{const q=[i];while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;if(!az[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}};
  rev(start);let open0=0;for(let i=0;i<N;i++)if(st[i]==1)open0++;
- const kinds=new Set(),safe=N-M;let rounds=0,bug=0,maxc=0;
- for(;;){const d=deduce(P,st,num,M,skip);if(!d.length)break;rounds++;maxc=Math.max(maxc,Math.min(...d.map(e=>e.cost||0)));
+ const kinds=new Set(),safe=N-M;let rounds=0,bug=0,maxc=0,deep=0;
+ for(;;){const d=deduce(P,st,num,M,skip);if(!d.length)break;rounds++;maxc=Math.max(maxc,Math.min(...d.map(e=>e.cost||0)));if(Math.min(...d.map(e=>e.tier))>=3)deep++; /* deep=単一制約では進めず、全列挙が要ったラウンドの数(詰まった回数) */
   for(const e of d){if(!!mines[e.i]!=!!e.mine)bug=1;if(st[e.i])continue;kinds.add(e.tier+e.src.t);if(e.mine)st[e.i]=2;else rev(e.i)}
   if(bug)break}
  let rv=0;for(let i=0;i<N;i++)if(st[i]==1)rv++;
- return{ok:rv==safe&&!bug,bug,rv,open0,rounds,kinds,safe,st,maxc}}
+ return{ok:rv==safe&&!bug,bug,rv,open0,rounds,kinds,safe,st,maxc,deep}}
