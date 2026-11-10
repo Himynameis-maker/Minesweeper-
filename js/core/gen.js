@@ -14,6 +14,7 @@
    新しい配置様式(例: ヘビ)のルールは、[grp] と同じ位置に「専用の sample と move」を足す(context.md 第6節)。 */
 async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,MC=o.maxCost??Infinity,mnC=o.minCost??0,mnD=o.minDeep??0,mnP=o.minDep??0,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
  const{R,C,M,ids}=cfg,N=R*C,P=prep(cfg),t0=performance.now(),kc=P.cons;
+ /*[s1]*/const SZ=s=>P.s1?new Set([s]):new Set([s,...P.nb[s]]); /* 開始マスと「必ず安全にするマス」。ふつうは数字0にするため nb も安全。startOnly の縛り(均一な配置)では開始マス1つだけ(開始の数字は0でなくてよい) */
  if(P.grp&&M%P.grp)throw Error('爆弾数が'+P.grp+'の倍数ではありません');
  const byC=[...Array(N)].map(()=>[]);kc.forEach((k,q)=>k.cells.forEach(c=>byC[c].push(q)));
  /*[iso]*/const iok=m=>{if(P.imax)return ccomps(m).every(q=>q.length>=2&&q.length<=P.imax);for(let i=0;i<N;i++)if(m[i]&&!P.adj8[i].some(y=>m[y]))return false;return true};
@@ -72,7 +73,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,MC=
    while(gr.length<n){const f=[];for(const c of gr)for(const y of P.adj[c])if(can(y)&&!f.includes(y))f.push(y);if(!f.length)return null;const y=wpick(f,w);gr.push(y);put(y)}
    for(const c of gr){blk[c]=1;for(const y of P.adj[c])blk[y]=1}}
   return valid(m)?m:null};
- const gmove=(cur,a,Us,cs)=>{const n=P.grp,sz=new Set([cs,...P.nb[cs]]),m=cur.slice(),x=a[rnd()*a.length|0],cm=gcomps(P,cur).find(q=>q.includes(x));
+ const gmove=(cur,a,Us,cs)=>{const n=P.grp,sz=SZ(cs),m=cur.slice(),x=a[rnd()*a.length|0],cm=gcomps(P,cur).find(q=>q.includes(x));
   if(!cm)return null;for(const c of cm)m[c]=0;
   const cand=[];for(let c=0;c<N;c++)if(!m[c]&&Us.has(c)&&!sz.has(c)&&!P.adj[c].some(y=>m[y])&&(!P.conn||P.adj8[c].some(y=>m[y])))cand.push(c);
   if(!cand.length)return null;
@@ -94,7 +95,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,MC=
    if(P.imax)for(const c of g){blk[c]=1;for(const y of P.adj8[c])blk[y]=1}
    left-=n}
   return valid(m)?m:null};
- const imove=(cur,a,Us,cs)=>{const sz=new Set([cs,...P.nb[cs]]),m=cur.slice(),x=a[rnd()*a.length|0];
+ const imove=(cur,a,Us,cs)=>{const sz=SZ(cs),m=cur.slice(),x=a[rnd()*a.length|0];
   if(P.imax&&rnd()<.5){ /* 塊ごと、同じ大きさのまま別の場所(他の塊に触れない所)へ */
    const cm=ccomps(cur).find(q=>q.includes(x));if(!cm)return null;for(const c of cm)m[c]=0;
    const ban=new Uint8Array(N);for(let i=0;i<N;i++)if(m[i]){ban[i]=1;for(const y of P.adj8[i])ban[y]=1}
@@ -119,7 +120,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,MC=
   for(let n=1;n<M;n++){const f=[];for(let c=0;c<N;c++)if(can(c)){let k=0;for(const y of P.adj8[c])k+=m[y];if(k){f.push(c);ww[c]=w[c]/(1+2*(k-1))}}
    if(!f.length)return null;put(wpick(f,ww))}
   return valid(m)?m:null};
- const cmove=(cur,a,Us,cs)=>{const sz=new Set([cs,...P.nb[cs]]);
+ const cmove=(cur,a,Us,cs)=>{const sz=SZ(cs);
   for(let t=0;t<6;t++){const m=cur.slice(),x=a[rnd()*a.length|0];m[x]=0;if(!cconn(m))continue;
    const cand=[];for(const c of Us)if(!m[c]&&c!=x&&!sz.has(c)&&P.adj8[c].some(y=>m[y]))cand.push(c);
    if(!cand.length)continue;m[cand[rnd()*cand.length|0]]=1;return m}
@@ -191,7 +192,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,MC=
   for(let n=nD;n<M;n++){const a=[];for(let c=0;c<N;c++)if(can(c)&&!blk[c])a.push(c);if(!a.length)return null;put(wpick(a,w))}
   return valid(m)?m:null};
  /* ---- 標準の配置サンプラ(密度ムラ)。grp持ちは gsample、iso持ちは isample、dragon持ちは dsample、conn持ちは csample に切り替わる ---- */
- const sample=s=>{const sz=new Set([s,...P.nb[s]]),cx=[0,1,2].map(()=>[rnd()*R,rnd()*C,rnd()]),sg=Math.max(R,C)/3,w=[];
+ const sample=s=>{const sz=SZ(s),cx=[0,1,2].map(()=>[rnd()*R,rnd()*C,rnd()]),sg=Math.max(R,C)/3,w=[];
   for(let i=0;i<N;i++){let v=.25;for(const[y,x,a]of cx)v+=a*2*Math.exp(-(((i/C|0)-y)**2+(i%C-x)**2)/(2*sg*sg));w.push(v)}
   if(P.grp)return gsample(sz,w);
   if(P.iso)return isample(sz,w);
@@ -206,7 +207,7 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,MC=
  /* ---- 例盤面用(UIの長押し): 解けるかは見ず、OK例とNG例だけ作る ---- */
  if(o.sampleOnly){let ex=null,bad=null,bc=[];
   let s0=0;for(let k=0;k<20000&&!ex;k++){s0=rnd()*N|0;ex=sample(s0);if(ex&&MIRM&&!mstate(ex,s0))ex=null}
-  const sz0=new Set([s0,...P.nb[s0]]); /* ex の開始マスと数字0の領域(NG例で爆弾を置かない)。下限つき cons は当たりが薄い(lines で約0.05%)ので多めに試す */
+  const sz0=SZ(s0); /* ex の開始マスと数字0の領域(NG例で爆弾を置かない)。下限つき cons は当たりが薄い(lines で約0.05%)ので多めに試す */
   const valid2=m=>kc.every(k=>{let s=0;for(const c of k.cells)s+=m[c];return s>=k.lo&&s<=k.hi}); /* NG例が cons の違反でなく龍の違反だけになるように */
   if(P.dragon==2&&ex){ /* 双竜のNG例: OK例の龍以外の爆弾を1つ、龍に8近傍で触れるマスへ動かす(赤枠=動かした爆弾)。龍以外の爆弾が無ければ下のランダム抽選 */
    const t=tpath(P,ex),D=new Set(t.cells||[]),ex2=[...Array(N).keys()].filter(i=>ex[i]&&!D.has(i));

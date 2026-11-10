@@ -11,7 +11,7 @@ function prep(cfg){const{R,C,ids}=cfg,rs=ids.map(id=>RULES[id]),nr=rs.find(r=>r.
  /*[iso]*/const ir=rs.find(r=>r.iso),cr=rs.find(r=>r.conn),adj8=(ir||cr||(dr&&(dr.twin||dr.dragon===2)))?[...Array(R*C)].map((_,i)=>offs(R,C,i,D8)):null;
  /*[probe]*/const pr=rs.find(r=>r.probe);
  /*[mir]*/const mr=rs.find(r=>r.mir),ms=mr?[...Array(R*C)].map((_,i)=>offs(R,C,R*C-1-i,D8)):null,o4=mr?[...Array(R*C)].map((_,i)=>offs(R,C,i,D4)):null; /* 鏡爆弾: ms[i]=盤面の中心と点対称なマス(R*C-1-i)の周囲8マス。マスiの爆弾が鏡爆弾なら ms[i] の数字が+1(逆に、数字iに+1できる鏡爆弾の候補も ms[i])。o4=上下左右 */
- return{nb,cons,/*[dragon]*/dragon:dr?(dr.twin||dr.dragon===2?2:1):0,did:dr?dr.id:'',/*[dd]*/dd:dr&&dr.dragon===true&&dr.dbl?1:0,probe:pr?1:0,pid:pr?pr.id:'',grp:gr?gr.grp:0,gid:gr?gr.id:'',adj,R,C,lie:lr?(lr.liar===2?2:1):0,lid:lr?lr.id:'',/*[iso]*/iso:ir?1:0,iid:ir?ir.id:'',imax:ir&&ir.iso!==true?ir.iso:0,/*[conn]*/conn:cr?1:0,cnid:cr?cr.id:'',adj8,w,/*[mir]*/mir:mr?1:0,mid:mr?mr.id:'',ms,o4,mk:MIRN}}
+ return{nb,cons,/*[dragon]*/dragon:dr?(dr.twin||dr.dragon===2?2:1):0,did:dr?dr.id:'',/*[dd]*/dd:dr&&dr.dragon===true&&dr.dbl?1:0,probe:pr?1:0,pid:pr?pr.id:'',grp:gr?gr.grp:0,gid:gr?gr.id:'',adj,R,C,lie:lr?(lr.liar===2?2:1):0,lid:lr?lr.id:'',/*[iso]*/iso:ir?1:0,iid:ir?ir.id:'',imax:ir&&ir.iso!==true?ir.iso:0,/*[conn]*/conn:cr?1:0,cnid:cr?cr.id:'',adj8,w,/*[mir]*/mir:mr?1:0,mid:mr?mr.id:'',ms,o4,mk:MIRN,/*[s1]*/s1:rs.some(r=>r.startOnly)?1:0}}
 /* [wt] マスiの数字の真の値 = nbが指すマスの爆弾の重み付き和(wtなしなら普通の個数)。m は 0/1 配列 */
 function ncount(P,m,i){let s=0;for(const j of P.nb[i])s+=m[j]*(P.w?P.w[j]:1);return s}
 /* [dragon] 龍: 左端から右端まで、1列ごとに行が同じか±1の爆弾の列。m は 0/1 配列。dok=あるか / dpath=1本(マス番号の配列)。
