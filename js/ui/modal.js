@@ -1,12 +1,11 @@
 /* [ui/modal] 縛りモーダル(pick=検索つき選択 / view=今の盤面の縛り)、併用不可の無効化、長押しで出る7x7の例盤面。
-   縛りに付くタグ(tags)は、新しいフックを足したらここに1行足す。例盤面(mini/exHtml)の見せ方もここ。 */
-const tags=r=>{const g=k=>'<span class="tag">'+k+'</span>';return(r.nb?g(tx('数字変更')):'')+(r.cons?g(tx('制約')):'')+(r.grp?g(tx('グループ')):'')+(r.liar?g(r.liar===2?tx('嘘は各行列1つ'):tx('数字が嘘')):'')+(r.iso?g(r.iso===true?tx('孤立禁止'):tx('塊は2〜{n}個',{n:r.iso})):'')+(r.conn?g(tx('つながる')):'')+(r.dragon?g(r.dragon===2?tx('双竜(左右+上下)'):tx('龍(左→右)')):'')+(r.twin?g(tx('双竜(左右+上下)')):'')+(r.mir?g(tx('鏡爆弾(数字+1)')):'')+(r.wt||r.dbl?g(tx('数え方変更')):'')+(r.ok?g(tx('条件付き')):'')+(stepOf(r)>1?g(tx('爆弾数は{n}の倍数',{n:stepOf(r)})):'')};
+   例盤面(mini/exHtml)の見せ方もここ。 */
 const vis=()=>{const q=$('#mq').value.trim().toLowerCase();return Object.values(RULES).filter(r=>!q||(r.id+rname(r)+rdesc(r)).toLowerCase().includes(q))};
 function renderList(){const L=$('#ml');
  if(MODE=='pick'){$('#mt').textContent=tx('縛りを選ぶ ({a}/{b})',{a:SEL.size,b:Object.keys(RULES).length});
-  L.innerHTML=vis().map(r=>{const d=blockers(r.id).length;return '<label class="ri'+(d?' dis':'')+'" data-rid="'+r.id+'"><input type="checkbox" data-id="'+r.id+'"'+(SEL.has(r.id)?' checked':'')+(d?' disabled':'')+'><div><b>'+rname(r)+'</b>'+tags(r)+'<div class="mut" style="margin:0">'+rdesc(r)+'</div></div></label>'}).join('')||'<p class="mut">'+tx('該当する縛りがありません')+'</p>'}
+  L.innerHTML=vis().map(r=>{const d=blockers(r.id).length;return '<label class="ri'+(d?' dis':'')+'" data-rid="'+r.id+'"><input type="checkbox" data-id="'+r.id+'"'+(SEL.has(r.id)?' checked':'')+(d?' disabled':'')+'><div><b>'+rname(r)+'</b>'+'<div class="mut" style="margin:0">'+rdesc(r)+'</div></div></label>'}).join('')||'<p class="mut">'+tx('該当する縛りがありません')+'</p>'}
  else{const h=MODE=='dy'?null:G&&G.hint,hr=h?h.rs:[],ids=MODE=='dy'?(DYS.rules||[]).filter(id=>RULES[id]):G.cfg.ids; /* dy=デイリーのスタート前に見る「今日の縛り」(ui/daily.js) */
-  L.innerHTML=ids.map(id=>'<div class="ri '+(hr.includes(id)?'hl':'')+'" data-rid="'+id+'"><div><b>'+rname(RULES[id])+'</b>'+tags(RULES[id])+'<div class="mut" style="margin:0">'+rdesc(RULES[id])+'</div></div></div>').join('')||'<p class="mut">'+tx('この盤面に縛りはありません')+'</p>'}}
+  L.innerHTML=ids.map(id=>'<div class="ri '+(hr.includes(id)?'hl':'')+'" data-rid="'+id+'"><div><b>'+rname(RULES[id])+'</b>'+'<div class="mut" style="margin:0">'+rdesc(RULES[id])+'</div></div></div>').join('')||'<p class="mut">'+tx('この盤面に縛りはありません')+'</p>'}}
 function openM(m){MODE=m;const p=m=='pick';if(!p)$('#mt').textContent=tx(m=='dy'?'今日の縛り':'この盤面の縛り');$('#mh').textContent=tx(m!='dy'&&!p&&hm?'ヒントON: 縛りをタップすると、その縛りから分かることを教えます':'縛りを長押しすると、例の盤面が表示されます');$('#mq').hidden=$('#mfoot').hidden=!p;$('#mq').value='';$('#md').hidden=false;renderList()}
 function closeM(){$('#md').hidden=true;updSel();upd()}
 function updSel(){const n=[...SEL].map(id=>rname(RULES[id]));$('#sel').textContent=n.length?tx('{n}件: {l}',{n:n.length,l:n.join(' / ')}):tx('未選択(縛りなし)')}
