@@ -12,6 +12,8 @@ window.addEventListener('load',()=>{
  /* 検査レポート欄は ?repo(または #repo)をつけて開いたときだけ出す。例: https://…/?repo */
  try{if(typeof location!='undefined'&&(/[?&]repo(=|&|$)/.test(location.search||'')||location.hash=='#repo'))$('#rpt').hidden=false}catch(e){}
  setMode(false);updSel();
+ /* ボタン(開ける/旗/マーク/縛りを選ぶ/縛り/ヒント/今日の縛り)の絵文字をドット絵にする。i18nDom の英語化のあと(load)に、今の文字をそのまま変換する */
+ for(const s of['#fo','#ff','#fk','#pk','#rv','#hb','#dyu'])$(s).innerHTML=pxi($(s).innerHTML.replace('<span class="mk">🚩</span>','<i class="px fg mk inl"></i>'));
  for(const id of['S','M'])$('#'+id).addEventListener('input',upd);
  $('#mf').onclick=()=>setMode('f');$('#mc').onclick=()=>setMode('c');$('#mdy').onclick=()=>setMode('d');
  $('#pk').onclick=()=>openM('pick');$('#rv').onclick=()=>G&&openM('view');

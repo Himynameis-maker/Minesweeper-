@@ -16,7 +16,7 @@ const exCache={};
 function mini(P,m,o){o=o||{};let h='<div class="mini">';
  for(let i=0;i<49;i++){let cl='c o',t='';
   if(o.pat){if(i==24){cl+=' ctr';t='?'}else if(P.nb[24].includes(i)){cl+=' cnt';t='●'}}
-  else if(m[i])t='💣';else{const n=o.sh?o.sh[i]:ncount(P,m,i);t=n||'';if(n)cl+=' n'+Math.min(n,8);if(o.hon&&o.hon[i])cl+=' hon'}
+  else if(m[i])t='<i class="px bm"></i>';else{const n=o.sh?o.sh[i]:ncount(P,m,i);t=n||'';if(n)cl+=' n'+Math.min(n,8);if(o.hon&&o.hon[i])cl+=' hon'}
   if(o.bc&&o.bc.includes(i))cl+=' bad';
   if(o.dr&&o.dr.includes(i))cl+=' drg';
   h+='<div class="'+cl+'"'+(P.w&&P.w[i]>1?WTST:'')+'>'+t+'</div>'}
