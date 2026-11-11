@@ -35,6 +35,7 @@ css/style.css         見た目のみ (チャレンジの解説・終了演出�
 functions/en.js ja.js /en と /ja で index.html をそのまま返す(アドレスは変わらない)。第12節
 js/i18n.js            言語の決定(URL の /en /ja、確認用 ?lang=)・tx('日本語')・rname/rdesc/rwhy・index.html の一括置き換え(i18nDom)
 js/i18n-en.js         英語の文(キー=日本語の文)
+js/i18n-en-rules.js   縛りの英語の名前・説明・why(I18N_RULES[id])。縛りを足したらここにも足す
 tools/i18n-check.js   訳の漏れ検査(node tools/i18n-check.js)。ブラウザ不要
 js/core/              推論と生成。DOM非依存(node でも動く)
   util.js             rnd, D8/D4/KN, offs, gcd (0.5KB)
@@ -347,7 +348,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 
 **進み具合**
 - 第1弾(画面の文言: フリープレイ・チャレンジ・デイリー画面・厳選盤面・盤面コード欄・縛り一覧のタグと例盤面の説明): 済。
-- 第2弾(縛り17個の name/desc/why の英語 = `js/i18n-en-rules.js`): 未。それまで縛りの名前と説明は英語画面でも日本語。
+- 第2弾(縛り17個の name/desc/why の英語 = `js/i18n-en-rules.js`): 済(2026-11-11)。新しい縛りを足すときは `rules/<id>.js`(日本語)と一緒に、ここへ英語を足す(第10節の6)。
 - 第3弾(`functions/` が返す文言・ランキングなどサーバー側): 未(`js/ui/daily.js` が出す文言は第1弾で済み)。
 
 **既知の制限**: 検索・SNS のプレビュー(`<title>` / OGP)は静的HTMLの日本語のまま(英語にするには `/en` だけ別のHTMLを返す仕組みが要る)。`?repo` の検査レポート・`tools/`・`DAILY.md` は日本語のみ。英語は日本語より文が長いので、ボタンなどの幅が足りない所が出たら `css/style.css` で直す。
