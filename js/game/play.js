@@ -29,6 +29,17 @@ function act(i,f){if(!G||G.over||G.done||G.st[i])return;G.hint=null;
  else flood(i);
  if(!G.over&&G.rev==G.N-G.cfg.M){G.done=1;if(run)chClear();else msg(tx('🎉 クリア!'))}
  draw();if(DY&&(G.over||G.done))dyEnd()} /* デイリー: ミスもクリアもここで終わり(ui/daily.js) */
+/* スマート開示: 開いている数字マスの周りの旗(🚩のみ。マークは数えない)の数が、その数字と同じなら、周りの残りの未開マスを開く。
+   旗の数え方は数字と同じ ncount を通すので、2倍の爆弾や十字・ナイトの数え方もそのまま効く。旗が間違っていれば爆発する。 */
+function chord(i){if(!G||G.over||G.done||G.st[i]!=1||!G.num[i])return;const{P,st,fl,mines}=G,f=new Uint8Array(G.N);
+ for(let j=0;j<G.N;j++)if(fl[j]==1)f[j]=1;
+ if(ncount(P,f,i)!=G.num[i])return;
+ const t=P.nb[i].filter(j=>!st[j]&&!fl[j]);if(!t.length)return;
+ G.hint=null;
+ for(const j of t){if(st[j])continue;if(mines[j]){st[j]=2;G.over=1}else flood(j)}
+ if(G.over){if(run)chMiss();else msg(tx('爆発…'))}
+ else if(G.rev==G.N-G.cfg.M){G.done=1;if(run)chClear();else msg(tx('🎉 クリア!'))}
+ draw();if(DY&&(G.over||G.done))dyEnd()}
 /* ヒント: ON中に 数字マス/縛り(一覧内)/残り爆弾数 をタップ。その手がかりから分かることがあるかだけ教える(場所は教えない) */
 function hscan(){const{P,N,num,mines,fl,cfg}=G,st=G.st.slice(),out=[],seen=new Set();
  for(let i=0;i<N;i++)if(fl[i]==1&&mines[i]&&!st[i])st[i]=2; /* 正しい旗=既知の爆弾(マークは対象外) */
