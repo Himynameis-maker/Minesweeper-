@@ -10,9 +10,9 @@ const PICK={
  minDep:.15        // 下限3: 縛りを外すと解けなくなるマスが、安全マスの15%以上(縛りが飾りでない)
 };
 /* 1つ作る。見つかれば {cfg,res,tries,sec,m:{maxc,deep,rounds}}、あきらめたら null */
-async function pickMake(log){const t0=Date.now();
+async function pickMake(log){const t0=Date.now(),none=rnd()<DAILY.noneRate; /* 縛りなしにするかは最初に1回だけ(確率は DAILY.noneRate。daily-plan.js) */
  for(let n=1;;n++){const el=(Date.now()-t0)/1000;if(el>PICK.giveUpSec){log('あきらめました('+(n-1)+'回)');return null}
-  const cfg=dailyPlan(false);let res=null;
+  const cfg=dailyPlan(none);let res=null;
   try{res=await gen(cfg,{qms:PICK.genSec*1000,hard:PICK.genSec*1000,maxCost:DAILY.maxCost,minCost:PICK.minCost,minDeep:PICK.minDeep,minDep:PICK.minDep})}catch(e){log('試行'+n+': エラー '+e.message)}
   if(res&&res.gf&&res.q){const s=sim(prep(cfg),cfg.M,res.mines,res.start,undefined,res.L);
    return{cfg,res,tries:n,sec:(Date.now()-t0)/1000,m:{maxc:s.maxc,deep:s.deep,rounds:s.rounds}}}
