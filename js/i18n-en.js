@@ -34,7 +34,7 @@ Object.assign(I18N_EN,{
 '盤面':"Board",
 '盤面の縦と横の長さ':"Board size (W × H)",
 '爆弾数':"Mines",
-'盤面コード(貼り付け専用)':"Board code",
+'盤面コード':"Board code",
 '貼り付け':"Paste here",
 '縛り':"Rules",
 '🧩 縛りを選ぶ':"🧩 Choose rules",
