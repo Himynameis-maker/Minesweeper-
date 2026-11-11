@@ -31,7 +31,7 @@ window.addEventListener('load',()=>{
  $('#ml').addEventListener('click',e=>{if(MODE!='view'||!hm)return;const t=e.target.closest('.ri');if(t)ask('r',t.dataset.rid)});
  const setFm=n=>{fm=n;['#fo','#ff','#fk'].forEach((s,k)=>$(s).classList.toggle('on',k==n))};
  $('#fo').onclick=()=>setFm(0);$('#ff').onclick=()=>setFm(1);$('#fk').onclick=()=>setFm(2);
- $('#g').onclick=e=>{const i=e.target.dataset.i;if(i===undefined)return;if(hm&&G&&G.st[+i]==1&&G.num[+i])return ask('n',+i);if(G&&G.st[+i]==1){if(!hm&&!fm)chord(+i);return}act(+i,fm)};
+ $('#g').onclick=e=>{const i=e.target.dataset.i;if(i===undefined)return;if(hm&&G&&G.st[+i]==1&&G.num[+i])return ask('n',+i);if(G&&G.st[+i]==1){if(!hm)chord(+i);return}act(+i,fm)};
  $('#g').oncontextmenu=e=>{e.preventDefault();const i=e.target.dataset.i;if(i!==undefined)act(+i,fm||1)}; /* 右クリック=今選んでいる印を立てる(開けるモード中は旗) */
  /* 検査レポート: 実行→表示、コピー、ダウンロード */
  $('#cg').onclick=()=>{const t=rep();$('#ctx').select();try{navigator.clipboard.writeText(t)}catch(e){}};
