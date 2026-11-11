@@ -1,5 +1,6 @@
 /* ルールのひな形(index.html には読み込まない。_ で始まるファイルは無視される)。
    新ルール = rules/<id>.js を1個作る(ファイル名=id)。使うフックだけ残して他は消す。仕様: context.md 第4節。 */
+/* 英語の名前・説明・why は rules/ ではなく js/i18n-en-rules.js に足す(context.md 第12節)。足したら node tools/i18n-check.js */
 reg({id:'myRule',                       // camelCase 一意。ファイル名と揃える
  name:'表示名(短く)', desc:'説明を1行で',
  // excl:'num',                         // 数字の定義を変えるルールは 'num'(同じ excl は併用不可)
