@@ -54,7 +54,7 @@ js/game/              盤面の進行(DOMを読み書きする)
   play.js             start(gen呼び出し。nr=新挑戦, again=引き直し), flood, act, hscan, ask(ヒント)。`setBoard` は startOnly のとき開始マスの直後に最初の1手ぶんも開ける
 js/ui/                描画と配線
   board.js            draw (チャレンジ中は ✅クリア X/N・第N盤面・❤・💡 のチップ、「次の盤面」ボタンの出し分けもここ。絵文字→ドット絵の変換 `pxi` と対応表 `PXI` もここ。第13節)
-  modal.js            縛りモーダル, tags(縛りのタグ), 例盤面 mini/exHtml(爆弾はドット絵), longpress
+  modal.js            縛りモーダル, 例盤面 mini/exHtml(爆弾はドット絵), longpress
   copycode.js         盤面コードのコピーボタン(#cp / #fincp)。daily.js の dyCopy を使うので daily.js より後に読む
   picks.js            厳選盤面の一覧(タイトル横の「🎯 厳選盤面」#pkb → #pkm)。daily.js の dyApi/dyCopy を使うので daily.js より後に読む (pkOpen/pkDraw/pkCopy)
   freecode.js         フリープレイの「盤面コード(貼り付け専用)」欄 (FC, fcApply/fcCancel/fcStart)
@@ -202,7 +202,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 2. `prep.js` — `prep` で P に必要情報を載せる(例: grp は `adj`)。
 3. `solver.js` `deduce` — 制約の作り方(`add`。`[probe]` は単一制約の推論が空のときだけ、全列挙の前に働くブロック)と、全列挙 `rec` 内の枝刈り(必要条件のみ)、必要なら全マス1成分へ併合(liar 方式)、`why` の根拠に rule id を足す(ヒント用)。
 4. `gen.js` — `valid`(全体制約の判定。下限つき cons は `lsample`/`smove` が担当)、`sample`(標準サンプラが作れない配置なら専用サンプラ)、山登りの専用 move(`gmove` 相当)、隠れ状態があれば `L` のように一緒に作って動かす。`nec`(外すと詰む検査の対象)に入れる。
-5. `ui/modal.js` — `tags` にタグを1行、例盤面(`mini`/`exHtml`)で見せ方が要るなら追記。数字の表示が変わるなら `ui/board.js` の `draw`。
+5. `ui/modal.js` — 例盤面(`mini`/`exHtml`)で見せ方が要るなら追記。数字の表示が変わるなら `ui/board.js` の `draw`。
 6. `game/play.js` の `start` で、gen の返す隠れ状態(`res.L` 相当)を `G.num` などに反映。
 
 ## 8. 検証(出力前に必ず)
