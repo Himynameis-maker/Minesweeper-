@@ -5,9 +5,9 @@ function draw(){if(!G)return;const{cfg,st,fl,num,mines,hint:h}=G,{R,C}=cfg,s=Mat
  const ns=h?h.ns:[],hr=h?h.rs:[],wt=G.P.w,fin=G.over||G.done; /* fin=ミスかクリアで終わった盤面。全マスを開いて見せる */
  let o='',expl=0,flg=0;
  for(let i=0;i<G.N;i++){let cl='c',t='',tint=wt&&wt[i]>1&&(fin||!st[i]);if(fl[i]==1&&!st[i])flg++; /* 残り爆弾数に数えるのは旗(1)だけ。マーク(2)は数えない */
-  if(st[i]==2){cl+=' x';t='💥';expl++}
-  else if(fin||st[i]==1){cl+=' o';if(mines[i])t='💣';else{t=num[i]||'';if(t)cl+=' n'+Math.min(t,8)}} /* 終了時は旗・マークも外して全マスを開いた見た目にする。数字はプレイ中に見えていたもの(num)と同じ */
-  else if(fl[i])t=fl[i]==2?'<span class="mk">🚩</span>':'🚩';
+  if(st[i]==2){cl+=' x';t='<i class="px ex"></i>';expl++}
+  else if(fin||st[i]==1){cl+=' o';if(mines[i])t='<i class="px bm"></i>';else{t=num[i]||'';if(t)cl+=' n'+Math.min(t,8)}} /* 終了時は旗・マークも外して全マスを開いた見た目にする。数字はプレイ中に見えていたもの(num)と同じ */
+  else if(fl[i])t=fl[i]==2?'<i class="px fg mk"></i>':'<i class="px fg"></i>';
   if(ns.includes(i))cl+=' hsrc';
   o+='<div class="'+cl+'" data-i="'+i+'"'+(tint?WTST:'')+'>'+t+'</div>'}
  const g=$('#g');g.style.setProperty('--s',s+'px');g.style.gridTemplateColumns='repeat('+C+','+s+'px)';g.innerHTML=o;
