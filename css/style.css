@@ -4,9 +4,8 @@
 body{margin:0;font:15px/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--fg)}
 #app{max-width:640px;margin:auto;padding:18px 14px 48px}
 /* タイトル: マス目のドット文字(SVG。index.html の h1)。MINESWEEPER=灰色のマス、ADDICT=紫のグラデのマス。検索エンジン・読み上げ用の文字は .sr に隠してある */
-h1{margin:4px 0 0;font-size:28px;letter-spacing:-.5px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
-h1 .pkb{margin-left:0}
-.logo{display:block;width:100%;max-width:420px;height:auto;flex:0 1 420px}
+h1{margin:4px 0 0;font-size:28px;letter-spacing:-.5px}
+.logo{display:block;width:100%;max-width:420px;height:auto;margin:2px 0 8px}
 .logo .lg1{fill:var(--mut)}.logo .lgs1{stop-color:var(--ac)}.logo .lgs2{stop-color:var(--ac2)}
 .sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .sub{margin:0 0 16px;color:var(--mut);font-size:13px}
@@ -27,6 +26,8 @@ button:active{transform:scale(.97)}button:disabled{opacity:.4}
 .big{width:100%;padding:15px;font-size:17px;border-radius:14px}.grow{flex:1}
 .seg{display:flex;background:var(--o);border:1px solid var(--l);border-radius:14px;padding:3px;gap:3px}
 .seg button{flex:1;border:0;background:transparent;border-radius:11px}
+/* モード切り替え(フリープレイ/チャレンジ/デイリー): 文字が折り返さないよう、画面の幅に合わせて文字の大きさを変える(広い画面は今までと同じ15px) */
+#cmd .seg button{white-space:nowrap;padding:10px 2px;font-size:clamp(12px,4vw,15px)}
 .seg button.on{background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.18);font-weight:700}
 .top{justify-content:space-between;align-items:center}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
@@ -144,7 +145,10 @@ input[type=text]{font:inherit;font-size:16px;color:var(--fg);background:var(--o)
 #dyw{font-size:13px;font-weight:700;color:var(--mut);margin-left:6px;white-space:nowrap;vertical-align:middle}#dyw.on{color:#f26a1b}#dyw:not(.on) .px{filter:grayscale(1);opacity:.5} /* 0連勝のあいだは火を灰色にする */
 /* 幅320pxほどの狭い画面: ランキング/今日の縛りの2ボタンが折り返さないよう、文字と余白を少し小さく(広い画面は変えない) */
 @media(max-width:340px){#dyr,#dyu{font-size:15px;padding:15px 6px}}
-/* 厳選盤面(タイトルの横のボタンと一覧) */
+/* 厳選盤面(「モード」の見出しの右のボタンと一覧)。ボタンは見出しと同じ高さに収め、カードの高さは変えない(上下のマイナス余白で、ボタンの背が見出しの行を押し広げないようにしている) */
+.cmdh{display:flex;align-items:center;justify-content:space-between;margin:0 0 10px}
+.cmdh h3{margin:0}
+.cmdh .pkb{margin:-5px 0;padding:3px 9px;font-size:11px;line-height:1.3}
 .pkb{font-size:12px;font-weight:700;letter-spacing:0;padding:4px 10px;margin-left:6px;vertical-align:middle;border:1.5px solid var(--ac);background:var(--card);color:var(--ac);border-radius:10px;white-space:nowrap;box-shadow:0 1px 3px rgba(91,108,255,.28)}
 .pkb:active{transform:none;background:var(--ac);color:#fff}
 #pkm{position:fixed;inset:0;background:rgba(10,12,25,.55);display:flex;align-items:flex-end;justify-content:center;z-index:11}
