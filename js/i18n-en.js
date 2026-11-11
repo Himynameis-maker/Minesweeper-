@@ -9,7 +9,7 @@ const s=(n,one,many)=>n==1?one:many; /* 1つなら one、それ以外は many */
 const hintFrom=p=>'From '+p.w+', some cells are '+['certainly mines','certainly safe','certainly mines and others certainly safe'][p.c];
 Object.assign(I18N_EN,{
 /* ---- 画面の見出し・ボタン(index.html) ---- */
-'Minesweeper Plus 運ゲーなしの特殊ルールマインスイーパ':"Minesweeper Plus – No-Guess Minesweeper with Special Rules",
+'Minesweeper Addict 運ゲーなしの特殊ルールマインスイーパ':"Minesweeper Addict – No-Guess Minesweeper with Special Rules",
 '運ゲーなし。推論だけで解ける、特殊ルールのマインスイーパー。オンラインタイムアタックとチャレンジモードつき':"No guessing needed. Minesweeper with special rules, solvable by pure logic. Includes an online daily time attack and a challenge mode.",
 '運ゲーなし。推論だけで解ける、特殊ルールのマインスイーパー':"No guessing needed. Minesweeper with special rules, solvable by pure logic.",
 'やりごたえのある厳選盤面':"Hand-picked boards that put up a fight",
