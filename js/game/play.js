@@ -4,15 +4,15 @@
 async function start(nr,again){const ch=mode()=='c',tk=++TK;
  if(ch){if(nr||!run||run.end)chNewRun();if(!again)chNewBoard()}else run=null;
  const cfg=plan(ch);G=null;hm=0;cpUpd();$('#g').innerHTML='';$('#st').innerHTML='';$('#nx').hidden=true;$('#hb').disabled=true;$('#fin').hidden=true;
- $('#rv').textContent='🧩 縛り ('+cfg.ids.length+')';msg('');$('#ld').hidden=false;$('#rg').hidden=true;$('#ldt').textContent='ノーゲス盤面を探索中…';
+ $('#rv').textContent=tx('🧩 縛り ({n})',{n:cfg.ids.length});msg('');$('#ld').hidden=false;$('#rg').hidden=true;$('#ldt').textContent=tx('ノーゲス盤面を探索中…');
  let res=null;
- try{res=await gen(cfg,{cancel:()=>tk!=TK,tick:(el,n)=>{$('#ldt').textContent='ノーゲス盤面を探索中… '+(el/1000|0)+'秒 / 候補 '+n+'件';if(ch&&el>=CHALLENGE.regenSec*1000)$('#rg').hidden=false}})}
- catch(e){if(tk==TK){if(ch){$('#ldt').textContent='内部エラー: '+e.message;$('#rg').hidden=false}else{$('#ld').hidden=true;msg('内部エラー: '+e.message)}}return}
+ try{res=await gen(cfg,{cancel:()=>tk!=TK,tick:(el,n)=>{$('#ldt').textContent=tx('ノーゲス盤面を探索中… {s}秒 / 候補 {n}件',{s:el/1000|0,n});if(ch&&el>=CHALLENGE.regenSec*1000)$('#rg').hidden=false}})}
+ catch(e){if(tk==TK){if(ch){$('#ldt').textContent=tx('内部エラー: {m}',{m:e.message});$('#rg').hidden=false}else{$('#ld').hidden=true;msg(tx('内部エラー: {m}',{m:e.message}))}}return}
  if(tk!=TK)return;
- if(!res){if(ch){$('#ldt').textContent='盤面検索難航中…「引き直す」でもう一度抽選できます';$('#rg').hidden=false;return}
-  $('#ld').hidden=true;return msg('ノーゲスの盤面が見つかりませんでした(条件が厳しすぎる可能性)。「設定に戻る」で条件を変えてください')}
+ if(!res){if(ch){$('#ldt').textContent=tx('盤面検索難航中…「引き直す」でもう一度抽選できます');$('#rg').hidden=false;return}
+  $('#ld').hidden=true;return msg(tx('ノーゲスの盤面が見つかりませんでした(条件が厳しすぎる可能性)。「設定に戻る」で条件を変えてください'))}
  $('#ld').hidden=true;$('#rg').hidden=true;
- setBoard(cfg,res);msg(ch?'第'+run.stage+'盤面スタート':cfg.dropped?cfg.dropped+'件の縛りは条件に合わないため外しました':'');draw()}
+ setBoard(cfg,res);msg(ch?tx('第{n}盤面スタート',{n:run.stage}):cfg.dropped?tx('{n}件の縛りは条件に合わないため外しました',{n:cfg.dropped}):'');draw()}
 /* 盤面を G に作って開始マスを開く。gen の返り値でも、boardDecode の res(盤面コード由来。デイリー)でも同じ形で渡せる */
 function setBoard(cfg,res){const P=prep(cfg),N=cfg.R*cfg.C,act=P.nb.map((_,i)=>ncount(P,res.mines,i)),num=res.L?res.L.sh:act;
  let code=null;try{code=boardEncode(cfg,res)}catch(e){} /* 盤面コード(ui/copycode のコピーボタン用。作れなければ null=ボタンを出さない) */
@@ -25,9 +25,9 @@ function flood(i){const q=[i],{st,fl,mines,P}=G,ac=G.az||G.act; /* az=数字0の
 /* チャレンジ: ミスもクリアも盤面はそこで終わり(ミス=爆発して全開示、フリープレイと同じ)。次の盤面は「次の盤面」ボタン */
 function act(i,f){if(!G||G.over||G.done||G.st[i])return;G.hint=null;
  if(f){G.fl[i]=G.fl[i]==f?0:f;draw();return}if(G.fl[i])return; /* f: 0=開ける 1=旗 2=マーク。同じ種類をもう一度で外れ、別の種類なら置き換え */
- if(G.mines[i]){G.st[i]=2;G.over=1;if(run)chMiss();else msg('爆発…')}
+ if(G.mines[i]){G.st[i]=2;G.over=1;if(run)chMiss();else msg(tx('爆発…'))}
  else flood(i);
- if(!G.over&&G.rev==G.N-G.cfg.M){G.done=1;if(run)chClear();else msg('🎉 クリア!')}
+ if(!G.over&&G.rev==G.N-G.cfg.M){G.done=1;if(run)chClear();else msg(tx('🎉 クリア!'))}
  draw();if(DY&&(G.over||G.done))dyEnd()} /* デイリー: ミスもクリアもここで終わり(ui/daily.js) */
 /* ヒント: ON中に 数字マス/縛り(一覧内)/残り爆弾数 をタップ。その手がかりから分かることがあるかだけ教える(場所は教えない) */
 function hscan(){const{P,N,num,mines,fl,cfg}=G,st=G.st.slice(),out=[],seen=new Set();
@@ -37,12 +37,12 @@ function hscan(){const{P,N,num,mines,fl,cfg}=G,st=G.st.slice(),out=[],seen=new S
   if(!mk.length)break;for(const i of mk)st[i]=2}
  return out}
 function ask(k,key){if(!G||G.over||G.done)return;
- if(run&&run.hints<=0)return msg('この盤面のヒントは使い切ったよ');
+ if(run&&run.hints<=0)return msg(tx('この盤面のヒントは使い切ったよ'));
  const m=hscan().filter(e=>{const s=e.src;return k=='n'?(s.t=='n'&&s.i==key)||(s.t=='x'&&s.ns.includes(key)):k=='r'?(s.t=='r'&&s.id==key)||(s.t=='x'&&s.rs.includes(key)):s.t=='c'});
  if(run){run.hints--;if(run.hints<=0)hm=0}
- const who=k=='n'?'この数字':k=='r'?'この縛り':'残り爆弾数';let t;
- if(!m.length){G.hint=null;t=who+'からは、いま分かることはありません'}
+ const who=tx(k=='n'?'この数字':k=='r'?'この縛り':'残り爆弾数');let t;
+ if(!m.length){G.hint=null;t=tx('{w}からは、いま分かることはありません',{w:who})}
  else{const a=m.some(e=>e.mine),b=m.some(e=>!e.mine),w=a&&b?'爆弾と安全の両方':a?'爆弾':'安全',x=k!='c'&&Math.min(...m.map(e=>e.tier))==3;
   G.hint={ns:k=='n'?[key]:[],rs:k=='r'?[key]:[],c:k=='c'};
-  t=who+'から、'+w+'と言い切れるマスがあります'+(x?'(ほかの手がかりとの組み合わせ)':'')}
+  t=tx(x?'{w}から、{x}と言い切れるマスがあります(ほかの手がかりとの組み合わせ)':'{w}から、{x}と言い切れるマスがあります',{w:who,x:w,c:a&&b?2:a?0:1})}
  msg(t);if(k=='r')$('#mh').textContent=t;draw();if(k=='r')renderList()}

@@ -13,10 +13,10 @@ function draw(){if(!G)return;const{cfg,st,fl,num,mines,hint:h}=G,{R,C}=cfg,s=Mat
  const g=$('#g');g.style.setProperty('--s',s+'px');g.style.gridTemplateColumns='repeat('+C+','+s+'px)';g.innerHTML=o;
  const ch=(t,c,k)=>'<span class="chip '+(c||'')+'"'+(k?' data-k="'+k+'"':'')+'>'+t+'</span>';
  /* チャレンジ: 第N盤面 / 連続クリア(●=クリア済) / ライフ / この盤面のヒント残り */
- const rc=run?ch((CHALLENGE.missResetsStreak?'✅ 連続クリア ':'✅ クリア ')+run.streak+'/'+run.X,'clr')+ch('第'+run.stage+'盤面')+ch('❤ '+run.lives+'/'+CHALLENGE.lives)+ch('💡 '+run.hints+'/'+CHALLENGE.hints):'';
- $('#st').innerHTML=ch(R+'×'+C)+ch('💣 残り '+(cfg.M-expl-flg),h&&h.c?'hl':'','c')+rc+(G.gf?'':ch('⚠ ノーゲス未達'))+(G.gf&&!G.q?ch('品質条件未達'):'');
- $('#rv').textContent='🧩 縛り ('+cfg.ids.length+')';$('#rv').className=hr.length?'hl':'';
- const out=run&&run.hints<=0;if(fin||out)hm=0;$('#hb').disabled=fin||out;$('#hb').classList.toggle('on',!!hm);$('#hb').textContent='💡 ヒント '+(hm?'ON':'OFF')+(run?' (残り'+run.hints+')':'');
+ const rc=run?ch(tx(CHALLENGE.missResetsStreak?'✅ 連続クリア {a}/{b}':'✅ クリア {a}/{b}',{a:run.streak,b:run.X}),'clr')+ch(tx('第{n}盤面',{n:run.stage}))+ch('❤ '+run.lives+'/'+CHALLENGE.lives)+ch('💡 '+run.hints+'/'+CHALLENGE.hints):'';
+ $('#st').innerHTML=ch(R+'×'+C)+ch(tx('💣 残り {n}',{n:cfg.M-expl-flg}),h&&h.c?'hl':'','c')+rc+(G.gf?'':ch(tx('⚠ ノーゲス未達')))+(G.gf&&!G.q?ch(tx('品質条件未達')):'');
+ $('#rv').textContent=tx('🧩 縛り ({n})',{n:cfg.ids.length});$('#rv').className=hr.length?'hl':'';
+ const out=run&&run.hints<=0;if(fin||out)hm=0;$('#hb').disabled=fin||out;$('#hb').classList.toggle('on',!!hm);$('#hb').textContent=tx(run?'💡 ヒント {o} (残り{n})':'💡 ヒント {o}',{o:hm?'ON':'OFF',n:run?run.hints:0});
  /* 次へボタン: フリープレイ=いつでも「新しい盤面」。チャレンジ=クリアでもミスでも「次の盤面」(挑戦が終わったら出さない。終了演出のボタンを使う) */
- let lab=null;if(DY){}else if(!run)lab='新しい盤面';else if(!run.end&&fin)lab='次の盤面';
+ let lab=null;if(DY){}else if(!run)lab=tx('新しい盤面');else if(!run.end&&fin)lab=tx('次の盤面');
  const nx=$('#nx');nx.hidden=!lab;nx.textContent=lab||'';nx.dataset.nr=0;cpUpd()}

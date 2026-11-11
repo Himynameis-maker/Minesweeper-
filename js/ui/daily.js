@@ -60,7 +60,7 @@ function dyOpen(){try{const n=localStorage.getItem(DAILY_UI.nameKey);if(n&&!$('#
  dyClose();dyRender();dyClockTick();DYS.clock=setInterval(dyClockTick,1000);dyRefresh()}
 function dyClose(){clearInterval(DYS.clock);clearTimeout(DYS.poll)}
 function dyClockTick(){const left=864e5-((Date.now()+9*36e5)%864e5),s=Math.floor(left/1000),p=n=>String(n).padStart(2,'0');
- $('#dyx').textContent='⏰ 次の盤面まで '+p(s/3600|0)+':'+p(s%3600/60|0)+':'+p(s%60);
+ $('#dyx').textContent=tx('⏰ 次の盤面まで {t}',{t:p(s/3600|0)+':'+p(s%3600/60|0)+':'+p(s%60)});
  if(left>86396e3&&DYS.state!=''&&!document.hidden&&Date.now()-DYS.last>5000)dyRefresh()} /* 0:00 を過ぎた直後は状態を取り直す(見えていないタブは、見えるようになったときに取り直す) */
 async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll);DYS.last=Date.now();
  const r=await dyApi('/api/daily/status?token='+dyTok());if(DYS.busy)return;
@@ -76,40 +76,40 @@ async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll
 /* 定期の確かめ直し。タブが見えていないなら通信せず、ここで止める(見えるようになったら visibilitychange が取り直して、また続く) */
 function dyPoll(){if(document.hidden)return;dyRefresh()}
 function dyRender(){const s=DYS.state,g=$('#dyg'),done=s=='done',nameOk=!!dyName();
- {const w=$('#dyw'),n=dyStreakNow();w.textContent='🔥 '+n+'連勝';w.classList.toggle('on',n>0)} /* 見出しの横の連勝記録 */
+ {const w=$('#dyw'),n=dyStreakNow();w.textContent=tx('🔥 {n}連勝',{n});w.classList.toggle('on',n>0)} /* 見出しの横の連勝記録 */
  $('#dyu').hidden=!(DYS.rules&&(s=='new'||s=='done')); /* 今日の縛りボタン: 縛りが分かっているときだけ出す(クリア後も見られる) */
  $('#dyl').hidden=done||s=='maint';$('#dyg').hidden=done;$('#dyk').hidden=!done;
  g.disabled=s==''||(s=='new'&&!nameOk);
- g.textContent=s==''?'読み込み中…':s=='new'?'スタート':s=='prep'?'⏳ 準備中(タップで更新)':s=='maint'?'🛠 更新中(タップで更新)':'🔄 再読み込み';
+ g.textContent=tx(s==''?'読み込み中…':s=='new'?'スタート':s=='prep'?'⏳ 準備中(タップで更新)':s=='maint'?'🛠 更新中(タップで更新)':'🔄 再読み込み');
  let t='';
- if(s=='new')t=nameOk?'準備OK! 押すと 3・2・1 のあとすぐ始まるよ(今日の1回を使います)':'ニックネームを入れてね';
- else if(s=='prep')t=DYS.ver!=null&&DYS.ver<BOARD_VER?'ルールの更新で、今日の盤面を作り直し中です。少し待ってね。':'今日の盤面はまだ準備中です。少し待ってね。';
- else if(s=='maint')t='🛠 更新中のため遊べません'; /* ランキング・盤面入手は今までどおり使える */
- else if(s=='done')t=(DYS.forfeit?'前回は途中で終わったので、今日の挑戦は終了です。':'今日の挑戦は終わったよ。')+'また明日!(盤面入手で今日の盤面コードをコピーできます)';
- else if(s=='err')t=DYS.err==0?'サーバーにつながりません。通信を確かめてね。':DYS.err==404?'デイリーのサーバー機能が見つかりません(公開サイトで開いていますか?)':'うまく読み込めませんでした(エラー '+DYS.err+')';
+ if(s=='new')t=tx(nameOk?'準備OK! 押すと 3・2・1 のあとすぐ始まるよ(今日の1回を使います)':'ニックネームを入れてね');
+ else if(s=='prep')t=tx(DYS.ver!=null&&DYS.ver<BOARD_VER?'ルールの更新で、今日の盤面を作り直し中です。少し待ってね。':'今日の盤面はまだ準備中です。少し待ってね。');
+ else if(s=='maint')t=tx('🛠 更新中のため遊べません'); /* ランキング・盤面入手は今までどおり使える */
+ else if(s=='done')t=tx(DYS.forfeit?'前回は途中で終わったので、今日の挑戦は終了です。また明日!(盤面入手で今日の盤面コードをコピーできます)':'今日の挑戦は終わったよ。また明日!(盤面入手で今日の盤面コードをコピーできます)');
+ else if(s=='err')t=DYS.err==0?tx('サーバーにつながりません。通信を確かめてね。'):DYS.err==404?tx('デイリーのサーバー機能が見つかりません(公開サイトで開いていますか?)'):tx('うまく読み込めませんでした(エラー {e})',{e:DYS.err});
  $('#dys').textContent=t}
 async function dyGo(){const s=DYS.state;
  if(s=='prep'||s=='maint'||s=='err'){DYS.state='';dyRender();return dyRefresh()}
  if(s=='new')return dyStart()}
 async function dyCode(){const b=$('#dyk');if(b.disabled)return;b.disabled=true;
  const r=await dyApi('/api/daily/code?token='+dyTok());
- b.textContent=r.ok&&r.j.code?(bcOld(r.j.code)?'🔒 バージョンアップのため使えません':await dyCopy(r.j.code)?'✅ コピーしました':'コピーできませんでした'):'取得できませんでした';
- setTimeout(()=>{b.textContent='📋 盤面入手';b.disabled=false},2200)}
+ b.textContent=r.ok&&r.j.code?(bcOld(r.j.code)?tx('🔒 バージョンアップのため使えません'):await dyCopy(r.j.code)?tx('✅ コピーしました'):tx('コピーできませんでした')):tx('取得できませんでした');
+ setTimeout(()=>{b.textContent=tx('📋 盤面入手');b.disabled=false},2200)}
 
 /* ---- 開始 → 3,2,1 → プレイ ---- */
 async function dyStart(){if(DYS.busy||DYS.state!='new')return;const name=dyName();if(!name)return dyRender();
  try{localStorage.setItem(DAILY_UI.nameKey,name)}catch(e){}
- DYS.busy=1;$('#dyg').disabled=true;$('#dys').textContent='盤面を受け取っています…';
+ DYS.busy=1;$('#dyg').disabled=true;$('#dys').textContent=tx('盤面を受け取っています…');
  const r=await dyApi('/api/daily/start',{token:dyTok()});
  const back=m=>{DYS.busy=0;dyRender();if(m)$('#dys').textContent=m};
  if(!r.ok){
   if(r.status==409){DYS.state='playing';back();return dyRefresh()} /* すでに始めていた */
   if(r.status==503){DYS.state='prep';back();return dyRefresh()}
   if(r.status==423){DYS.state='maint';back();return dyRefresh()} /* 画面を開いたあとに更新が始まった */
-  return back(r.status==0?'サーバーにつながりませんでした。もう一度押してね。':'うまく始められませんでした(エラー '+r.status+')。少し待ってもう一度。')}
+  return back(r.status==0?tx('サーバーにつながりませんでした。もう一度押してね。'):tx('うまく始められませんでした(エラー {e})。少し待ってもう一度。',{e:r.status}))}
  DYS.prev=dyStreakNow();dyStreakStart(r.j.day); /* ここから結果が出るまで「保留」。リロード・閉じる・圏外放置はミス扱い */
  const d=boardDecode(r.j.code);
- if(!d.ok)return back('盤面を読み込めませんでした('+d.err+(d.id?':'+d.id:'')+')。少し待ってからもう一度。続けて失敗する場合は作者に連絡してね。');
+ if(!d.ok)return back(tx('盤面を読み込めませんでした({e})。少し待ってからもう一度。続けて失敗する場合は作者に連絡してね。',{e:d.err+(d.id?':'+d.id:'')}));
  DYS.day=r.j.day;DYS.name=name;DYS.fin=0;DYS.res=null;DYS.sent='';
  TK++;run=null;hm=0;fm=0;['#fo','#ff','#fk'].forEach((x,k)=>$(x).classList.toggle('on',k==0));
  setBoard(d.cfg,d.res);DY=1;
@@ -131,7 +131,7 @@ function dyCount(){return new Promise(res=>{const o=$('#cdn'),n=$('#cdnn'),t0=pe
 async function dyEnd(){if(!DY||DYS.fin)return;DYS.fin=1;clearInterval(DYS.tick);
  DYS.clear=!!G.done&&!G.over;DYS.local=performance.now()-DYS.t0;
  if(DYS.clear)dyStreakWon(DYS.day);else dyStreakLoss(); /* ミスは通信の前に 0 で保存(送信を邪魔しても戻せない)。クリアはサーバーが受け付けたら +1(dySend) */
- $('#dyt').textContent=dyFmt(DYS.local,2);msg(DYS.clear?'🎉 クリア!':'💥 ミス! 今日の挑戦は終了です');
+ $('#dyt').textContent=dyFmt(DYS.local,2);msg(tx(DYS.clear?'🎉 クリア!':'💥 ミス! 今日の挑戦は終了です'));
  await Promise.all([dySend(),dySleep(DAILY_UI.endDelayMs)]);if(DY&&DYS.fin)dyShow()}
 async function dySend(){DYS.sent='sending';let net=0;
  for(let i=0;i<3;i++){const r=await dyApi('/api/daily/finish',{token:dyTok(),day:DYS.day,clear:DYS.clear,name:DYS.name});
@@ -142,31 +142,31 @@ async function dySend(){DYS.sent='sending';let net=0;
  DYS.sent='fail'}
 function dyShow(){const win=DYS.clear,sent=DYS.sent,r=DYS.res,ms=r?r.ms:DYS.local,bad=win&&sent=='fail'; /* bad=クリアしたのに結果を送れていない */
  let ic,tt,ds;
- if(bad){ic='📡';tt='通信エラー';ds='結果を送れませんでした。電波のいい場所で「もう一度送る」を押してね。このまま戻ると、今日の記録は残りません。'}
- else if(!win){ic='💥';tt='ミス…';ds=(DYS.prev>0?DYS.prev+'連勝がストップしちゃった…。':'')+'今日の挑戦は終了です。また明日!(盤面入手で今日の盤面コードをコピーできます)'}
- else if(sent=='ok'){ic='🏆';tt='クリア!';ds=r.rank?r.rank+'位にランクイン! 今のランキングは設定画面の「ランキング」で見られるよ。':'クリア! 惜しくもランキング圏外(上位20位まで)でした。'}
- else{ic='🏆';tt='クリア!';ds=sent=='unk'?'結果が届いたか確認できませんでした。ランキングで確かめてね。':'今日の記録は登録できませんでした('+DYS.err+')。'}
+ if(bad){ic='📡';tt=tx('通信エラー');ds=tx('結果を送れませんでした。電波のいい場所で「もう一度送る」を押してね。このまま戻ると、今日の記録は残りません。')}
+ else if(!win){ic='💥';tt=tx('ミス…');ds=tx(DYS.prev>0?'{n}連勝がストップしちゃった…。今日の挑戦は終了です。また明日!(盤面入手で今日の盤面コードをコピーできます)':'今日の挑戦は終了です。また明日!(盤面入手で今日の盤面コードをコピーできます)',{n:DYS.prev})}
+ else if(sent=='ok'){ic='🏆';tt=tx('クリア!');ds=r.rank?tx('{n}位にランクイン! 今のランキングは設定画面の「ランキング」で見られるよ。',{n:r.rank}):tx('クリア! 惜しくもランキング圏外(上位20位まで)でした。')}
+ else{ic='🏆';tt=tx('クリア!');ds=sent=='unk'?tx('結果が届いたか確認できませんでした。ランキングで確かめてね。'):tx('今日の記録は登録できませんでした({e})。',{e:DYS.err})}
  $('#fin').className=win&&!bad?'win':'lose';$('#fini').textContent=ic;$('#fint').textContent=tt;$('#find').textContent=ds;
- $('#fins').innerHTML='<span class="chip">⏱ <b>'+dyFmt(ms,2)+'</b></span>'+(win&&sent=='ok'&&r&&r.rank?'<span class="chip">🏅 '+r.rank+'位</span>':'')+(win&&!bad&&sent!='rej'?'<span class="chip">🔥 <b>'+dyStreakNow()+'</b>連勝</span>':'');
- $('#finr').hidden=!bad;$('#finr').textContent='📡 もう一度送る';$('#finb').textContent='デイリーに戻る';cpFin(0);
+ $('#fins').innerHTML='<span class="chip">⏱ <b>'+dyFmt(ms,2)+'</b></span>'+(win&&sent=='ok'&&r&&r.rank?'<span class="chip">'+tx('🏅 {n}位',{n:r.rank})+'</span>':'')+(win&&!bad&&sent!='rej'?'<span class="chip">'+tx('🔥 <b>{n}</b>連勝',{n:dyStreakNow()})+'</span>':'');
+ $('#finr').hidden=!bad;$('#finr').textContent=tx('📡 もう一度送る');$('#finb').textContent=tx('デイリーに戻る');cpFin(0);
  chFx(win&&!bad);$('#fin').hidden=false}
-async function dyRetry(){if(DYS.sent=='sending')return;$('#finr').disabled=true;$('#finr').textContent='送信中…';await dySend();$('#finr').disabled=false;dyShow()}
+async function dyRetry(){if(DYS.sent=='sending')return;$('#finr').disabled=true;$('#finr').textContent=tx('送信中…');await dySend();$('#finr').disabled=false;dyShow()}
 function dyLeave(){$('#fin').hidden=true;clearInterval(DYS.tick);DY=0;DYS.busy=0;G=null;$('#g').innerHTML='';$('#g').style.visibility='';$('#st').innerHTML='';
- $('#hb').hidden=$('#bk').hidden=false;$('#dyt').hidden=true;$('#finr').hidden=false;$('#finr').textContent='もう一度挑戦';$('#finb').textContent='タイトルへ';
+ $('#hb').hidden=$('#bk').hidden=false;$('#dyt').hidden=true;$('#finr').hidden=false;$('#finr').textContent=tx('もう一度挑戦');$('#finb').textContent=tx('タイトルへ');
  DYS.state='';show('setup');dyRender();dyRefresh()}
 
 /* ---- ランキング(今日〜6日前)。今日の分は順位だけで、盤面コードは出さない(明日から)。盤面コードは順位の一覧の上(#rkc)に「コピー」ボタンで置く。押すとボタンの文字が1.5秒だけ変わる ---- */
-const RK_CP='📋 盤面コードをコピー';
-async function dyRank(){$('#rk').hidden=false;$('#rkt').innerHTML='';$('#rkc').innerHTML='';$('#rkl').innerHTML='<p class="mut">読み込み中…</p>';
+const RK_CP=tx('📋 盤面コードをコピー');
+async function dyRank(){$('#rk').hidden=false;$('#rkt').innerHTML='';$('#rkc').innerHTML='';$('#rkl').innerHTML='<p class="mut">'+tx('読み込み中…')+'</p>';
  const r=await dyApi('/api/daily/ranking');
- if(!r.ok||!r.j.days){$('#rkl').innerHTML='<p class="mut">読み込めませんでした。あとでもう一度開いてね。</p>';return}
+ if(!r.ok||!r.j.days){$('#rkl').innerHTML='<p class="mut">'+tx('読み込めませんでした。あとでもう一度開いてね。')+'</p>';return}
  DYS.rk=r.j.days;DYS.rkSel=0;dyRankDraw()}
 function dyRankDraw(){const ds=DYS.rk||[],d=ds[DYS.rkSel];if(!d)return;
- $('#rkt').innerHTML=ds.map((x,i)=>'<button data-n="'+i+'"'+(i==DYS.rkSel?' class="on"':'')+'>'+(x.today?'今日':x.day.slice(5).replace('-','/'))+'</button>').join('');
- $('#rkc').innerHTML=d.today?'<div class="rkcn">🔒 今日の盤面コードは、明日から見られます</div>' /* 今日の分: コードは出さない */
-  :d.code?(bcOld(d.code)?'<div class="rkcn">🔒 バージョンアップのため、この盤面は利用できません</div>' /* 古い番号: コードは出さない=コピーできない */
+ $('#rkt').innerHTML=ds.map((x,i)=>'<button data-n="'+i+'"'+(i==DYS.rkSel?' class="on"':'')+'>'+(x.today?tx('今日'):x.day.slice(5).replace('-','/'))+'</button>').join('');
+ $('#rkc').innerHTML=d.today?'<div class="rkcn">'+tx('🔒 今日の盤面コードは、明日から見られます')+'</div>' /* 今日の分: コードは出さない */
+  :d.code?(bcOld(d.code)?'<div class="rkcn">'+tx('🔒 バージョンアップのため、この盤面は利用できません')+'</div>' /* 古い番号: コードは出さない=コピーできない */
   :'<button class="rkcp" data-c="1">'+RK_CP+'</button>'):'';
- $('#rkl').innerHTML=(d.ranks.length?d.ranks.map((x,i)=>'<div class="rkr"><span class="rkn">'+(i+1)+'</span><span class="rkm">'+dyEsc(x.name)+'</span><b>'+dyFmt(x.ms,2)+'</b></div>').join(''):'<p class="mut">'+(d.today?'まだクリア記録はありません':d.code?'この日のクリア記録はありません':'この日の盤面はありません')+'</p>')}
+ $('#rkl').innerHTML=(d.ranks.length?d.ranks.map((x,i)=>'<div class="rkr"><span class="rkn">'+(i+1)+'</span><span class="rkm">'+dyEsc(x.name)+'</span><b>'+dyFmt(x.ms,2)+'</b></div>').join(''):'<p class="mut">'+tx(d.today?'まだクリア記録はありません':d.code?'この日のクリア記録はありません':'この日の盤面はありません')+'</p>')}
 
 window.addEventListener('load',()=>{
  dyAbandon();
@@ -175,7 +175,7 @@ window.addEventListener('load',()=>{
  $('#rkx').onclick=()=>$('#rk').hidden=true;$('#rk').onclick=e=>{if(e.target.id=='rk')$('#rk').hidden=true};
  $('#rkt').onclick=e=>{const b=e.target.closest&&e.target.closest('button');if(b){DYS.rkSel=+b.dataset.n;dyRankDraw()}};
  $('#rkc').onclick=async e=>{const b=e.target.closest&&e.target.closest('button[data-c]');if(!b)return;const d=(DYS.rk||[])[DYS.rkSel];if(!d||d.today||!d.code||bcOld(d.code))return;
-  const ok=await dyCopy(d.code);clearTimeout(b._t);b.textContent=ok?'✅ コピーしました':'コピーできませんでした';b._t=setTimeout(()=>{b.textContent=RK_CP},1500)}; /* 横幅いっぱいのボタンなので、文字が変わっても画面は動かない */
+  const ok=await dyCopy(d.code);clearTimeout(b._t);b.textContent=ok?tx('✅ コピーしました'):tx('コピーできませんでした');b._t=setTimeout(()=>{b.textContent=RK_CP},1500)}; /* 横幅いっぱいのボタンなので、文字が変わっても画面は動かない */
  /* アプリに戻ってきたとき(別アプリ・別タブから)。遊んでいる最中は触らない */
  const back=()=>{if(mode()=='d'&&!DYS.busy&&!$('#setup').hidden&&Date.now()-DYS.last>5000)dyRefresh()};
  window.addEventListener('focus',back);window.addEventListener('pageshow',back);

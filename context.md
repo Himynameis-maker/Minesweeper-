@@ -5,6 +5,7 @@
 ## 0. あなたの役割と出力ルール
 
 - 役割: マインスイーパーの「縛り(ルール)」の追加・修正・併用矛盾の解消担当。必要なら CORE(推論/生成)も拡張する。
+- 画面の文言は日本語と英語の2言語(第12節)。文言を足す/直すときは `tx()` と英語の訳もセットで出す。
 - ユーザーは日本語話者で、**コードは書けない/読めない**。専門用語・コマンドは避け、手順は「GitHub の画面でこのファイルを開く→鉛筆→ここを直す→Commit」のように1手ずつ。ファイルを渡すときは変更ファイルを丸ごと(置換位置の指示だけにしない)。簡潔に。案が複数あるなら短く列挙して選んでもらう。
 - **渡されていないファイルは推測で書かない。** 必要なら「◯◯を渡してください」と先に言う。
 - 出力は「変更・新規ファイルの全文」+「CHANGELOG.md に足す1行」+「併用NGを conflicts に入れた旨」。大きいファイル(solver.js / gen.js)だけは「置換前→置換後」の差分でもよい。
@@ -31,6 +32,10 @@ index.html            画面のHTML骨格 + script読み込み順 (RULES:BEGIN�
 build.py              全部インライン化 → dist/minesweeper-variants.html (python3 build.py)
 context.md            ← これ。CHANGELOG.md = 変更履歴。README.md = 人間向け手順
 css/style.css         見た目のみ (チャレンジの解説・終了演出を含む)
+_redirects            /en と /ja を index.html に振り向ける(Cloudflare Pages)。第12節
+js/i18n.js            言語の決定(URL の /en /ja、確認用 ?lang=)・tx('日本語')・rname/rdesc/rwhy・index.html の一括置き換え(i18nDom)
+js/i18n-en.js         英語の文(キー=日本語の文)
+tools/i18n-check.js   訳の漏れ検査(node tools/i18n-check.js)。ブラウザ不要
 js/core/              推論と生成。DOM非依存(node でも動く)
   util.js             rnd, D8/D4/KN, offs, gcd (0.5KB)
   registry.js         RULES, reg, conflict, stepOf/mfit/mok/mnear/mpick (2.1KB)
@@ -87,6 +92,7 @@ DAILY.md              ★ユーザー向けのデイリー管理ガイド(非エ
 | CORE拡張(新しい種類の制約・数字の意味変更。第7節) | `context.md` + `js/core/{prep,solver,gen}.js` + 対象ルール。例盤面の見せ方も変えるなら `js/ui/modal.js` |
 | チャレンジの数値・解説文・演出の調整 | `context.md` + `js/game/challenge.js` だけ(抽選の中身を変えるなら `js/game/config.js` の `chPlan` も) |
 | UIの見た目・操作の変更 | `context.md` + `index.html` + `css/style.css` + 該当の `js/ui/*.js` `js/game/*.js` |
+| 画面の文言を足す/直す・英語(多言語。第12節) | `context.md` + `js/i18n-en.js` + 該当の `js/ui/*.js` `js/game/*.js` `index.html`(縛りの英語は `js/i18n-en-rules.js` と対象の `rules/*.js`) |
 | デイリーの不具合(サーバー機能・登録・準備中など) | `context.md` + 症状(画面のメッセージ / `/ping` の表示 / Actions の赤い行)。コードは `functions/` `.github/workflows/daily.yml` `js/ui/daily.js` |
 | デイリーの盤面(大きさ・爆弾率・生成) | `context.md` + `tools/daily-plan.js` |
 | 厳選盤面(難易度の下限・出る頻度・画面) | `context.md` + `tools/pick-plan.js`(下限) / `.github/workflows/picks.yml`(頻度) / `js/ui/picks.js` `index.html` `css/style.css`(画面) |
@@ -159,6 +165,8 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 - Actions のログ(公開される)に、翌日の盤面コード・縛りを出さない。
 - デイリーの「更新中」判定は `functions/_lib.js` の `playBlocked` / `boardLocked` の2つだけ(status・start・admin/board が使う)。新しい API で盤面を配る・受け付けるなら、同じ判定を入れる。
 
+- 画面に出す文言は必ず `tx('日本語')` に通し、英語を `js/i18n-en.js` に足す(第12節)。盤面コード・`BOARD_VER`・デイリーの記録は言語に関係なく共通(言語を変えても盤面は変わらない)ので、文言だけの変更で `BOARD_VER` は上げない。
+
 ## 7. CORE拡張の判定と、触る場所
 
 **判定表**(ユーザーのアイデア → 必要なもの):
@@ -198,6 +206,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 node tools/headless.js <新ruleのid>        # 単体 + そのidを含む全ペア。NG(…)/併用NGが出たら直す
 node tools/headless.js --combo a,b,c       # 3縛り以上の同時適用を試す
 node tools/smoke-ui.js                     # UI一式の通し(ルール登録→生成→操作→例盤面)+チャレンジの通し。チャレンジの数値(CHALLENGE)を変えても通るように書いてある
+node tools/i18n-check.js                   # 画面の文言(と縛りの name/desc/why)の英語の訳漏れ。表示文言を触ったら必ず
 python3 build.py                           # rules ブロック同期 + dist 生成
 ```
 
@@ -248,6 +257,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 3. `python3 build.py`(index.html の RULES ブロックが自動更新される)。手でやるなら index.html の `RULES:BEGIN〜END` 内に `<script src="rules/<id>.js"></script>` を1行足す。
 4. `CHANGELOG.md` に1行追記。
 5. デイリーに関わる変更なら `node tools/daily-e2e.js` も通す(Node 22.5+)。意味を変えたなら BOARD_VER を +1(第6節)。
+6. 縛り(`rules/<id>.js`)の `name` / `desc` / `why` を足したら、英語も `js/i18n-en-rules.js`(`I18N_RULES[id]={name,desc,why}`)に足す。画面の文言を足したら `tx()` に通して `js/i18n-en.js` へ。最後に `node tools/i18n-check.js`(第12節)。
 
 ## 11. デイリー(毎日1盤面・1人1回・タイムランキング)
 
@@ -323,3 +333,21 @@ python3 build.py                           # rules ブロック同期 + dist 生
 **検査**: `node tools/daily-e2e.js` の末尾(登録・1日3つ・21個・古い番号・メンテ中・テーブル無し・画面の表示とコピー)。生成そのものは `node tools/pick-gen.js out.json`(手元で動く)。
 **D1 の準備**: `schema.sql` の `picks` の2行を、Cloudflare の D1 → Console で1回実行しておくとよい(実行しなくても、最初の登録時に自動で作られる)。
 
+## 12. 多言語(日本語 / 英語。2026-11-11 追加)
+
+**URL**: `/` は今まで通り日本語(自動振り分けはしない)、`/ja` も日本語、`/en` が英語。中身は同じ `index.html` で、言語は URL で決まる(`js/i18n.js` の `LANG`)。`_redirects`(リポジトリ直下)が `/en` `/ja`(末尾スラッシュあり/なし)に `index.html` を返す。`/en/` のように末尾スラッシュだと相対パス(`js/…` `css/…`)がずれるので、`index.html` の先頭の小さなスクリプトが、そのときだけ `<base href="/">` を足す(file:// では足さない)。ローカルや確認用は `index.html?lang=en`(`?lang=ja`)。設定画面の右上に言語リンク(`#lja` `#len`。`data-nt` つき=置き換え対象外)。
+
+**文言の通し方**
+- 画面に出す文は `tx('日本語の文')`。**日本語のときは文がそのまま返る**ので日本語の見た目は変わらない。英語のときだけ `js/i18n-en.js` の `I18N_EN['日本語の文']` に置き換わる。キーは一字一句同じにする(違うと日本語のまま出る。英語のときコンソールに `[i18n] 未翻訳` が出る)。
+- 数字や名前は連結せず `tx('第{n}盤面',{n:3})` のように `{名前}` で差し込む(英語は語順が違うため)。複数形・場合分けが要る英語の値だけ関数 `p=>'…'` にする。日本語の文の中の分岐は、文ごと別のキーにする(`tx(a?'文A':'文B')`)。
+- `index.html` に最初から書いてある文は、起動時に `i18nDom` が一括で置き換える(テキスト・`title`・`placeholder`)。文の途中に `<b>` などが入る要素は `data-h` をつける(要素の中身ぜんぶが1つのキー)。置き換えたくない所(検査レポート・言語リンク)は `data-nt`。
+- 縛りの名前・説明・why は `rname(r)` / `rdesc(r)` / `rwhy(r)`(`r.name` 等を直接出さない)。英語は `I18N_RULES[id]={name,desc,why}`。
+- `tx` という名前は他の用途に使わない(関数内のローカル変数名にも使わない)。`core/` は触らない。
+- 英語の文を直したら `node tools/i18n-check.js`(未翻訳・`{名前}` の過不足・関数の訳のエラーを検査)。
+
+**進み具合**
+- 第1弾(画面の文言: フリープレイ・チャレンジ・デイリー画面・厳選盤面・盤面コード欄・縛り一覧のタグと例盤面の説明): 済。
+- 第2弾(縛り17個の name/desc/why の英語 = `js/i18n-en-rules.js`): 未。それまで縛りの名前と説明は英語画面でも日本語。
+- 第3弾(`functions/` が返す文言・ランキングなどサーバー側): 未(`js/ui/daily.js` が出す文言は第1弾で済み)。
+
+**既知の制限**: 検索・SNS のプレビュー(`<title>` / OGP)は静的HTMLの日本語のまま(英語にするには `/en` だけ別のHTMLを返す仕組みが要る)。`?repo` の検査レポート・`tools/`・`DAILY.md` は日本語のみ。英語は日本語より文が長いので、ボタンなどの幅が足りない所が出たら `css/style.css` で直す。

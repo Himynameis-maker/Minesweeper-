@@ -29,7 +29,7 @@ function freeCfg(){const R=Math.max(3,Math.min(24,v('S')||3)),C=R,N=R*C;return{R
 function problems(){if(mode()!='f'||FC)return[]; /* FC=盤面コードを貼っている間は、盤面はコードで決まるので縛りの検査はしない(ui/freecode.js) */
  const cfg=freeCfg(),{R,C,M}=cfg,max=Math.max(1,R*C-10),o=[],fx=[];
  for(const id of SEL){const r=RULES[id];let f=0;for(let m=1;m<=max&&!f;m++)if(mok(R,C,m,[id]))f=1;
-  if(f)fx.push(id);else o.push('「'+r.name+'」: '+(r.why||'今の盤面では使えません'))}
- if(fx.length&&!mok(R,C,M,fx)){const{lo,hi}=mnear(R,C,M,fx,max),a=[lo&&lo+'個',hi&&hi+'個'].filter(Boolean);
-  o.push(a.length?'爆弾数'+M+'個は選んだ縛りに合いません → '+a.join(' か '):'選んだ縛りに合う爆弾数がありません')}
+  if(f)fx.push(id);else o.push(tx('「{n}」: {w}',{n:rname(r),w:rwhy(r)||tx('今の盤面では使えません')}))}
+ if(fx.length&&!mok(R,C,M,fx)){const{lo,hi}=mnear(R,C,M,fx,max),a=[lo&&tx('{n}個',{n:lo}),hi&&tx('{n}個',{n:hi})].filter(Boolean);
+  o.push(a.length?tx('爆弾数{m}個は選んだ縛りに合いません → {a}',{m:M,a:a.join(tx(' か '))}):tx('選んだ縛りに合う爆弾数がありません'))}
  return o}
