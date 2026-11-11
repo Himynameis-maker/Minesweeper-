@@ -28,7 +28,7 @@ function chDescHtml(){const c=CHALLENGE,pc=x=>Math.round(x*100),rg=(a,b)=>a==b?'
   tx('クリアしてもミスしても次の盤面へ。'),
   tx('盤面づくりが{s}秒を超えたら、「引き直す」ボタンが出るよ。',{s:c.regenSec})
  ].map(t=>'<p>'+t+'</p>').join('')}
-function chSetup(){$('#cht').textContent=CHALLENGE.title;$('#chd').innerHTML=chDescHtml();$('#chw').innerHTML=tx('🏆 ウィンストリーク <b>{n}</b>',{n:chStreak()})}
+function chSetup(){$('#cht').innerHTML=pxi(CHALLENGE.title);$('#chd').innerHTML=chDescHtml();$('#chw').innerHTML=tx('🏆 ウィンストリーク <b>{n}</b>',{n:chStreak()})}
 /* ---- 進行 run={streak,lives,hints,X,stage,total,prev,end} (streak/lives/hints/X は board.js のチップも参照する名前なので変えない) ---- */
 function chNewRun(){run={streak:0,lives:CHALLENGE.lives,hints:CHALLENGE.hints,X:CHALLENGE.wins,stage:0,total:0,prev:chStreak(),end:''}}
 function chNewBoard(){run.stage++;run.hints=CHALLENGE.hints}
