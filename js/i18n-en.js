@@ -32,7 +32,7 @@ Object.assign(I18N_EN,{
 '🏅 ランキング':"🏅 Ranking",
 '🧩 今日の縛り':"🧩 Today’s rules",
 '盤面':"Board",
-'盤面の縦と横の長さ':"Board size (width and height)",
+'盤面の縦と横の長さ':"Board size (width & height)",
 '爆弾数':"Mines",
 '盤面コード(貼り付け専用)':"Board code (paste only)",
 '貼り付け':"Paste here",
