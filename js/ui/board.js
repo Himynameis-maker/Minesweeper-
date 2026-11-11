@@ -1,9 +1,9 @@
 /* [ui/board] 盤面画面の描画(draw)。G を読んで #g と #st(チップ)と各ボタンを更新する。 */
 /* [wt] 重みが2以上のマス(色つきマス)の薄い塗り。CSSを触らずに済むよう inline で背景画像として重ねる。プレイ中は未開のマスだけ塗る。ミス/クリアで全開放したときは、開いたマス・爆弾・爆発したマスも含めて全体に塗る(市松模様が盤面全体に戻る) */
 const WTST=' style="background-image:linear-gradient(rgba(255,150,0,.28),rgba(255,150,0,.28))"';
-/* [px] 絵文字(💣 🚩 ⛏ 💡 🧩 ❤)をドット絵(CSSの .px)に置き換える。訳(i18n)は絵文字のまま使えるので、英語でも同じように変わる */
-const PXI={'💣':'bm','🚩':'fg','⛏':'pk','💡':'bl','🧩':'pz','❤':'ht'};
-const pxi=s=>String(s).replace(/(💣|🚩|⛏|💡|🧩|❤)\uFE0F?/g,(m,e)=>'<i class="px '+PXI[e]+' inl"></i>');
+/* [px] 絵文字(💣 🚩 ⛏ 💡 🧩 ❤ 🔥)をドット絵(CSSの .px)に置き換える。訳(i18n)は絵文字のまま使えるので、英語でも同じように変わる */
+const PXI={'💣':'bm','🚩':'fg','⛏':'pk','💡':'bl','🧩':'pz','❤':'ht','🔥':'fl'};
+const pxi=s=>String(s).replace(/(💣|🚩|⛏|💡|🧩|❤|🔥)\uFE0F?/g,(m,e)=>'<i class="px '+PXI[e]+' inl"></i>');
 function draw(){if(!G)return;const{cfg,st,fl,num,mines,hint:h}=G,{R,C}=cfg,s=Math.min(40,Math.floor(Math.min(620,document.documentElement.clientWidth-40)/C));
  const ns=h?h.ns:[],hr=h?h.rs:[],wt=G.P.w,fin=G.over||G.done; /* fin=ミスかクリアで終わった盤面。全マスを開いて見せる */
  let o='',expl=0,flg=0;

@@ -76,7 +76,7 @@ async function dyRefresh(){if(DYS.busy||mode()!='d')return;clearTimeout(DYS.poll
 /* 定期の確かめ直し。タブが見えていないなら通信せず、ここで止める(見えるようになったら visibilitychange が取り直して、また続く) */
 function dyPoll(){if(document.hidden)return;dyRefresh()}
 function dyRender(){const s=DYS.state,g=$('#dyg'),done=s=='done',nameOk=!!dyName();
- {const w=$('#dyw'),n=dyStreakNow();w.textContent=tx('🔥 {n}連勝',{n});w.classList.toggle('on',n>0)} /* 見出しの横の連勝記録 */
+ {const w=$('#dyw'),n=dyStreakNow();w.innerHTML=pxi(tx('🔥 {n}連勝',{n}));w.classList.toggle('on',n>0)} /* 見出しの横の連勝記録 */
  $('#dyu').hidden=!(DYS.rules&&(s=='new'||s=='done')); /* 今日の縛りボタン: 縛りが分かっているときだけ出す(クリア後も見られる) */
  $('#dyl').hidden=done||s=='maint';$('#dyg').hidden=done;$('#dyk').hidden=!done;
  g.disabled=s==''||(s=='new'&&!nameOk);
@@ -147,7 +147,7 @@ function dyShow(){const win=DYS.clear,sent=DYS.sent,r=DYS.res,ms=r?r.ms:DYS.loca
  else if(sent=='ok'){ic='🏆';tt=tx('クリア!');ds=r.rank?tx('{n}位にランクイン! 今のランキングは設定画面の「ランキング」で見られるよ。',{n:r.rank}):tx('クリア! 惜しくもランキング圏外(上位20位まで)でした。')}
  else{ic='🏆';tt=tx('クリア!');ds=sent=='unk'?tx('結果が届いたか確認できませんでした。ランキングで確かめてね。'):tx('今日の記録は登録できませんでした({e})。',{e:DYS.err})}
  $('#fin').className=win&&!bad?'win':'lose';$('#fini').textContent=ic;$('#fint').textContent=tt;$('#find').textContent=ds;
- $('#fins').innerHTML='<span class="chip">⏱ <b>'+dyFmt(ms,2)+'</b></span>'+(win&&sent=='ok'&&r&&r.rank?'<span class="chip">'+tx('🏅 {n}位',{n:r.rank})+'</span>':'')+(win&&!bad&&sent!='rej'?'<span class="chip">'+tx('🔥 <b>{n}</b>連勝',{n:dyStreakNow()})+'</span>':'');
+ $('#fins').innerHTML='<span class="chip">⏱ <b>'+dyFmt(ms,2)+'</b></span>'+(win&&sent=='ok'&&r&&r.rank?'<span class="chip">'+tx('🏅 {n}位',{n:r.rank})+'</span>':'')+(win&&!bad&&sent!='rej'?'<span class="chip">'+pxi(tx('🔥 <b>{n}</b>連勝',{n:dyStreakNow()}))+'</span>':'');
  $('#finr').hidden=!bad;$('#finr').textContent=tx('📡 もう一度送る');$('#finb').textContent=tx('デイリーに戻る');cpFin(0);
  chFx(win&&!bad);$('#fin').hidden=false}
 async function dyRetry(){if(DYS.sent=='sending')return;$('#finr').disabled=true;$('#finr').textContent=tx('送信中…');await dySend();$('#finr').disabled=false;dyShow()}
