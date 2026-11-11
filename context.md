@@ -32,7 +32,7 @@ index.html            画面のHTML骨格 + script読み込み順 (RULES:BEGIN�
 build.py              全部インライン化 → dist/minesweeper-variants.html (python3 build.py)
 context.md            ← これ。CHANGELOG.md = 変更履歴。README.md = 人間向け手順
 css/style.css         見た目のみ (チャレンジの解説・終了演出を含む)
-_redirects            /en と /ja を index.html に振り向ける(Cloudflare Pages)。第12節
+functions/en.js ja.js /en と /ja で index.html をそのまま返す(アドレスは変わらない)。第12節
 js/i18n.js            言語の決定(URL の /en /ja、確認用 ?lang=)・tx('日本語')・rname/rdesc/rwhy・index.html の一括置き換え(i18nDom)
 js/i18n-en.js         英語の文(キー=日本語の文)
 tools/i18n-check.js   訳の漏れ検査(node tools/i18n-check.js)。ブラウザ不要
@@ -335,7 +335,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 
 ## 12. 多言語(日本語 / 英語。2026-11-11 追加)
 
-**URL**: `/` は今まで通り日本語(自動振り分けはしない)、`/ja` も日本語、`/en` が英語。中身は同じ `index.html` で、言語は URL で決まる(`js/i18n.js` の `LANG`)。`_redirects`(リポジトリ直下)が `/en` `/ja`(末尾スラッシュあり/なし)に `index.html` を返す。`/en/` のように末尾スラッシュだと相対パス(`js/…` `css/…`)がずれるので、`index.html` の先頭の小さなスクリプトが、そのときだけ `<base href="/">` を足す(file:// では足さない)。ローカルや確認用は `index.html?lang=en`(`?lang=ja`)。設定画面の右上に言語リンク(`#lja` `#len`。`data-nt` つき=置き換え対象外)。
+**URL**: `/` は今まで通り日本語(自動振り分けはしない)、`/ja` も日本語、`/en` が英語。中身は同じ `index.html` で、言語は URL で決まる(`js/i18n.js` の `LANG`)。`functions/en.js` と `functions/ja.js`(Pages Functions)が、アドレスはそのままで `index.html` を返す。(`_redirects` で `/en` を `/index.html` に振り向ける方法は、Pages が `/` に飛ばしてしまい英語にならなかったので使わない。2026-11-11 確認)`/en/` のように末尾スラッシュだと相対パス(`js/…` `css/…`)がずれるので、`index.html` の先頭の小さなスクリプトが、そのときだけ `<base href="/">` を足す(file:// では足さない)。ローカルや確認用は `index.html?lang=en`(`?lang=ja`)。設定画面の右上に言語リンク(`#lja` `#len`。`data-nt` つき=置き換え対象外)。
 
 **文言の通し方**
 - 画面に出す文は `tx('日本語の文')`。**日本語のときは文がそのまま返る**ので日本語の見た目は変わらない。英語のときだけ `js/i18n-en.js` の `I18N_EN['日本語の文']` に置き換わる。キーは一字一句同じにする(違うと日本語のまま出る。英語のときコンソールに `[i18n] 未翻訳` が出る)。
