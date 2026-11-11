@@ -31,7 +31,7 @@ button:active{transform:scale(.97)}button:disabled{opacity:.4}
 #msg{min-height:44px;display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1.5;font-weight:600;text-align:center;margin:6px 0}
 #mh{min-height:39px} /* 縛り一覧でヒントの答えが出る欄も2行ぶん確保(シートが伸びて動かないように) */
 /* 盤面: オセロ風。盤全体を1枚の面にして、マスは全部同じ色・細い線(1px)で区切る。線の色は盤の背景(--gl)がすき間から見えているだけ。縛りの例盤面(.mini)も同じ見た目 */
-#g,.mini{display:grid;gap:1px;width:max-content;max-width:100%;padding:2px;background:var(--gl);border-radius:6px;box-shadow:0 2px 8px rgba(20,24,50,.16);user-select:none;touch-action:manipulation}
+#g,.mini{display:grid;gap:1px;width:max-content;max-width:100%;padding:0;border:2px solid var(--gl);background:var(--gl);border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(20,24,50,.16);user-select:none;touch-action:manipulation}
 #g{margin:8px auto 14px}
 .c{width:var(--s);height:var(--s);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:calc(var(--s)*.52);cursor:pointer;background:var(--c)}
 .o{background:var(--o);cursor:default}
@@ -49,8 +49,10 @@ button:active{transform:scale(.97)}button:disabled{opacity:.4}
 /* 文字のすぐ横に置く小さいドット絵(ボタン・チップ用) */
 .px.inl{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.25em}
 .n1{color:#2563eb}.n2{color:#16a34a}.n3{color:#dc2626}.n4{color:#7c3aed}.n5{color:#b45309}.n6{color:#0891b2}.n7{color:#777}.n8{color:#999}
-.hsrc,.hl{outline:3px solid #3b82f6;outline-offset:-1px;animation:pl 1.1s infinite}
+.hl{outline:3px solid #3b82f6;outline-offset:-1px;animation:pl 1.1s infinite}
+.hsrc{outline:3px solid #3b82f6;outline-offset:-3px;animation:plc 1.1s infinite}
 @keyframes pl{50%{box-shadow:0 0 0 5px rgba(59,130,246,.3)}}
+@keyframes plc{50%{box-shadow:inset 0 0 0 6px rgba(59,130,246,.3)}}
 #md,#ex{position:fixed;inset:0;background:rgba(10,12,25,.55);display:flex;align-items:flex-end;justify-content:center;z-index:9}
 #mb,#eb{background:var(--card);width:100%;max-width:640px;max-height:86vh;border-radius:22px 22px 0 0;display:flex;flex-direction:column;padding:16px}
 #mb .row,#eb .row{align-items:center;justify-content:space-between}
@@ -63,7 +65,7 @@ textarea{width:100%;height:150px;font:11px monospace;box-sizing:border-box;margi
 .ri.dis{opacity:.45;cursor:not-allowed}
 .mini{--s:30px;grid-template-columns:repeat(7,var(--s));margin:6px auto 10px}
 .mini .c{cursor:default}.mini .ctr{background:#3b82f6;color:#fff}.mini .cnt{background:#bfdbfe;color:#1d4ed8}
-.bad{outline:3px solid #ef4b5f;outline-offset:-1px}
+.bad{outline:3px solid #ef4b5f;outline-offset:-3px}
 .hon{outline:2px solid #3b82f6;outline-offset:-2px}
 #hb.on{background:#3b82f6;color:#fff;border-color:#3b82f6}
 .mk{display:inline-block;filter:hue-rotate(200deg) saturate(1.3);pointer-events:none}
