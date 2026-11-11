@@ -40,5 +40,7 @@ lines:{name:"Mines in Every Row and Column",
  desc:"Every row and every column contains at least one mine.",
  why:"The mine count must be at least the larger of the board’s width and height."},
 noTouch:{name:"No Side Contact",
- desc:"Mines never sit next to each other horizontally or vertically."}
+ desc:"Mines never sit next to each other horizontally or vertically."},
+   antiKnight:{name:"Anti-Knight",
+ desc:"No mine is a knight’s move away from another mine."}
 });
