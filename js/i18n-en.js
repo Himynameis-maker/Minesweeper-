@@ -63,6 +63,9 @@ Object.assign(I18N_EN,{
 '🏅 デイリーランキング':"🏅 Daily Ranking",
 'タイムが早い順で、上位20位まで表示されます。最新の盤面コードは明日公開されます。':"Sorted by fastest time; the top 20 are shown. The latest board code is published tomorrow.",
 'やりごたえのある盤面を選んで置いてあるよ。「コード」を押してコピーして、フリープレイの盤面コード欄に貼り付けると遊べます。最大21個で、古いものから消えます。':"A collection of boards that put up a fight. Press “Code” to copy one, then paste it into the board code box in Free Play to play it. Up to 21 are kept, and the oldest are removed first.",
+'🛠 自分で作る・作ったものを見る':"🛠 Make your own / view yours",
+'🛠 自分で作る盤面':"🛠 Make your own board",
+'盤面の大きさと縛りを選んでスタート。作っている間は、この画面を閉じても、ほかの画面で遊んでいても大丈夫。1分で見つからなかったらあきらめます。最大10個まで、この端末にだけ保存されます。':"Choose a board size and rules, then press Start. While it’s being made, you can close this screen or play something else. If nothing is found within a minute, it gives up. Up to 10 are kept, saved only on this device.",
 /* ---- チャレンジ(game/challenge.js) ---- */
 '🔥 チャレンジ':"🔥 Challenge",
 '〜':"–",
@@ -183,6 +186,13 @@ Object.assign(I18N_EN,{
 '縛り <b>{n}</b>':"Rules <b>{n}</b>",
 '縛りなし':"No rules",
 '読み込めませんでした。あとでもう一度開いてね。':"Couldn’t load. Please try again later.",
+/* ---- 自分で作る(ui/picks.js の #pmm) ---- */
+'生成中':"Generating",
+'見つかりませんでした。縛りや大きさを変えて、もう一度どうぞ。':"Couldn’t find one. Change the rules or the size and try again.",
+'いっぱいです({n}個)。捨てるものを選んでね。':"Full ({n}). Choose one to discard.",
+'捨てる':"Discard",
+'本当に捨てる':"Really discard",
+'まだありません。作るとここに出ます。':"None yet. Boards you make appear here.",
 /* ---- デイリー(ui/daily.js) ---- */
 '⏰ 次の盤面まで {t}':"⏰ Next board in {t}",
 '🔥 {n}連勝':"🔥 Streak {n}",
