@@ -56,7 +56,7 @@ js/ui/                描画と配線
   board.js            draw (チャレンジ中は ✅クリア X/N・第N盤面・❤・💡 のチップ、「次の盤面」ボタンの出し分けもここ。絵文字→ドット絵の変換 `pxi` と対応表 `PXI` もここ。第13節)
   modal.js            縛りモーダル, 例盤面 mini/exHtml(爆弾はドット絵), longpress
   copycode.js         盤面コードのコピーボタン(#cp / #fincp)。daily.js の dyCopy を使うので daily.js より後に読む
-  picks.js            厳選盤面の一覧(タイトル横の「🎯 厳選盤面」#pkb → #pkm)。daily.js の dyApi/dyCopy を使うので daily.js より後に読む (pkOpen/pkDraw/pkCopy)
+  picks.js            厳選盤面の一覧(タイトル横の「🎯 厳選盤面」#pkb → #pkm)と、その一番上の「🛠 自分で作る」(#pmb → #pmm。下の「自分で作る」)。daily.js の dyApi/dyCopy を使うので daily.js より後に読む (pkOpen/pkDraw/pkCopy、自分で作る=pm*)
   freecode.js         フリープレイの「盤面コード(貼り付け専用)」欄 (FC, fcApply/fcCancel/fcStart)
   daily.js            デイリー画面(スタート/3,2,1/タイマー/結果/ランキング/盤面入手)。サーバーとの通信もここ
   main.js             upd, setMode, 検査レポート欄(?repo をつけたときだけ表示), 全イベント配線(load。操作ボタンの絵文字をドット絵に変換するのもここ。第13節)
@@ -351,6 +351,14 @@ python3 build.py                           # rules ブロック同期 + dist 生
 **調整**: 難しさの下限は `PICK` の `minCost`/`minDeep`/`minDep`(デイリーの下限は `DAILY` の同名の項目で、別の変数。上げるほど歯ごたえ重視で、生成に時間がかかり、出る回が減る)。出る頻度は `picks.yml` の cron(1日の上限は `_lib.js` の `PICK_PER_DAY`)。
 
 **検査**: `node tools/daily-e2e.js` の末尾(登録・1日3つ・21個・古い番号・メンテ中・テーブル無し・画面の表示とコピー)。生成そのものは `node tools/pick-gen.js out.json`(手元で動く)。
+
+**自分で作る(厳選盤面の一番上の「🛠 自分で作る・作ったものを見る」)**: サーバーを使わず、自分の端末の中で、縛りと盤面の大きさ(7〜12の正方形)を選んで盤面を1つ作る。コードは `js/ui/picks.js` の `pm*`(`PM` 状態、`PM_Q` 数値)、画面は `index.html` の `#pmm`、見た目は `css/style.css` の `#pmm` 以降。
+- 作り方は厳選と同じ(`gen` に下限 `minCost/minDeep/minDep` と上限 `maxCost` を渡す)。違いは、縛り・大きさは自分で決めるので抽選・引き直しをしないこと。**60秒(`PM_Q.sec`)で見つからなければあきらめる**。爆弾数は自動(盤面の28〜45%から抽選し、縛りに合わなければ `mnear` の近い数。`pmPlan`)。使えない縛りは理由を出して止める(フリープレイの `problems` と同じ文言)。
+- **`PM_Q` は `tools/pick-plan.js` の `PICK`(`minCost/minDeep/minDep/tries`)と `tools/daily-plan.js` の `DAILY`(`maxCost/bombMin/bombMax`)のコピー**。ブラウザは tools/ を読まないため。厳選の下限を変えたら `PM_Q` も同じ値にする。
+- 保存は `localStorage` の `msv.myPicks`(盤面コードだけ・最大10個 `PM_MAX`)。古いルールセット番号(`bcOld`)は出さず、読み込み時に外す。いっぱいなら「いっぱいです。捨てるものを選んでね。」で止まり、各行の「捨てる」(2度押し。1度目は「本当に捨てる」で3秒)で消してから作る。各行は 大きさ・縛り数・コード(コピー)・捨てる。
+- 生成中は一覧の一番上に帯「生成中」+キャンセル(秒数や件数は出さない)。生成は非同期で、ポップを閉じても、ほかの画面で遊んでいても続く(キャンセルは `PM.tk` を進めるだけ。フリープレイの `TK` とは別)。生成中は `#pkb` `#pmb` に点滅の丸、できたら(まだ見ていないとき)緑の丸。ページを再読み込みすると生成は消える。
+- 縛りの選択画面は、フリープレイと同じ `#md`(modal.js)を使い回す。開く間だけフリープレイの `SEL` を預けて自分用の選択に入れ替え、閉じる(`closeM` → `pmEndPick`)で戻す。`#md` は `#pmm` の上に出すため、CSS で `#md{z-index:12}#ex{z-index:13}`。
+- 盤面の意味は変わらないので BOARD_VER は上げない。
 
 ## 12. 多言語(日本語 / 英語)
 
