@@ -14,7 +14,7 @@ const driver=`
  const r=await pickMake(m=>console.log(m));if(!r)return null;
  const c=boardEncode(r.cfg,r.res),d=boardDecode(c);
  if(!d.ok||d.cfg.M!=r.cfg.M||d.res.start!=r.res.start||d.res.mines.some((x,i)=>x!=r.res.mines[i]))throw Error('盤面コードの往復が一致しません');
- return{code:c,tries:r.tries,sec:r.sec,info:r.cfg.R+'x'+r.cfg.C+' 爆弾'+r.cfg.M+' 縛り['+(r.cfg.ids.join('+')||'なし')+'] 最重'+r.m.maxc+'通り 詰まり'+r.m.deep+'回'}})()`;
+ return{code:c,tries:r.tries,sec:r.sec,info:r.cfg.R+'x'+r.cfg.C+' 爆弾'+r.cfg.M+' 縛り['+(r.cfg.ids.join('+')||'なし')+'] 最重'+r.m.maxc+'通り 場合分け'+r.m.deep+'回 定番パターン'+r.m.pats+'回'}})()`;
 const ctx=vm.createContext({performance,setTimeout,console,Date,Uint8Array,Int8Array,Int32Array,DAILY_DEBUG:false});
 vm.runInContext(code+'\n'+driver,ctx).then(r=>{
  if(!r){console.log('NONE: 今回は見つかりませんでした(厳選は出なくてもよいので正常終了)');return}
