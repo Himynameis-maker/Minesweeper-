@@ -4,7 +4,7 @@
    liar持ちは「各行・各列に正直な数字1つ」の表示状態 L={hon,sg,sh} を一緒に作り、山登りでも動かす。
    ノーゲスでない盤面は絶対に返さない(見つからなければ null)。
    品質条件: 推論の種類>=2, 手順3段以上, 開始開放<=50%, cons/grp持ちルールは外すと詰む(=縛りが飾りでない)。
-   qms秒探索して品質条件を満たさなければ「ノーゲスだが品質未達」を許容、hard秒で打ち切り。
+   qms秒探索して品質条件を満たさなければ「ノーゲスだが品質未達」を許容、hard秒で打ち切り。o.maxTries があれば、時間とは別に「初期盤面を何個まで試すか」でも打ち切る(デイリー・厳選用。GitHub の実行時間以外に時間制限を持たないため)。
    iso持ちは「8近傍でつながる塊(imax があれば2〜imax個。塊同士は8近傍で触れない)を置く」配置と「塊ごと動かす」山登り。
    下限つき cons(lo>0。例: tidy)は、爆弾を撒いてから違反を min-conflicts で直すサンプラ(lsample)と、valid を保つ swap の山登り(smove)を使う。
    鏡爆弾(P.mir)は「爆弾のうち上下左右に爆弾が無い3個を鏡爆弾(L.sp)にして、数字 L.sh に反映する」状態を盤面と一緒に作って動かす(mstate)。
@@ -12,7 +12,7 @@
    双竜(dragon:2)は「龍H(左→右)と龍V(上→下)を置き、その8近傍を避けて残りを撒く」配置(tsample)。
    dragon持ちは「左端から右端まで、1列ごとに直進か上下1行ずれで爆弾を並べる(DFS。直進の確率は盤面ごとにランダム)」配置(dsample)と、valid を保つ付け替えの山登り(smove)。
    新しい配置様式(例: ヘビ)のルールは、[grp] と同じ位置に「専用の sample と move」を足す(context.md 第6節)。 */
-async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,MC=o.maxCost??Infinity,mnC=o.minCost??0,mnD=o.minDeep??0,mnP=o.minDep??0,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
+async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,MC=o.maxCost??Infinity,mnC=o.minCost??0,mnD=o.minDeep??0,mnP=o.minDep??0,MT=o.maxTries??Infinity,cancel=o.cancel||(()=>0),tick=o.tick||(()=>0);
  const{R,C,M,ids}=cfg,N=R*C,P=prep(cfg),t0=performance.now(),kc=P.cons;
  /*[s1]*/const SZ=s=>P.s1?new Set([s]):new Set([s,...P.nb[s]]); /* 開始マスと「必ず安全にするマス」。ふつうは数字0にするため nb も安全。startOnly の縛り(均一な配置)では開始マス1つだけ(開始の数字は0でなくてよい) */
  if(P.grp&&M%P.grp)throw Error('爆弾数が'+P.grp+'の倍数ではありません');
@@ -226,13 +226,14 @@ async function gen(cfg,o){o=o||{};const qms=o.qms??10000,hard=o.hard??120000,MC=
   return{P,mines:ex,bad,bc,L}}
  /* ---- 品質判定と本体ループ ---- */
  const qual=(m,s,r,L)=>r.kinds.size>=2&&r.rounds>=3&&r.open0<=.5*r.safe&&r.maxc<=MC&&r.maxc>=mnC&&r.deep>=mnD&&nec.every(id=>{const x=sim(P,M,m,s,id,L);return!x.ok&&r.safe-x.rv>=mnP*r.safe}); /* 下限(厳選盤面用): maxc>=minCost=一番重い手が○通り以上 / deep>=minDeep=詰まる場面が○回以上 / 縛りを外すと解けなくなるマスが安全マスの minDep 以上 */
- let cur=null,cl=null,cs=0,cr=null,soft=null,inv=0,it=0,tries=0,last=t0;
+ let cur=null,cl=null,cs=0,cr=null,soft=null,inv=0,it=0,tries=0,att=0,last=t0;
  for(;;){const now=performance.now(),el=now-t0;
   if(el>hard||cancel())break;
   if(soft&&el>qms)break;
   if(now-last>40){last=now;tick(el,tries);await new Promise(r=>setTimeout(r,0))}
-  if(!cur){cs=MIRM?mcs():rnd()*N|0;cur=sample(cs);inv=it=0;if(!cur)continue;cl=null;if(LM){cl=lstate(cur);if(!cl){cur=null;continue}}else if(DDM){cl=ddstate(cur,rpath(cur));if(!cl){cur=null;continue}}else if(MIRM){cl=mstate(cur,cs);if(!cl){cur=null;continue}}tries++;cr=sim(P,M,cur,cs,undefined,cl);if(cr.bug)throw Error('solver unsound')}
-  if(cr.ok){if(qual(cur,cs,cr,cl))return{mines:cur,start:cs,gf:1,q:1,L:cl};soft={mines:cur,start:cs,gf:1,q:0,L:cl};cur=null;continue}
+  if(!cur){if(tries>=MT||++att>MT*10)break; /* maxTries: 時間ではなく回数の打ち切り(tries=解けるか調べた初期盤面の数, att=配置を試した回数。配置が作れない縛りで空回りしないよう10倍まで)。未指定=無制限 */
+   cs=MIRM?mcs():rnd()*N|0;cur=sample(cs);inv=it=0;if(!cur)continue;cl=null;if(LM){cl=lstate(cur);if(!cl){cur=null;continue}}else if(DDM){cl=ddstate(cur,rpath(cur));if(!cl){cur=null;continue}}else if(MIRM){cl=mstate(cur,cs);if(!cl){cur=null;continue}}tries++;cr=sim(P,M,cur,cs,undefined,cl);if(cr.bug)throw Error('solver unsound')}
+  if(cr.ok){if(qual(cur,cs,cr,cl))return{mines:cur,start:cs,gf:1,q:1,L:cl,tries};soft={mines:cur,start:cs,gf:1,q:0,L:cl};cur=null;continue}
   if(++it>400){cur=null;continue}
   const U=[];for(let i=0;i<N;i++)if(!cr.st[i])U.push(i);
   const a=U.filter(i=>cur[i]),b=U.filter(i=>!cur[i]);

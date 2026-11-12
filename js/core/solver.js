@@ -75,7 +75,7 @@ function deduce(P,st,num,M,skip,all){
   /*[mir]*/else if(MR){let ins=0;for(const j of P.ms[i])ins+=mpo[j];const mi=N-1-i,sh=Math.min(P.mk,ins,num[i],st[mi]==1?num[mi]:P.mk),sl=Math.max(0,P.mk-(mzt-ins));add(P.nb[i],num[i]-sh,num[i]-sl,{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
   else add(P.nb[i],num[i],num[i],{t:'n',i},0,/*[wt]*/P.w?P.nb[i].map(c=>P.w[c]):null)}
  for(const k of P.cons)if(k.src.id!==skip)add(k.cells,k.lo,k.hi,k.src);
- const T=M-km,seen=new Set(),push=(i,mine,tier,src,cost)=>{const key=all?i+src.t+(src.id??src.i??''):i;if(!seen.has(key)){seen.add(key);out.push({i,mine,tier,src,cost})}}; /* cost=その手を決めるのに要る通りの数(tier1は未設定=0扱い。人間向けの難易度の物差し。判定には使わない) */
+ const T=M-km,seen=new Set(),push=(i,mine,tier,src,cost,pt)=>{const key=all?i+src.t+(src.id??src.i??''):i;if(!seen.has(key)){seen.add(key);out.push({i,mine,tier,src,cost,pat:pt?1:0})}}; /* cost=その手を決めるのに要る通りの数(tier1は未設定=0扱い。人間向けの難易度の物差し。判定には使わない)。pat=1 は定番パターン(下の [pat])で、場合分けには数えない */
  /*[grp]*/const GN=(P.grp&&P.gid!==skip)?P.grp:0;let S=null,vis=null,sp=0,hb=0;
  /*[grp]*/const reach=(x,onlyB,cap)=>{const q=[x];vis[x]=++sp;hb=S[x]==1?1:0;
   for(let h=0;h<q.length&&q.length<cap;h++)for(const y of P.adj[q[h]])if(vis[y]!=sp&&(onlyB?S[y]==1:S[y]!=0)){vis[y]=sp;q.push(y);if(S[y]==1)hb=1}
@@ -151,6 +151,37 @@ function deduce(P,st,num,M,skip,all){
     for(let h=0;h<sq.length;h++)for(const y of P.adj8[sq[h]])if(S[y]==1&&!sd[y]){sd[y]=1;sq.push(y)}
     for(const x of sq)for(const y of P.adj8[x])if(S[y]==2&&!sd[y]&&!poss(y))push(y,0,1,ds)}}}
  const why=x=>{const L=K.filter(k=>k.cells.includes(x));return{t:'x',ns:L.filter(k=>k.src.t=='n').map(k=>k.src.i),rs:[...new Set([...L.filter(k=>k.src.t=='r').map(k=>k.src.id),...(GN?[P.gid]:[]),...(IM?[P.iid]:[]),...(CM?[P.cnid]:[]),...(DM?[P.did]:[]),...(HM?[P.lid]:[]),...(MR?[P.mid]:[])])]}};
+ /*[pat]*/ /* 定番パターン(二つの制約の組み合わせ。人間が「1-2の形」「差を取る」「残り爆弾数と見比べる」と呼ぶ手)。単一制約では進めず、仮定も全列挙もまだ要らない段。
+     制約 A と B(数字・縛りの cons・残り爆弾数)が共有するマス I、Aだけの X、Bだけの Y に分けて、爆弾数 x,i,y の範囲を
+        la <= x+i <= ha,  lb <= i+y <= hb
+     の両辺から詰める(上限/下限の伝播だけ。仮定は置かない)。X か I か Y の範囲が「0個」なら全部安全、「全部」なら全部爆弾。
+     例: A={a,b}=1, B={a,b,c}=2 なら Y={c} は 1個 → c は爆弾。A=3個の数字と残り爆弾数3個なら、A以外は全部安全。
+     範囲を詰めるだけの必要条件なので sound。重み(wt)つきの制約は対象外。cost=2(場合分けではない)。deep には数えない(sim)。
+     ヒント(all=1)のときは最後に、全列挙の結果と同じマスは重複を捨てて足す。 */
+ const wx=(ns,rs)=>({t:'x',ns,rs:[...new Set([...rs,...(GN?[P.gid]:[]),...(IM?[P.iid]:[]),...(CM?[P.cnid]:[]),...(DM?[P.did]:[]),...(HM?[P.lid]:[]),...(MR?[P.mid]:[])])]});
+ const pat=()=>{const Q=[];for(const k of K)if(!k.w)Q.push(k);
+  if(unk.length&&T>=0&&T<=unk.length)Q.push({cells:unk,lo:T,hi:T,src:{t:'c'}}); /* 残り爆弾数も1つの制約として扱う */
+  const nq=Q.length;if(nq<2)return;
+  const by=new Array(N).fill(null);Q.forEach((k,q)=>{for(const c of k.cells)(by[c]||(by[c]=[])).push(q)});
+  const cn=new Int32Array(nq),mk=new Int32Array(N),tc=[];let stamp=0;
+  for(let a=0;a<nq;a++){const A=Q[a];tc.length=0;
+   for(const c of A.cells)for(const b of by[c])if(b>a){if(!cn[b])tc.push(b);cn[b]++}
+   for(const b of tc){const B=Q[b],nI=cn[b];cn[b]=0;
+    const nX=A.cells.length-nI,nY=B.cells.length-nI;if(!nX&&!nY)continue; /* 同じマスの組=何も増えない */
+    const la=A.lo,ha=A.hi,lb=B.lo,hb=B.hi;let xl=0,xh=nX,il=0,ih=nI,yl=0,yh=nY;
+    for(let t=0;t<4;t++){const p=[xl,xh,il,ih,yl,yh];
+     xl=Math.max(xl,la-ih);xh=Math.min(xh,ha-il);il=Math.max(il,la-xh,lb-yh);ih=Math.min(ih,ha-xl,hb-yl);yl=Math.max(yl,lb-ih);yh=Math.min(yh,hb-il);
+     if(xl>xh||il>ih||yl>yh)break; /* 食い違い(普通は起きない)は何も言わない */
+     if(p[0]==xl&&p[1]==xh&&p[2]==il&&p[3]==ih&&p[4]==yl&&p[5]==yh)break}
+    if(xl>xh||il>ih||yl>yh)continue;
+    const dx=nX>0&&(xh<=0||xl>=nX),di=nI>0&&(ih<=0||il>=nI),dy=nY>0&&(yh<=0||yl>=nY);if(!dx&&!di&&!dy)continue;
+    const mn=k=>k.src.t=='n'?[k.src.i]:[],mr=k=>k.src.t=='r'?[k.src.id]:[],sr=wx([...new Set([...mn(A),...mn(B)])],[...new Set([...mr(A),...mr(B)])]);
+    ++stamp;for(const c of B.cells)mk[c]=stamp;const X=A.cells.filter(c=>mk[c]!=stamp),I=A.cells.filter(c=>mk[c]==stamp);
+    ++stamp;for(const c of A.cells)mk[c]=stamp;const Y=B.cells.filter(c=>mk[c]!=stamp);
+    if(dx)for(const c of X)push(c,xl>=nX?1:0,2,sr,2,1);
+    if(di)for(const c of I)push(c,il>=nI?1:0,2,sr,2,1);
+    if(dy)for(const c of Y)push(c,yl>=nY?1:0,2,sr,2,1)}}};
+ /*[pat]*/if(!all&&!out.length)pat(); /* 単一制約で進めるときは使わない */
  /*[probe]*/if(P.probe&&P.pid!==skip&&!out.length&&unk.length){
   /* 仮定して矛盾を探す推論(failed-literal probing。全列挙より前に試し、見つかれば全列挙を飛ばす=速い): 未確定マスを爆弾/安全と仮定し、全制約(数字・cons・残り爆弾数)の単純な伝播だけで
      矛盾が出たら逆が確定。伝播は各制約の上限/下限の範囲だけを使うので sound。全列挙が3万ノードを超えて諦めるような広い盤面で効く */
@@ -234,6 +265,7 @@ function deduce(P,st,num,M,skip,all){
   cj.cells.forEach((x,p)=>{let m=0,s=0;
    for(let k=0;k<=cj.n;k++)if(T-k>=0&&T-k<O.length&&O[T-k]){if(cj.mk[p][k])m=1;if(cj.sk[p][k])s=1}
    if(m&&!s)push(x,1,3,cj.free?{t:'c'}:why(x),cc);else if(s&&!m)push(x,0,3,cj.free?{t:'c'}:why(x),cc)})});
+ /*[pat]*/if(all)pat();
  return out}
 
 /* 開始マスから推論のみで解き進めるシミュレーション。真の配置と食い違えばbug。L=liarの表示状態({sh:表示数字}) */
@@ -241,9 +273,9 @@ function sim(P,M,mines,start,skip,L){
  const N=P.nb.length,st=new Uint8Array(N),act=P.nb.map((_,i)=>ncount(P,mines,i)),num=L?L.sh:act,az=P.mir&&L?L.sh:act; /*[mir]*/ /* 数字0の自動開放は「見えている数字」で決める(鏡爆弾は+1するので、実際の爆弾数0でも表示が0とは限らない) */
  const rev=i=>{const q=[i];while(q.length){const x=q.pop();if(st[x])continue;st[x]=1;if(!az[x])for(const y of P.nb[x])if(!st[y]&&!mines[y])q.push(y)}};
  rev(start);let open0=0;for(let i=0;i<N;i++)if(st[i]==1)open0++;
- const kinds=new Set(),safe=N-M;let rounds=0,bug=0,maxc=0,deep=0;
- for(;;){const d=deduce(P,st,num,M,skip);if(!d.length)break;rounds++;maxc=Math.max(maxc,Math.min(...d.map(e=>e.cost||0)));if(Math.min(...d.map(e=>e.tier))>=3)deep++; /* deep=単一制約では進めず、全列挙が要ったラウンドの数(詰まった回数) */
+ const kinds=new Set(),safe=N-M;let rounds=0,bug=0,maxc=0,deep=0,pats=0;
+ for(;;){const d=deduce(P,st,num,M,skip);if(!d.length)break;rounds++;maxc=Math.max(maxc,Math.min(...d.map(e=>e.cost||0)));if(d.every(e=>e.pat))pats++;else if(d.every(e=>e.tier>=2))deep++; /* deep=単一制約でも定番パターン([pat])でも進めず、仮定(probe)か全列挙が要ったラウンドの数(=場合分けが要った回数)。pats=定番パターンで進んだラウンドの数 */
   for(const e of d){if(!!mines[e.i]!=!!e.mine)bug=1;if(st[e.i])continue;kinds.add(e.tier+e.src.t);if(e.mine)st[e.i]=2;else rev(e.i)}
   if(bug)break}
  let rv=0;for(let i=0;i<N;i++)if(st[i]==1)rv++;
- return{ok:rv==safe&&!bug,bug,rv,open0,rounds,kinds,safe,st,maxc,deep}}
+ return{ok:rv==safe&&!bug,bug,rv,open0,rounds,kinds,safe,st,maxc,deep,pats}}
