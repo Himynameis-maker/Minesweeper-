@@ -42,8 +42,8 @@ js/core/              推論と生成。DOM非依存(node でも動く)
   util.js             rnd, D8/D4/KN, offs, gcd
   registry.js         RULES, reg, conflict, stepOf/mfit/mok/mnear/mpick
   prep.js             prep(cfg)→P(問題定義。`s1`=開始マスだけ安全にするか), gcomps
-  solver.js           deduce(確定推論エンジン), sim(解き進めシミュ)  ★全体制約の主戦場。[probe]=仮定して矛盾を探す推論(`[pk]`=重ならない2×2の下限の合計で矛盾を探す検査つき)。各手の `cost`(難易度の物差し)は第11節「難易度の上限」
-  gen.js              gen(ノーゲス盤面の生成・山登り・品質判定。品質は `o.maxCost` で難易度の上限も見る)  ★配置様式の主戦場。下限つき cons 用は lsample/smove。開始マスと必ず安全にするマスは `SZ(s)`(`P.s1` なら開始マス1つだけ、そうでなければ nb も)
+  solver.js           deduce(確定推論エンジン), sim(解き進めシミュ)  ★全体制約の主戦場。[pat]=二つの制約の定番パターン(単一制約の次・probe の前。第11節)。[probe]=仮定して矛盾を探す推論(`[pk]`=重ならない2×2の下限の合計で矛盾を探す検査つき)。各手の `cost`(難易度の物差し)は第11節「難易度の上限」
+  gen.js              gen(ノーゲス盤面の生成・山登り・品質判定。品質は `o.maxCost` で難易度の上限も見る。`o.maxTries` で試す盤面の数の上限=時間ではなく回数の打ち切り。デイリー・厳選が使う)  ★配置様式の主戦場。下限つき cons 用は lsample/smove。開始マスと必ず安全にするマスは `SZ(s)`(`P.s1` なら開始マス1つだけ、そうでなければ nb も)
   selftest.js         selfTest(単体+併用ペア検査), buildReport
   boardcode.js        盤面コードの符号化(boardEncode/boardDecode)
   boardver.js         ルールセット番号 BOARD_VER
@@ -66,7 +66,7 @@ rules/                1ルール=1ファイル(ファイル名=id)。_始まり�
 tools/
   headless.js         ブラウザ無しで検査: node tools/headless.js [id...] | --combo a,b,c
   smoke-ui.js         偽DOMでUI一式+チャレンジの通しを動かす: node tools/smoke-ui.js
-  daily-plan.js       デイリー盤面の抽選と生成。数値の調整は先頭の DAILY だけ(盤面サイズ・爆弾率・生成の制限時間・難易度の上限 `maxCost`)
+  daily-plan.js       デイリー盤面の抽選と生成。数値の調整は先頭の DAILY だけ(盤面サイズ・爆弾率・全体の時間の上限 `giveUpSec`・1抽選で試す盤面数 `tries`・難易度の上限 `maxCost`)
   daily-gen.js        daily-plan を core+rules と読み込み、盤面コードを JSON に書く: node tools/daily-gen.js payload.json YYYY-MM-DD (workflow が使う)
   pick-plan.js        厳選盤面の抽選と生成(デイリーと同じ作り方で、難易度の下限だけ違う)。数値の調整は先頭の PICK だけ
   pick-gen.js         pick-plan を core+rules+daily-plan と読み込み、盤面コードを JSON に書く。見つからなければファイルを書かず正常終了(workflow が使う)
@@ -196,7 +196,7 @@ reg({id:"camelCase一意", name:"表示名(短く)", desc:"説明を1行で",
 | 偶奇だけの数字 / 範囲で出る数字 / 数字が複数 | **CORE拡張**: 数字の意味変更(solver の数字制約の作り方、sim の num、draw) |
 | プレイ中に状態が動く / lo,hi で書けない制約 | **CORE拡張(大)**: 要相談 |
 
-**CORE拡張で触る場所**(既存の拡張は行頭の `[grp]` `[liar]` `[iso]` `[conn]` `[wt]` `[dragon]` `[mir]` `[pk]`(solver の probe 内) `[s1]`(gen / play)の印で探す。新フックは同じ位置に並べる。liar 系は `P.lie`=1/2 で分岐する: solver は `LV=P.lie==2`、gen も `LV`。`L.hon[]` は「特別マス」の集合で、liar では正直マス・liar2 では嘘マス。`mkShown` が `!!hon[i]!==LV` なら正直、それ以外は ±1 ズレ):
+**CORE拡張で触る場所**(既存の拡張は行頭の `[grp]` `[liar]` `[iso]` `[conn]` `[wt]` `[dragon]` `[mir]` `[pat]`(solver。定番パターン) `[pk]`(solver の probe 内) `[s1]`(gen / play)の印で探す。新フックは同じ位置に並べる。liar 系は `P.lie`=1/2 で分岐する: solver は `LV=P.lie==2`、gen も `LV`。`L.hon[]` は「特別マス」の集合で、liar では正直マス・liar2 では嘘マス。`mkShown` が `!!hon[i]!==LV` なら正直、それ以外は ±1 ズレ):
 
 1. `registry.js` — `reg` に新フィールドの検査、`conflict` に併用不可、`stepOf`(爆弾数の倍数があるなら)。
 2. `prep.js` — `prep` で P に必要情報を載せる(例: grp は `adj`)。
@@ -226,7 +226,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 - 下限(lo)つき cons: `sample` は標準サンプラ(上限しか見ない)の代わりに `lsample` を使い、山登りは `smove` を使う。grp / iso / conn と併用のときは各専用サンプラが優先で、下限は見ない。
 
 **tidy(probe 推論)**
-- `deduce` は成分ごとの全列挙が3万ノードを超えると諦める。tidy の連制約(縦横4連に爆弾1〜3個)は盤面全体を1成分にするので、そのままでは推論が進まない。そこで `probe:true` のルールがあるとき、単一制約の推論が空なら(全列挙の前に)未確定マスを爆弾/安全と仮定し、全制約(数字・cons・残り爆弾数)の上限/下限だけの単純な伝播で矛盾を探す(矛盾なら逆が確定。必要条件のみなので sound)。probe ルールでは全列挙のノード上限を500にしている。
+- `deduce` は成分ごとの全列挙が3万ノードを超えると諦める。tidy の連制約(縦横4連に爆弾1〜3個)は盤面全体を1成分にするので、そのままでは推論が進まない。そこで `probe:true` のルールがあるとき、単一制約と定番パターン(`[pat]`)の推論が空なら(全列挙の前に)未確定マスを爆弾/安全と仮定し、全制約(数字・cons・残り爆弾数)の上限/下限だけの単純な伝播で矛盾を探す(矛盾なら逆が確定。必要条件のみなので sound)。probe ルールでは全列挙のノード上限を500にしている。
 - `ok`: 爆弾数は盤面の3〜6.5割(4連の理論上の限界は2.5〜7.5割。7割では 6x6 が生成に失敗した)。
 - liar/grp/iso/conn の全体制約は伝播に入れない(弱くなるだけで sound は保つ)。重み(wt)は伝播で考慮する。
 - ヒント(`all=1`)の根拠 `why` は近似(そのマスに触れる数字とルールを挙げるだけ)。
@@ -303,10 +303,14 @@ python3 build.py                           # rules ブロック同期 + dist 生
 
 **画面の状態**: DYS.state = ''(読み込み中)/new/prep/**maint**/done/err。maint は「🛠 更新中のため遊べません」+ボタン「更新中(タップで更新)」(スタート・ニックネーム欄は隠す)。途中で離れて戻った(サーバー上 playing)人はミス扱いで終了(finish clear:false)。`err` のとき、404 または「200 なのに JSON でない」は「サーバー機能が見つかりません」と表示(Pages は functions が無いと index.html を 200 で返すことがあるため)。
 
-**盤面作り**: `daily.yml`(毎日 日本時間のAM2:33〜8:33までの計7回。対象日は「JST の明日」で、何時に走っても常に翌日分。すでに盤面があれば何もしない)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・制限時間・難易度の上限は `tools/daily-plan.js` の DAILY。
+**盤面作り**: `daily.yml`(毎日 日本時間のAM2:33〜8:33までの計7回。対象日は「JST の明日」で、何時に走っても常に翌日分。すでに盤面があれば何もしない)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・全体の時間の上限(`giveUpSec`。これが唯一の時間制限で、`daily.yml` の timeout-minutes より短くする)・1抽選で試す盤面数(`tries`)・難易度の上限は `tools/daily-plan.js` の DAILY。1抽選ごとの制限時間や、時間がたったら縛りなしにする仕組みは無い。
 
-**難易度の上限(`DAILY.maxCost`、現行 16)**: `solver.js` の `deduce` は各手に `cost`=「その手を決めるのに要る配置の通りの数」を付ける(tier1 は未設定=0 扱い。全列挙の手=その成分の成り立つ配置の数 `sols`(打ち切りは Infinity)/自由マスの確定(`3c`)=他の成分の爆弾数の取りうる値の合計 / probe=固定の 4・6)。`sim` はラウンドごとに「確定できた手のうち一番易しい手の cost」を取り、盤面内の最大を `maxc` として返す。`gen` は `o.maxCost` を超える盤面を**品質未達**にする(未指定=上限なし。フリープレイ・チャレンジは未指定)。解けるかどうかの判定には使わないので盤面の意味は変わらず、BOARD_VER は上げない。
-- 16 は、maxc が 9 以下と 63 以上に二極化している谷と、人間が場合分けできる目安(普通は8〜12通り、最大でも24通り程度)から決めた。高い方は縛りを4〜5個重ねた小盤面・嘘つき数字・鏡爆弾の盤面。弾かれた盤面は作り直しになり、1盤面あたり最長約60秒(上限は giveUpSec=900)。
+**推論の段と難易度の物差し**: `solver.js` の `deduce` は、①単一制約(tier1) → ②**定番パターン `[pat]`**(tier2・`pat:1`・cost 2) → ③仮定して矛盾を探す probe(tier2・cost 4/6。`probe:true` の縛りだけ) → ④全列挙(tier3・cost=成分の配置の数) の順に試し、見つかった段で止まる。`[pat]` は二つの制約(数字・縛りの cons・残り爆弾数。重みつきは除く)を、共有マス I・片方だけのマス X/Y に分け、爆弾数の範囲 `la<=x+i<=ha, lb<=i+y<=hb` を伝播で詰めて、範囲が0個なら安全・全部なら爆弾とする(例: 1-2の形、差を取る、「この数字で残りの爆弾を使い切る」)。必要条件のみで sound。全列挙は打ち切りがなければ完全なので、強さが変わるのは打ち切り(probe 縛りの500ノードなど)のときだけ=**BOARD_VER は上げない**。ヒント(`all=1`)では最後に足し、全列挙と同じマスは重複を捨てる。
+- `sim` は各ラウンドの結果から `maxc`(各ラウンドで一番易しい手の cost の、盤面内の最大)、`deep`(**単一制約でも定番パターンでも進めず、probe か全列挙が要ったラウンドの数=場合分けが要った回数**)、`pats`(定番パターンで進んだラウンド数)を返す。`maxc>=6` なら必ず `deep>=1`(定番パターンは cost 2 のため)。
+- 旧 `deep`(全列挙が要ったラウンド数)は定番パターンも数えていたので、易しい盤面が下限を通っていた(縛りなし盤面は実測で約93%が新しい `deep` で0回)。
+
+**難易度の上限(`DAILY.maxCost`、現行 30)**: `gen` は `o.maxCost` を超える盤面を**品質未達**にする(未指定=上限なし。フリープレイ・チャレンジは未指定)。解けるかどうかの判定には使わないので盤面の意味は変わらず、BOARD_VER は上げない。
+- 30 は、maxc が小さい山(新しい物差しでは多くが5以下)と、数十〜数百以上の山(縛りを4〜5個重ねた小盤面・嘘つき数字・鏡爆弾の盤面)の間の谷。弾かれた盤面は作り直しになる。
 - cost は「つながった成分全体の配置の数」で、人間が局所で解ける手も多めに数える(縛りが多い盤面ほど厳しめ)。値を上げると難しい盤面も出る。
 
 **設定の置き場所**: GitHub の Secrets `DAILY_TOKEN`、Variables `DAILY_SITE`(`https://` から・末尾 `/` なし)。Cloudflare Pages の環境変数 `DAILY_TOKEN`(GitHub と同じ値)、Bindings の D1 変数名 `DB`。D1 に `schema.sql` を1回実行。
@@ -332,10 +336,11 @@ python3 build.py                           # rules ブロック同期 + dist 生
 **構成**: `picks.yml` → `tools/pick-gen.js`(`pick-plan.js`)で生成 → `PUT /api/admin/pick` で登録(管理者。`DAILY_TOKEN`、デイリーと同じ Secrets/Variables)→ D1 `picks` → 画面が `GET /api/picks`(公開)で一覧を取る。
 
 **生成**: `dailyPlan(false)`(サイズ・爆弾率・縛りの抽選と上限 `DAILY.maxCost` はデイリーと同じ)で抽選し、`gen` に下限 `minCost`/`minDeep`/`minDep` を渡す(`gen.js` の `qual`)。下限は縛りの有無・種類に依らない。
-- `minCost`(現行6): 一番重い手が「6通り以上」。= 少なくとも1回は場合分け(背理法)が要る。上限は 16 なので「人間が解ける範囲で、場合分けが要る」帯になる。
-- `minDeep`(現行3): 単一制約で進めず、全列挙が要る場面(`sim` の `deep`=詰まった回数)が3回以上。
+- `minCost`(現行6): 一番重い手が「6通り以上」。= 少なくとも1回は場合分け(背理法)が要る。上限は `DAILY.maxCost`(30)。
+- `minDeep`(現行2): 定番パターンでも進めず、場合分け(probe か全列挙)が要る場面(`sim` の `deep`)が2回以上。
 - `minDep`(現行.15): 縛りを外すと解けなくなるマスが、安全マスの15%以上(`nec` の縛りだけが対象。数字の定義を変える縛りは対象外)。
-- `pickMake` は genSec=30 で引き直し、giveUpSec=840 であきらめる(null。**失敗にしない**=厳選は出なくてもよい)。生成は1秒〜数分かかる。
+- 実測(簡易版の縛りで)の見つかりやすさ: 縛りなしは約1000回の試行(約35秒)、桂馬は約10回、tidy は約20回、均一は約3回、色つきは約80回。十字だけ・隣接禁止だけ・その併用は、新しい物差しでは易しすぎて通らない(他の縛りと重なれば通る)。
+- `pickMake` は全体の時間 `giveUpSec`=840 だけを時間制限にして、あきらめたら null(**失敗にしない**=厳選は出なくてもよい)。1回の抽選は `tries`=3000 回試して見つからなければ引き直す(時間ではなく回数)。
 
 **サーバー**(`functions/api/admin/pick.js`): 縛りの数・ルールセット番号・作成日は、送られた値を信じずコードと時計(JST)から決める。`PICK_PER_DAY=3`・`PICK_MAX=21`(`_lib.js`)。1文の `INSERT … SELECT … WHERE (今日の本数)<3` で入れるので、同時に届いても3を超えない。上限なら 409 `limit`、同じコードなら 200 `dup`、いまある盤面より古い番号なら 409 `old`、メンテナンス中(`boardLocked`)なら 423。入れたついでに、**ルールセット番号がそのコードより古いものと、新しい順で21個を超えたものを削除**。`GET /api/admin/pick` は `{day,count,limit,max,total,full}`(workflow が `full` で生成を省く)。`picks` テーブルは管理APIが `CREATE TABLE IF NOT EXISTS` で自動作成する(一覧は無ければ空)。`/ping` の `picks` は `tables` に混ぜない。
 
