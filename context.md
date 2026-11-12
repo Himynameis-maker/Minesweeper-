@@ -66,7 +66,7 @@ rules/                1ルール=1ファイル(ファイル名=id)。_始まり�
 tools/
   headless.js         ブラウザ無しで検査: node tools/headless.js [id...] | --combo a,b,c
   smoke-ui.js         偽DOMでUI一式+チャレンジの通しを動かす: node tools/smoke-ui.js
-  daily-plan.js       デイリー盤面の抽選と生成。数値の調整は先頭の DAILY だけ(盤面サイズ・爆弾率・全体の時間の上限 `giveUpSec`・1抽選で試す盤面数 `tries`・難易度の上限 `maxCost`)
+  daily-plan.js       デイリー盤面の抽選と生成。数値の調整は先頭の DAILY だけ(盤面サイズ・爆弾率・全体の時間の上限 `giveUpSec`・1抽選で試す盤面数 `tries`・1抽選にかける秒数 `drawSec`・難易度の上限 `maxCost`)
   daily-gen.js        daily-plan を core+rules と読み込み、盤面コードを JSON に書く: node tools/daily-gen.js payload.json YYYY-MM-DD (workflow が使う)
   pick-plan.js        厳選盤面の抽選と生成(デイリーと同じ作り方で、難易度の下限だけ違う)。数値の調整は先頭の PICK だけ
   pick-gen.js         pick-plan を core+rules+daily-plan と読み込み、盤面コードを JSON に書く。見つからなければファイルを書かず正常終了(workflow が使う)
@@ -303,7 +303,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 
 **画面の状態**: DYS.state = ''(読み込み中)/new/prep/**maint**/done/err。maint は「🛠 更新中のため遊べません」+ボタン「更新中(タップで更新)」(スタート・ニックネーム欄は隠す)。途中で離れて戻った(サーバー上 playing)人はミス扱いで終了(finish clear:false)。`err` のとき、404 または「200 なのに JSON でない」は「サーバー機能が見つかりません」と表示(Pages は functions が無いと index.html を 200 で返すことがあるため)。
 
-**盤面作り**: `daily.yml`(毎日 日本時間のAM2:33〜8:33までの計7回。対象日は「JST の明日」で、何時に走っても常に翌日分。すでに盤面があれば何もしない)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・全体の時間の上限(`giveUpSec`。これが唯一の時間制限で、`daily.yml` の timeout-minutes より短くする)・1抽選で試す盤面数(`tries`)・難易度の上限は `tools/daily-plan.js` の DAILY。1抽選ごとの制限時間や、時間がたったら縛りなしにする仕組みは無い。
+**盤面作り**: `daily.yml`(毎日 日本時間のAM2:33〜8:33までの計7回。対象日は「JST の明日」で、何時に走っても常に翌日分。すでに盤面があれば何もしない)。手動実行は `day`(空=自動)と `force`(作り直し)。手順: 設定確認(`/ping` が ok・binding・tables・token すべて true)→ 「すでにあるか」(`"exists":true` が返ったときだけ「ある」)→ `node tools/daily-gen.js` → PUT(HTTP 200 以外は失敗)。生成の抽選・全体の時間の上限(`giveUpSec`。`daily.yml` の timeout-minutes より短くする)・1抽選の打ち切り(試す盤面数 `tries`=1000 と 1抽選の秒数 `drawSec`=60 の**どちらか先に来た方**で見切って引き直す。`drawSec` は gen の `hard` に渡す=gen.js は変更なし。0 か Infinity で時間の打ち切りなし)・難易度の上限は `tools/daily-plan.js` の DAILY。時間がたったら縛りなしにする仕組みは無い。機械が遅い日は `drawSec` で先に切れて、1抽選で試す数が減る(=見つかりにくくなる)。
 
 **推論の段と難易度の物差し**: `solver.js` の `deduce` は、①単一制約(tier1) → ②**定番パターン `[pat]`**(tier2・`pat:1`・cost 2) → ③仮定して矛盾を探す probe(tier2・cost 4/6。`probe:true` の縛りだけ) → ④全列挙(tier3・cost=成分の配置の数) の順に試し、見つかった段で止まる。`[pat]` は二つの制約(数字・縛りの cons・残り爆弾数。重みつきは除く)を、共有マス I・片方だけのマス X/Y に分け、爆弾数の範囲 `la<=x+i<=ha, lb<=i+y<=hb` を伝播で詰めて、範囲が0個なら安全・全部なら爆弾とする(例: 1-2の形、差を取る、「この数字で残りの爆弾を使い切る」)。必要条件のみで sound。全列挙は打ち切りがなければ完全なので、強さが変わるのは打ち切り(probe 縛りの500ノードなど)のときだけ=**BOARD_VER は上げない**。ヒント(`all=1`)では最後に足し、全列挙と同じマスは重複を捨てる。
 - `sim` は各ラウンドの結果から `maxc`(各ラウンドで一番易しい手の cost の、盤面内の最大)、`deep`(**単一制約でも定番パターンでも進めず、probe か全列挙が要ったラウンドの数=場合分けが要った回数**)、`pats`(定番パターンで進んだラウンド数)を返す。`maxc>=6` なら必ず `deep>=1`(定番パターンは cost 2 のため)。
@@ -340,7 +340,7 @@ python3 build.py                           # rules ブロック同期 + dist 生
 - `minDeep`(現行2): 定番パターンでも進めず、場合分け(probe か全列挙)が要る場面(`sim` の `deep`)が2回以上。
 - `minDep`(現行.15): 縛りを外すと解けなくなるマスが、安全マスの15%以上(`nec` の縛りだけが対象。数字の定義を変える縛りは対象外)。
 - 実測(簡易版の縛りで)の見つかりやすさ: 縛りなしは約1000回の試行(約35秒)、桂馬は約10回、tidy は約20回、均一は約3回、色つきは約80回。十字だけ・隣接禁止だけ・その併用は、新しい物差しでは易しすぎて通らない(他の縛りと重なれば通る)。
-- `pickMake` は全体の時間 `giveUpSec`=840 だけを時間制限にして、あきらめたら null(**失敗にしない**=厳選は出なくてもよい)。1回の抽選は `tries`=3000 回試して見つからなければ引き直す(時間ではなく回数)。
+- `pickMake` は全体の時間 `giveUpSec`=840 であきらめたら null(**失敗にしない**=厳選は出なくてもよい)。1回の抽選は `tries`=3000 回と `drawSec`=90 秒の**どちらか先に来た方**で見切って引き直す(縛りなしは約35秒で見つかるので、2〜3倍の余裕を見た秒数。0 か Infinity で時間の打ち切りなし)。
 
 **サーバー**(`functions/api/admin/pick.js`): 縛りの数・ルールセット番号・作成日は、送られた値を信じずコードと時計(JST)から決める。`PICK_PER_DAY=3`・`PICK_MAX=21`(`_lib.js`)。1文の `INSERT … SELECT … WHERE (今日の本数)<3` で入れるので、同時に届いても3を超えない。上限なら 409 `limit`、同じコードなら 200 `dup`、いまある盤面より古い番号なら 409 `old`、メンテナンス中(`boardLocked`)なら 423。入れたついでに、**ルールセット番号がそのコードより古いものと、新しい順で21個を超えたものを削除**。`GET /api/admin/pick` は `{day,count,limit,max,total,full}`(workflow が `full` で生成を省く)。`picks` テーブルは管理APIが `CREATE TABLE IF NOT EXISTS` で自動作成する(一覧は無ければ空)。`/ping` の `picks` は `tables` に混ぜない。
 
