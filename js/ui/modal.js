@@ -7,7 +7,8 @@ function renderList(){const L=$('#ml');
  else{const h=MODE=='dy'?null:G&&G.hint,hr=h?h.rs:[],ids=MODE=='dy'?(DYS.rules||[]).filter(id=>RULES[id]):G.cfg.ids; /* dy=デイリーのスタート前に見る「今日の縛り」(ui/daily.js) */
   L.innerHTML=ids.map(id=>'<div class="ri '+(hr.includes(id)?'hl':'')+'" data-rid="'+id+'"><div><b>'+rname(RULES[id])+'</b>'+'<div class="mut" style="margin:0">'+rdesc(RULES[id])+'</div></div></div>').join('')||'<p class="mut">'+tx('この盤面に縛りはありません')+'</p>'}}
 function openM(m){MODE=m;const p=m=='pick';if(!p)$('#mt').textContent=tx(m=='dy'?'今日の縛り':'この盤面の縛り');$('#mh').textContent=tx(m!='dy'&&!p&&hm?'ヒントON: 縛りをタップすると、その縛りから分かることを教えます':'縛りを長押しすると、例の盤面が表示されます');$('#mq').hidden=$('#mfoot').hidden=!p;$('#mq').value='';$('#md').hidden=false;renderList()}
-function closeM(){$('#md').hidden=true;updSel();upd()}
+function closeM(){$('#md').hidden=true;if(typeof pmEndPick=='function'&&pmEndPick())return; /* 厳選盤面の「自分で作る」(ui/picks.js)から開いたときは、選んだ縛りをそちらへ渡して、フリープレイの選択を元に戻す */
+ updSel();upd()}
 function updSel(){const n=[...SEL].map(id=>rname(RULES[id]));$('#sel').textContent=n.length?tx('{n}件: {l}',{n:n.length,l:n.join(' / ')}):tx('未選択(縛りなし)')}
 /* ---- 競合(併用不可)と例盤面 ---- */
 const blockers=id=>[...SEL].filter(s=>s!=id&&conflict(RULES[s],RULES[id]));
