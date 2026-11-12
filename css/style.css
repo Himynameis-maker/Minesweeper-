@@ -158,4 +158,27 @@ input[type=text]{font:inherit;font-size:16px;color:var(--fg);background:var(--o)
 .pkh{margin:14px 0 2px;font-size:13px;font-weight:700;color:var(--mut)}
 .pkr{display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--l)}
 .pkn{flex:1}
+/* 厳選盤面の一番上の「自分で作る」ボタンと、そのポップ(#pmm)。#pmm は #pkm のすぐ後ろに置いてあるので、同じ重なり順(11)でも上に出る */
+#pmb{display:block;width:100%;margin:10px 0 0;padding:10px;font-size:14px;flex:none}
+#pmm{position:fixed;inset:0;background:rgba(10,12,25,.55);display:flex;align-items:flex-end;justify-content:center;z-index:11}
+#pmd{background:var(--card);width:100%;max-width:640px;height:80vh;border-radius:22px 22px 0 0;display:flex;flex-direction:column;padding:16px}
+#pmd>.row:first-child{align-items:center;justify-content:space-between}
+#pml{overflow:auto;flex:1;margin:10px 0 0}
+#pmg{margin-top:10px;flex:none}
+#pmw{min-height:1.2em}
+/* 生成中の帯(上に固定して出る。文字は「生成中」だけ) */
+.pmband{background:var(--o);border-radius:12px;border-bottom:0;margin:0 0 6px;padding:8px 10px}
+.pmband .pkn{font-weight:700;animation:pmp 1.2s ease-in-out infinite}
+.pmcx{padding:6px 12px;font-size:13px}
+.pmdl{min-width:92px;padding:6px 8px;font-size:13px;white-space:nowrap;border-radius:10px;color:var(--bad);border:1.5px solid var(--bad);background:var(--card)}
+.pmdl:active{transform:none}
+.pmdl.on{background:var(--bad);color:#fff}
+/* 生成中は点滅する丸、できたら(まだ見ていないとき)緑の丸を、ボタンの横に出す */
+#pkb.busy::after,#pkb.dn::after,#pmb.busy::after,#pmb.dn::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:6px;vertical-align:middle;background:var(--ac)}
+#pkb.busy::after,#pmb.busy::after{animation:pmp 1.2s ease-in-out infinite}
+#pkb.dn::after,#pmb.dn::after{background:#16a34a}
+@keyframes pmp{50%{opacity:.3}}
+@media(prefers-reduced-motion:reduce){.pmband .pkn,#pkb.busy::after,#pmb.busy::after{animation:none}}
+/* 縛りを選ぶ画面(#md)は、厳選盤面のポップ(11)の上に出す。縛りの例盤面(#ex)はさらに上 */
+#md{z-index:12}#ex{z-index:13}
 
