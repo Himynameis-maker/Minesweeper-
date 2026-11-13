@@ -34,7 +34,7 @@ async function pkCopy(b,L){const p=(L||PKS.list)[+b.dataset.i];if(!p)return;
    ・縛りの選択画面は、フリープレイと同じ #md(modal.js)を使い回す。開く間だけフリープレイの SEL を預けて、自分用の選択に入れ替え、閉じる(closeM→pmEndPick)で元に戻す。
    ・値は厳選と同じ。pick-plan.js の PICK(minCost/minDeep/minDep/tries) と daily-plan.js の DAILY(maxCost/bombMin/bombMax) を変えたら、PM_Q も同じ値にする。 */
 const PM_KEY='msv.myPicks',PM_MAX=10;
-const PM_Q={sec:60,tries:1500,maxCost:36,minCost:10,minDeep:4,minDep:.15,bombMin:.28,bombMax:.45};
+const PM_Q={sec:60,tries:1500,maxCost:36,minCost:6,minDeep:4,minDep:.15,bombMin:.28,bombMax:.45};
 const PM={list:[],sel:[],busy:0,tk:0,dn:0,del:-1,dt:0,msg:'',saved:null,picking:0};
 function pmLoad(){let raw=null;try{raw=localStorage.getItem(PM_KEY)}catch(e){return} /* 読めないときは今の一覧を消さない */
  let a=[];try{a=JSON.parse(raw||'[]')}catch(e){}
